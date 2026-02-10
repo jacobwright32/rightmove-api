@@ -8,3 +8,4 @@ pydantic>=2.12,<3.0
 pyarrow>=10.0,<20.0
 python-dotenv>=1.0,<2.0
 slowapi>=0.1.9,<1.0
+httpx>=0.24,<1.0

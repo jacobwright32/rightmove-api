@@ -35,8 +35,13 @@ def _migrate_db():
 def _backfill_parsed_fields():
     """Parse existing price/date strings into the new numeric/ISO columns."""
     import sqlalchemy
+    from sqlalchemy import inspect as sa_inspect
 
     from .parsing import parse_date_to_iso, parse_price_to_int
+
+    # Skip if the sales table doesn't exist yet (fresh DB)
+    if not sa_inspect(engine).has_table("sales"):
+        return
 
     with engine.connect() as conn:
         rows = conn.execute(sqlalchemy.text(
