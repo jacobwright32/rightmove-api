@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+.property-item {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 120px;
+}
