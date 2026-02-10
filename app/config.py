@@ -26,8 +26,8 @@ LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
 SCRAPER_REQUEST_TIMEOUT: int = int(os.getenv("SCRAPER_REQUEST_TIMEOUT", "30"))
 SCRAPER_RETRY_ATTEMPTS: int = int(os.getenv("SCRAPER_RETRY_ATTEMPTS", "3"))
 SCRAPER_RETRY_BACKOFF: float = float(os.getenv("SCRAPER_RETRY_BACKOFF", "1.0"))
-SCRAPER_DELAY_BETWEEN_REQUESTS: float = float(os.getenv("SCRAPER_DELAY_BETWEEN_REQUESTS", "0.5"))
+SCRAPER_DELAY_BETWEEN_REQUESTS: float = float(os.getenv("SCRAPER_DELAY_BETWEEN_REQUESTS", "0.25"))
 
 # Rate limiting
-RATE_LIMIT_SCRAPE: str = os.getenv("RATE_LIMIT_SCRAPE", "5/minute")
+RATE_LIMIT_SCRAPE: str = os.getenv("RATE_LIMIT_SCRAPE", "30/minute")
 RATE_LIMIT_DEFAULT: str = os.getenv("RATE_LIMIT_DEFAULT", "60/minute")
