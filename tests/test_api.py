@@ -171,6 +171,92 @@ class TestSimilarProperties:
         assert data[0]["address"] == "12 High St, SW20 8NE"
 
 
+class TestHousingInsights:
+    def test_empty_db(self, client):
+        resp = client.get("/api/v1/analytics/housing-insights")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["kpis"]["total_sales"] == 0
+        assert data["kpis"]["total_properties"] == 0
+        assert data["price_histogram"] == []
+        assert data["time_series"] == []
+        assert data["scatter_data"] == []
+        assert data["postcode_heatmap"] == []
+        assert data["investment_deals"] == []
+
+    def test_with_data(self, client, db_session):
+        prop1 = Property(
+            address="10 High St, SW20 8NE", postcode="SW20 8NE",
+            property_type="Semi-detached", bedrooms=3,
+        )
+        prop2 = Property(
+            address="20 Low St, SW20 8NE", postcode="SW20 8NE",
+            property_type="Terraced", bedrooms=2,
+        )
+        db_session.add_all([prop1, prop2])
+        db_session.flush()
+        db_session.add(Sale(
+            property_id=prop1.id, price_numeric=450000,
+            date_sold_iso="2023-11-04", date_sold="4 Nov 2023", price="£450,000",
+        ))
+        db_session.add(Sale(
+            property_id=prop2.id, price_numeric=300000,
+            date_sold_iso="2023-10-01", date_sold="1 Oct 2023", price="£300,000",
+        ))
+        db_session.commit()
+
+        resp = client.get("/api/v1/analytics/housing-insights")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["kpis"]["total_sales"] == 2
+        assert data["kpis"]["total_properties"] == 2
+        assert data["kpis"]["median_price"] == 375000
+        assert len(data["price_histogram"]) > 0
+        assert len(data["time_series"]) > 0
+        assert len(data["scatter_data"]) == 2
+        assert len(data["postcode_heatmap"]) > 0
+
+    def test_filters(self, client, db_session):
+        prop1 = Property(
+            address="10 High St, SW20 8NE", postcode="SW20 8NE",
+            property_type="Semi-detached", bedrooms=3,
+        )
+        prop2 = Property(
+            address="5 Low St, E1 6AA", postcode="E1 6AA",
+            property_type="Flat", bedrooms=1,
+        )
+        db_session.add_all([prop1, prop2])
+        db_session.flush()
+        db_session.add(Sale(
+            property_id=prop1.id, price_numeric=450000,
+            date_sold_iso="2023-11-04", date_sold="4 Nov 2023", price="£450,000",
+        ))
+        db_session.add(Sale(
+            property_id=prop2.id, price_numeric=200000,
+            date_sold_iso="2023-10-01", date_sold="1 Oct 2023", price="£200,000",
+        ))
+        db_session.commit()
+
+        # Filter by postcode prefix
+        resp = client.get("/api/v1/analytics/housing-insights?postcode_prefix=SW20")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["kpis"]["total_sales"] == 1
+        assert data["kpis"]["total_properties"] == 1
+
+        # Filter by property type
+        resp = client.get("/api/v1/analytics/housing-insights?property_type=FLAT")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["kpis"]["total_sales"] == 1
+
+        # Filter by min bedrooms
+        resp = client.get("/api/v1/analytics/housing-insights?min_bedrooms=2")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["kpis"]["total_sales"] == 1
+
+
 class TestScrapePropertyValidation:
     def test_invalid_url(self, client):
         resp = client.post("/api/v1/scrape/property", json={"url": "https://example.com"})

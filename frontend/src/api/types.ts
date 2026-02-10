@@ -119,3 +119,82 @@ export interface MarketOverview {
   yearly_trends: SalesVolumePoint[];
   price_trends: PriceTrendPoint[];
 }
+
+// Housing Insights types
+
+export interface PriceHistogramBucket {
+  range_label: string;
+  min_price: number;
+  max_price: number;
+  count: number;
+}
+
+export interface InsightsTimeSeriesPoint {
+  month: string;
+  median_price: number | null;
+  sales_count: number;
+}
+
+export interface ScatterPoint {
+  bedrooms: number;
+  price: number;
+  postcode: string;
+  property_type: string;
+}
+
+export interface PostcodeHeatmapPoint {
+  postcode: string;
+  avg_price: number;
+  count: number;
+  growth_pct: number | null;
+}
+
+export interface KPIData {
+  appreciation_rate: number | null;
+  price_per_bedroom: number | null;
+  market_velocity_pct: number | null;
+  market_velocity_direction: string | null;
+  price_volatility_pct: number | null;
+  total_sales: number;
+  total_properties: number;
+  median_price: number | null;
+}
+
+export interface InvestmentDeal {
+  property_id: number;
+  address: string;
+  postcode: string | null;
+  property_type: string | null;
+  bedrooms: number | null;
+  price: number;
+  date_sold: string | null;
+  postcode_avg: number;
+  value_score: number;
+  risk_level: string;
+}
+
+export interface HousingInsightsFilters {
+  property_type?: string;
+  min_bedrooms?: number;
+  max_bedrooms?: number;
+  min_bathrooms?: number;
+  max_bathrooms?: number;
+  min_price?: number;
+  max_price?: number;
+  postcode_prefix?: string;
+  tenure?: string;
+  epc_rating?: string;
+  has_garden?: boolean;
+  has_parking?: boolean;
+  chain_free?: boolean;
+}
+
+export interface HousingInsightsResponse {
+  price_histogram: PriceHistogramBucket[];
+  time_series: InsightsTimeSeriesPoint[];
+  scatter_data: ScatterPoint[];
+  postcode_heatmap: PostcodeHeatmapPoint[];
+  kpis: KPIData;
+  investment_deals: InvestmentDeal[];
+  filters_applied: Record<string, unknown>;
+}

@@ -5,6 +5,7 @@ const links = [
   { to: "/", label: "Search" },
   { to: "/market", label: "Market Overview" },
   { to: "/compare", label: "Compare Areas" },
+  { to: "/insights", label: "Housing Insights" },
 ];
 
 export default function NavBar() {

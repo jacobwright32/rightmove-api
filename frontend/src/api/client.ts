@@ -1,6 +1,8 @@
 import axios from "axios";
 import type {
   AreaScrapeResponse,
+  HousingInsightsFilters,
+  HousingInsightsResponse,
   MarketOverview,
   PostcodeAnalytics,
   PostcodeStatus,
@@ -117,5 +119,26 @@ export async function exportSalesData(
   const res = await api.post<ExportResponse>(
     `/export/${encodeURIComponent(postcode)}`
   );
+  return res.data;
+}
+
+export async function getHousingInsights(
+  filters: HousingInsightsFilters = {}
+): Promise<HousingInsightsResponse> {
+  const params: Record<string, string | number | boolean> = {};
+  if (filters.property_type) params.property_type = filters.property_type;
+  if (filters.min_bedrooms !== undefined) params.min_bedrooms = filters.min_bedrooms;
+  if (filters.max_bedrooms !== undefined) params.max_bedrooms = filters.max_bedrooms;
+  if (filters.min_bathrooms !== undefined) params.min_bathrooms = filters.min_bathrooms;
+  if (filters.max_bathrooms !== undefined) params.max_bathrooms = filters.max_bathrooms;
+  if (filters.min_price !== undefined) params.min_price = filters.min_price;
+  if (filters.max_price !== undefined) params.max_price = filters.max_price;
+  if (filters.postcode_prefix) params.postcode_prefix = filters.postcode_prefix;
+  if (filters.tenure) params.tenure = filters.tenure;
+  if (filters.epc_rating) params.epc_rating = filters.epc_rating;
+  if (filters.has_garden !== undefined) params.has_garden = filters.has_garden;
+  if (filters.has_parking !== undefined) params.has_parking = filters.has_parking;
+  if (filters.chain_free !== undefined) params.chain_free = filters.chain_free;
+  const res = await api.get<HousingInsightsResponse>("/analytics/housing-insights", { params });
   return res.data;
 }

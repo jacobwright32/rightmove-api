@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import NavBar from "./components/NavBar";
 import CompareAreasPage from "./pages/CompareAreasPage";
+import HousingInsightsPage from "./pages/HousingInsightsPage";
 import MarketOverviewPage from "./pages/MarketOverviewPage";
 import PropertyDetailPage from "./pages/PropertyDetailPage";
 import SearchPage from "./pages/SearchPage";
@@ -14,6 +15,7 @@ export default function App() {
           <Route path="/" element={<SearchPage />} />
           <Route path="/market" element={<MarketOverviewPage />} />
           <Route path="/compare" element={<CompareAreasPage />} />
+          <Route path="/insights" element={<HousingInsightsPage />} />
           <Route path="/property/:id" element={<PropertyDetailPage />} />
         </Routes>
       </div>

@@ -158,3 +158,66 @@ class MarketOverview(BaseModel):
     bedroom_distribution: list[BedroomDistribution] = []
     yearly_trends: list[SalesVolumePoint] = []
     price_trends: list[PriceTrendPoint] = []
+
+
+# --- Housing Insights schemas ---
+
+class PriceHistogramBucket(BaseModel):
+    range_label: str
+    min_price: int
+    max_price: int
+    count: int
+
+
+class InsightsTimeSeriesPoint(BaseModel):
+    month: str
+    median_price: Optional[float] = None
+    sales_count: int = 0
+
+
+class ScatterPoint(BaseModel):
+    bedrooms: int
+    price: int
+    postcode: str
+    property_type: str
+
+
+class PostcodeHeatmapPoint(BaseModel):
+    postcode: str
+    avg_price: float
+    count: int
+    growth_pct: Optional[float] = None
+
+
+class KPIData(BaseModel):
+    appreciation_rate: Optional[float] = None
+    price_per_bedroom: Optional[float] = None
+    market_velocity_pct: Optional[float] = None
+    market_velocity_direction: Optional[str] = None
+    price_volatility_pct: Optional[float] = None
+    total_sales: int = 0
+    total_properties: int = 0
+    median_price: Optional[float] = None
+
+
+class InvestmentDeal(BaseModel):
+    property_id: int
+    address: str
+    postcode: Optional[str] = None
+    property_type: Optional[str] = None
+    bedrooms: Optional[int] = None
+    price: int
+    date_sold: Optional[str] = None
+    postcode_avg: float
+    value_score: float
+    risk_level: str
+
+
+class HousingInsightsResponse(BaseModel):
+    price_histogram: list[PriceHistogramBucket] = []
+    time_series: list[InsightsTimeSeriesPoint] = []
+    scatter_data: list[ScatterPoint] = []
+    postcode_heatmap: list[PostcodeHeatmapPoint] = []
+    kpis: KPIData = KPIData()
+    investment_deals: list[InvestmentDeal] = []
+    filters_applied: dict = {}

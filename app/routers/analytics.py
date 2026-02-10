@@ -1,23 +1,33 @@
+import json
+import math
 import re
 import statistics
 from collections import defaultdict
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..feature_parser import parse_all_features
 from ..models import Property, Sale
 from ..schemas import (
     BedroomDistribution,
+    HousingInsightsResponse,
+    InsightsTimeSeriesPoint,
+    InvestmentDeal,
+    KPIData,
     MarketOverview,
     PostcodeAnalytics,
     PostcodeComparison,
+    PostcodeHeatmapPoint,
+    PriceHistogramBucket,
     PriceRangeBucket,
     PriceTrendPoint,
     PropertyTypeBreakdown,
     SalesVolumePoint,
+    ScatterPoint,
     StreetComparison,
 )
 
@@ -191,6 +201,348 @@ def get_market_overview(db: Session = Depends(get_db)):
         bedroom_distribution=bedroom_distribution,
         yearly_trends=yearly_trends,
         price_trends=price_trends,
+    )
+
+
+@router.get("/housing-insights", response_model=HousingInsightsResponse)
+def get_housing_insights(
+    db: Session = Depends(get_db),
+    property_type: Optional[str] = None,
+    min_bedrooms: Optional[int] = None,
+    max_bedrooms: Optional[int] = None,
+    min_bathrooms: Optional[int] = None,
+    max_bathrooms: Optional[int] = None,
+    min_price: Optional[int] = None,
+    max_price: Optional[int] = None,
+    postcode_prefix: Optional[str] = None,
+    tenure: Optional[str] = None,
+    epc_rating: Optional[str] = None,
+    has_garden: Optional[bool] = None,
+    has_parking: Optional[bool] = None,
+    chain_free: Optional[bool] = None,
+):
+    """Investment-focused analytics dashboard with histogram, time series,
+    scatter, heatmap, KPIs, and investment deals."""
+
+    # --- 1. Build base query with SQL-level filters ---
+    q = db.query(Sale, Property).join(Property, Sale.property_id == Property.id)
+
+    if postcode_prefix:
+        prefix = postcode_prefix.upper().strip()
+        q = q.filter(Property.postcode.isnot(None))
+        q = q.filter(func.upper(Property.postcode).like(f"{prefix}%"))
+    if property_type:
+        ptype = property_type.strip().upper()
+        q = q.filter(
+            func.upper(func.coalesce(Sale.property_type, Property.property_type))
+            == ptype
+        )
+    if min_bedrooms is not None:
+        q = q.filter(Property.bedrooms >= min_bedrooms)
+    if max_bedrooms is not None:
+        q = q.filter(Property.bedrooms <= max_bedrooms)
+    if min_bathrooms is not None:
+        q = q.filter(Property.bathrooms >= min_bathrooms)
+    if max_bathrooms is not None:
+        q = q.filter(Property.bathrooms <= max_bathrooms)
+    if min_price is not None:
+        q = q.filter(Sale.price_numeric >= min_price)
+    if max_price is not None:
+        q = q.filter(Sale.price_numeric <= max_price)
+    if tenure:
+        q = q.filter(func.upper(Sale.tenure) == tenure.upper().strip())
+
+    rows = q.all()
+
+    # --- 2. Feature filters (only when active) ---
+    feature_filtering = epc_rating is not None or has_garden is not None or has_parking is not None or chain_free is not None
+    if feature_filtering:
+        allowed_prop_ids: set[int] = set()
+        # Cache parsed features per property to avoid re-parsing
+        prop_features_cache: dict[int, dict] = {}
+        prop_ids_in_rows = {prop.id for _sale, prop in rows}
+
+        # Load extra_features for relevant properties
+        prop_rows = (
+            db.query(Property.id, Property.extra_features)
+            .filter(Property.id.in_(prop_ids_in_rows))
+            .all()
+        )
+        for pid, raw_features in prop_rows:
+            parsed = parse_all_features(raw_features)
+            prop_features_cache[pid] = parsed
+
+            matches = True
+            if epc_rating and parsed.get("epc_rating") != epc_rating.upper():
+                matches = False
+            if has_garden is not None:
+                has = parsed.get("garden") is not None
+                if has != has_garden:
+                    matches = False
+            if has_parking is not None:
+                has = parsed.get("parking") is not None
+                if has != has_parking:
+                    matches = False
+            if chain_free is not None:
+                is_cf = parsed.get("chain_free") is True
+                if is_cf != chain_free:
+                    matches = False
+
+            if matches:
+                allowed_prop_ids.add(pid)
+
+        rows = [(sale, prop) for sale, prop in rows if prop.id in allowed_prop_ids]
+
+    # --- 3. Single-pass aggregation ---
+    all_prices: list[int] = []
+    monthly_prices: dict[str, list[int]] = defaultdict(list)
+    scatter_points: list[ScatterPoint] = []
+    postcode_prices: dict[str, list[int]] = defaultdict(list)
+    postcode_dates: dict[str, list[tuple[str, int]]] = defaultdict(list)
+    bedroom_prices: dict[int, list[int]] = defaultdict(list)
+    yearly_counts: dict[int, int] = defaultdict(int)
+    prev_year_count = 0
+    curr_year_count = 0
+    property_ids: set[int] = set()
+    # For investment deals: track latest sale per property
+    latest_sale_per_prop: dict[int, tuple] = {}  # prop_id -> (sale, prop)
+
+    for sale, prop in rows:
+        price = sale.price_numeric
+        date_iso = sale.date_sold_iso
+        has_price = price is not None
+        has_date = date_iso is not None
+
+        property_ids.add(prop.id)
+
+        if has_price:
+            all_prices.append(price)
+
+            # Scatter data (cap at 2000)
+            if len(scatter_points) < 2000 and prop.bedrooms is not None:
+                ptype = sale.property_type or prop.property_type or "Unknown"
+                scatter_points.append(ScatterPoint(
+                    bedrooms=prop.bedrooms,
+                    price=price,
+                    postcode=prop.postcode or "Unknown",
+                    property_type=ptype.strip(),
+                ))
+
+            # Bedroom prices
+            if prop.bedrooms is not None:
+                bedroom_prices[prop.bedrooms].append(price)
+
+            # Postcode prices
+            if prop.postcode:
+                postcode_prices[prop.postcode].append(price)
+
+            if has_date:
+                monthly_prices[date_iso[:7]].append(price)
+                year = int(date_iso[:4])
+                yearly_counts[year] += 1
+                postcode_dates[prop.postcode or "Unknown"].append((date_iso, price))
+
+                # Track latest sale per property for deals
+                existing = latest_sale_per_prop.get(prop.id)
+                if existing is None or date_iso > (existing[0].date_sold_iso or ""):
+                    latest_sale_per_prop[prop.id] = (sale, prop)
+
+        elif has_date:
+            year = int(date_iso[:4])
+            yearly_counts[year] += 1
+
+    # --- Price histogram (20 buckets) ---
+    price_histogram: list[PriceHistogramBucket] = []
+    if all_prices:
+        p_min, p_max = min(all_prices), max(all_prices)
+        if p_min == p_max:
+            p_max = p_min + 1
+        bucket_size = math.ceil((p_max - p_min) / 20)
+        bucket_counts: dict[int, int] = defaultdict(int)
+        for p in all_prices:
+            idx = min((p - p_min) // bucket_size, 19)
+            bucket_counts[idx] += 1
+        for i in range(20):
+            lo = p_min + i * bucket_size
+            hi = lo + bucket_size
+            if bucket_counts[i] > 0 or i == 0 or i == 19:
+                price_histogram.append(PriceHistogramBucket(
+                    range_label=f"£{lo:,}-£{hi:,}",
+                    min_price=lo,
+                    max_price=hi,
+                    count=bucket_counts[i],
+                ))
+
+    # --- Time series (monthly) ---
+    time_series = [
+        InsightsTimeSeriesPoint(
+            month=m,
+            median_price=round(statistics.median(prices)),
+            sales_count=len(prices),
+        )
+        for m, prices in sorted(monthly_prices.items())
+    ]
+
+    # --- Postcode heatmap with growth ---
+    postcode_heatmap: list[PostcodeHeatmapPoint] = []
+    for pc, prices in postcode_prices.items():
+        avg_p = statistics.mean(prices)
+        growth = None
+        dates_prices = postcode_dates.get(pc, [])
+        if len(dates_prices) >= 2:
+            sorted_dp = sorted(dates_prices, key=lambda x: x[0])
+            # Compare first year avg to last year avg
+            first_year = sorted_dp[0][0][:4]
+            last_year = sorted_dp[-1][0][:4]
+            if first_year != last_year:
+                first_prices = [p for d, p in sorted_dp if d[:4] == first_year]
+                last_prices = [p for d, p in sorted_dp if d[:4] == last_year]
+                if first_prices and last_prices:
+                    first_avg = statistics.mean(first_prices)
+                    last_avg = statistics.mean(last_prices)
+                    if first_avg > 0:
+                        years_span = int(last_year) - int(first_year)
+                        total_growth = (last_avg - first_avg) / first_avg
+                        growth = round(
+                            (total_growth / years_span) * 100, 1
+                        ) if years_span > 0 else None
+
+        postcode_heatmap.append(PostcodeHeatmapPoint(
+            postcode=pc,
+            avg_price=round(avg_p),
+            count=len(prices),
+            growth_pct=growth,
+        ))
+    postcode_heatmap.sort(key=lambda x: x.count, reverse=True)
+
+    # --- KPIs ---
+    # Appreciation rate: overall annualized price growth
+    appreciation_rate = None
+    if time_series and len(time_series) >= 2:
+        first_price = time_series[0].median_price
+        last_price = time_series[-1].median_price
+        if first_price and last_price and first_price > 0:
+            months_span = len(time_series)
+            years_span = months_span / 12
+            if years_span > 0:
+                total_growth = (last_price - first_price) / first_price
+                appreciation_rate = round(
+                    (total_growth / years_span) * 100, 1
+                )
+
+    # Price per bedroom
+    price_per_bedroom = None
+    bed_total_price = 0
+    bed_total_beds = 0
+    for beds, prices in bedroom_prices.items():
+        if beds > 0:
+            bed_total_price += sum(prices)
+            bed_total_beds += beds * len(prices)
+    if bed_total_beds > 0:
+        price_per_bedroom = round(bed_total_price / bed_total_beds)
+
+    # Market velocity: compare last year's sales count to previous year
+    market_velocity_pct = None
+    market_velocity_direction = None
+    sorted_years = sorted(yearly_counts.keys())
+    if len(sorted_years) >= 2:
+        last_yr = sorted_years[-1]
+        prev_yr = sorted_years[-2]
+        prev_count = yearly_counts[prev_yr]
+        curr_count = yearly_counts[last_yr]
+        if prev_count > 0:
+            market_velocity_pct = round(
+                ((curr_count - prev_count) / prev_count) * 100, 1
+            )
+            market_velocity_direction = "accelerating" if market_velocity_pct > 0 else "decelerating"
+
+    # Price volatility (coefficient of variation)
+    price_volatility_pct = None
+    if len(all_prices) >= 2:
+        mean_p = statistics.mean(all_prices)
+        if mean_p > 0:
+            stdev_p = statistics.stdev(all_prices)
+            price_volatility_pct = round((stdev_p / mean_p) * 100, 1)
+
+    kpis = KPIData(
+        appreciation_rate=appreciation_rate,
+        price_per_bedroom=price_per_bedroom,
+        market_velocity_pct=market_velocity_pct,
+        market_velocity_direction=market_velocity_direction,
+        price_volatility_pct=price_volatility_pct,
+        total_sales=len(all_prices),
+        total_properties=len(property_ids),
+        median_price=round(statistics.median(all_prices)) if all_prices else None,
+    )
+
+    # --- Investment deals ---
+    # Properties whose latest sale is >5% below their postcode average
+    investment_deals: list[InvestmentDeal] = []
+    for prop_id, (sale, prop) in latest_sale_per_prop.items():
+        if not sale.price_numeric or not prop.postcode:
+            continue
+        pc_prices = postcode_prices.get(prop.postcode, [])
+        if len(pc_prices) < 2:
+            continue
+        pc_avg = statistics.mean(pc_prices)
+        if pc_avg <= 0:
+            continue
+        discount_pct = ((pc_avg - sale.price_numeric) / pc_avg) * 100
+        if discount_pct > 5:
+            risk = "Low" if discount_pct <= 15 else "Medium" if discount_pct <= 25 else "High"
+            investment_deals.append(InvestmentDeal(
+                property_id=prop.id,
+                address=prop.address,
+                postcode=prop.postcode,
+                property_type=(sale.property_type or prop.property_type or "Unknown").strip(),
+                bedrooms=prop.bedrooms,
+                price=sale.price_numeric,
+                date_sold=sale.date_sold_iso or sale.date_sold,
+                postcode_avg=round(pc_avg),
+                value_score=round(discount_pct, 1),
+                risk_level=risk,
+            ))
+
+    investment_deals.sort(key=lambda x: x.value_score, reverse=True)
+    investment_deals = investment_deals[:50]
+
+    # --- Build filters_applied ---
+    filters_applied: dict = {}
+    if property_type:
+        filters_applied["property_type"] = property_type
+    if min_bedrooms is not None:
+        filters_applied["min_bedrooms"] = min_bedrooms
+    if max_bedrooms is not None:
+        filters_applied["max_bedrooms"] = max_bedrooms
+    if min_bathrooms is not None:
+        filters_applied["min_bathrooms"] = min_bathrooms
+    if max_bathrooms is not None:
+        filters_applied["max_bathrooms"] = max_bathrooms
+    if min_price is not None:
+        filters_applied["min_price"] = min_price
+    if max_price is not None:
+        filters_applied["max_price"] = max_price
+    if postcode_prefix:
+        filters_applied["postcode_prefix"] = postcode_prefix
+    if tenure:
+        filters_applied["tenure"] = tenure
+    if epc_rating:
+        filters_applied["epc_rating"] = epc_rating
+    if has_garden is not None:
+        filters_applied["has_garden"] = has_garden
+    if has_parking is not None:
+        filters_applied["has_parking"] = has_parking
+    if chain_free is not None:
+        filters_applied["chain_free"] = chain_free
+
+    return HousingInsightsResponse(
+        price_histogram=price_histogram,
+        time_series=time_series,
+        scatter_data=scatter_points,
+        postcode_heatmap=postcode_heatmap,
+        kpis=kpis,
+        investment_deals=investment_deals,
+        filters_applied=filters_applied,
     )
 
 

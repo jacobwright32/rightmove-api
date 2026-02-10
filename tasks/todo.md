@@ -47,9 +47,17 @@ _Session started: 2026-02-10_
 - [x] 4 new API tests (market-overview empty + with data, similar properties not found + with similar)
 - [x] TypeScript types + API client functions (MarketOverview, getMarketOverview, getProperty, getSimilarProperties)
 
+**Housing Insights page (session 4):**
+_Backend endpoint + schemas + frontend API client already done (uncommitted from session 3)_
+- [x] Create HousingInsightsPage.tsx (Plotly charts: histogram, time series, scatter w/ trend line, postcode heatmap; KPI cards; filter panel; investment deals table)
+- [x] Add /insights route to App.tsx + NavBar link
+- [x] Add backend tests for housing-insights endpoint (3 tests: empty DB, with data, filters)
+- [x] Verify: 55 tests pass, tsc clean, 27 routes loaded
+- [ ] Commit all Housing Insights changes
+
 ---
 
 ## Verification
-- 52 backend tests passing: `pytest tests/ -v`
+- 55 backend tests passing: `pytest tests/ -v`
 - Frontend types clean: `npx tsc --noEmit`
-- App loads: `python -c "from app.main import app"` (26 routes)
+- App loads: `python -c "from app.main import app"` (27 routes)
