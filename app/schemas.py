@@ -29,6 +29,10 @@ class PropertyBrief(BaseModel):
     bathrooms: Optional[int] = None
     floorplan_urls: Optional[str] = None
     url: Optional[str] = None
+    epc_rating: Optional[str] = None
+    epc_score: Optional[int] = None
+    epc_environment_impact: Optional[int] = None
+    estimated_energy_cost: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -223,3 +227,27 @@ class HousingInsightsResponse(BaseModel):
     kpis: KPIData = KPIData()
     investment_deals: list[InvestmentDeal] = []
     filters_applied: dict = {}
+
+
+# --- EPC Enrichment schemas ---
+
+class EPCEnrichmentResponse(BaseModel):
+    message: str
+    properties_updated: int
+    certificates_found: int
+
+
+# --- Crime schemas ---
+
+class CrimeMonthlyStat(BaseModel):
+    month: str
+    total: int
+
+
+class CrimeSummaryResponse(BaseModel):
+    postcode: str
+    categories: dict[str, int] = {}
+    monthly_trend: list[CrimeMonthlyStat] = []
+    total_crimes: int = 0
+    months_covered: int = 0
+    cached: bool = False

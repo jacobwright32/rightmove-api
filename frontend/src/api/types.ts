@@ -20,6 +20,10 @@ export interface PropertyBrief {
   bathrooms: number | null;
   floorplan_urls: string | null;
   url: string | null;
+  epc_rating: string | null;
+  epc_score: number | null;
+  epc_environment_impact: number | null;
+  estimated_energy_cost: number | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -199,4 +203,28 @@ export interface HousingInsightsResponse {
   kpis: KPIData;
   investment_deals: InvestmentDeal[];
   filters_applied: Record<string, unknown>;
+}
+
+// EPC Enrichment
+
+export interface EPCEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  certificates_found: number;
+}
+
+// Crime Data
+
+export interface CrimeMonthlyStat {
+  month: string;
+  total: number;
+}
+
+export interface CrimeSummaryResponse {
+  postcode: string;
+  categories: Record<string, number>;
+  monthly_trend: CrimeMonthlyStat[];
+  total_crimes: number;
+  months_covered: number;
+  cached: boolean;
 }

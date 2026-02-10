@@ -11,6 +11,8 @@ import {
 } from "recharts";
 import { getProperty, getSimilarProperties } from "../api/client";
 import type { PropertyBrief, PropertyDetail } from "../api/types";
+import CrimeSection from "../components/CrimeSection";
+import EPCBadge from "../components/EPCBadge";
 import SaleHistoryTable from "../components/SaleHistoryTable";
 import { useDarkMode } from "../hooks/useDarkMode";
 import { getChartColors } from "../utils/chartTheme";
@@ -144,6 +146,7 @@ export default function PropertyDetailPage() {
           {property.bathrooms != null && property.bathrooms > 0 && (
             <span>{property.bathrooms} bath</span>
           )}
+          <EPCBadge rating={property.epc_rating} score={property.epc_score} size="md" />
         </div>
         {property.url && (
           <a
@@ -256,6 +259,41 @@ export default function PropertyDetailPage() {
         </div>
       )}
 
+      {/* EPC details */}
+      {property.epc_rating && (
+        <div className="mb-6 rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
+            Energy Performance
+          </h3>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="text-center">
+              <EPCBadge rating={property.epc_rating} score={property.epc_score} size="md" />
+              <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">Energy Rating</div>
+            </div>
+            {property.epc_score != null && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{property.epc_score}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Efficiency Score</div>
+              </div>
+            )}
+            {property.epc_environment_impact != null && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{property.epc_environment_impact}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Environment Impact</div>
+              </div>
+            )}
+            {property.estimated_energy_cost != null && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  £{property.estimated_energy_cost.toLocaleString()}/yr
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Est. Energy Cost</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Sale history table */}
       <div className="mb-6 rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
@@ -263,6 +301,13 @@ export default function PropertyDetailPage() {
         </h3>
         <SaleHistoryTable sales={sales} />
       </div>
+
+      {/* Crime statistics */}
+      {property.postcode && (
+        <div className="mb-6">
+          <CrimeSection postcode={property.postcode} />
+        </div>
+      )}
 
       {/* Similar properties */}
       {similar.length > 0 && (

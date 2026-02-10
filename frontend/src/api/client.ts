@@ -1,6 +1,8 @@
 import axios from "axios";
 import type {
   AreaScrapeResponse,
+  CrimeSummaryResponse,
+  EPCEnrichmentResponse,
   HousingInsightsFilters,
   HousingInsightsResponse,
   MarketOverview,
@@ -144,5 +146,23 @@ export async function getHousingInsights(
   if (filters.has_parking !== undefined) params.has_parking = filters.has_parking;
   if (filters.chain_free !== undefined) params.chain_free = filters.chain_free;
   const res = await api.get<HousingInsightsResponse>("/analytics/housing-insights", { params });
+  return res.data;
+}
+
+export async function enrichEPC(
+  postcode: string
+): Promise<EPCEnrichmentResponse> {
+  const res = await api.post<EPCEnrichmentResponse>(
+    `/enrich/epc/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function getCrimeData(
+  postcode: string
+): Promise<CrimeSummaryResponse> {
+  const res = await api.get<CrimeSummaryResponse>(
+    `/analytics/postcode/${encodeURIComponent(postcode)}/crime`
+  );
   return res.data;
 }

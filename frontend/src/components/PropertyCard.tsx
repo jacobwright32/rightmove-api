@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { PropertyDetail } from "../api/types";
+import EPCBadge from "./EPCBadge";
 import SaleHistoryTable from "./SaleHistoryTable";
 
 interface Props {
@@ -61,6 +62,7 @@ export default function PropertyCard({ property }: Props) {
             {features.length > 0 && (
               <span className="text-green-600">{features.length} features</span>
             )}
+            <EPCBadge rating={property.epc_rating} />
           </div>
         </div>
         <span className="text-gray-400 text-sm dark:text-gray-500" aria-hidden="true">

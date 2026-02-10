@@ -29,6 +29,10 @@ SCRAPER_RETRY_BACKOFF: float = float(os.getenv("SCRAPER_RETRY_BACKOFF", "1.0"))
 SCRAPER_DELAY_BETWEEN_REQUESTS: float = float(os.getenv("SCRAPER_DELAY_BETWEEN_REQUESTS", "0.25"))
 SCRAPER_FRESHNESS_DAYS: int = int(os.getenv("SCRAPER_FRESHNESS_DAYS", "7"))
 
+# EPC API (register free at https://epc.opendatacommunities.org/)
+EPC_API_EMAIL: str = os.getenv("EPC_API_EMAIL", "")
+EPC_API_KEY: str = os.getenv("EPC_API_KEY", "")
+
 # Rate limiting
 RATE_LIMIT_SCRAPE: str = os.getenv("RATE_LIMIT_SCRAPE", "30/minute")
 RATE_LIMIT_DEFAULT: str = os.getenv("RATE_LIMIT_DEFAULT", "60/minute")

@@ -69,60 +69,40 @@ _Researched 2026-02-10. Each task has full implementation details so it can be p
 - **Complexity**: Medium
 - **Deps**: `react-leaflet`, `leaflet`, `@types/leaflet`, `react-leaflet-cluster`. Backend: `httpx` for Postcodes.io calls (already installed).
 
-### 2. EPC Energy Rating Enrichment
-- [ ] **Backend**: Register at https://epc.opendatacommunities.org/ (free, instant API key). Create `app/enrichment/epc.py` service. Endpoint: `GET https://epc.opendatacommunities.org/api/v1/domestic/search?postcode=SW20+8ND` with `Authorization: Basic {base64(email:apikey)}` header. Returns JSON array with: `current-energy-rating` (A-G), `current-energy-efficiency` (1-100), `environment-impact-current`, `heating-cost-current`, `hot-water-cost-current`, `lighting-cost-current`, `mainheat-description`, `walls-description`, `roof-description`. Add columns to Property model: `epc_rating` (String, 1 char), `epc_score` (Integer), `epc_environment_impact` (Integer), `estimated_energy_cost` (Integer, annual £). Create enrichment endpoint: `POST /api/v1/enrich/epc/{postcode}` that batch-fetches and updates all properties in that postcode.
-- [ ] **Frontend**: EPC badge component (colour-coded A=green to G=red) on PropertyCard and PropertyDetailPage. EPC distribution bar chart on analytics pages. Filter by EPC rating on HousingInsightsPage (already has `epc_rating` filter param but no data).
-- [ ] **Config**: Add `EPC_API_EMAIL` and `EPC_API_KEY` to `.env.example` and `app/config.py`.
-- [ ] **Tests**: Test EPC enrichment with mocked API response, test badge renders correctly for each rating.
-- **Why**: EPC ratings increasingly affect property values and rental eligibility (minimum EPC E for UK rentals). Most-requested data dimension for property buyers. The filter already exists on HousingInsightsPage but has no backing data.
-- **Complexity**: Small-Medium
-- **Deps**: None new (httpx already installed). Needs free API key registration.
+### 2. ~~EPC Energy Rating Enrichment~~ DONE
+- [x] **Backend**: `app/enrichment/epc.py` service with `fetch_epc_for_postcode()`. `POST /api/v1/enrich/epc/{postcode}` endpoint with fuzzy address matching. EPC columns on Property model (`epc_rating`, `epc_score`, `epc_environment_impact`, `estimated_energy_cost`). DB migration for new columns. Config: `EPC_API_EMAIL` + `EPC_API_KEY`.
+- [x] **Frontend**: `EPCBadge.tsx` component (colour-coded A-G). Shown on PropertyCard + PropertyDetailPage header. Full EPC detail section on PropertyDetailPage (score, environment impact, energy cost).
+- [x] **Tests**: 3 new tests (no properties 404, no creds returns 0, EPC fields on property response). 66 total.
+- **Commit**: TBD
 
-### 3. Crime Data by Postcode
-- [ ] **Backend**: UK Police API is free, no auth required. Create `app/enrichment/crime.py`. Step 1: Convert postcode to lat/lng via Postcodes.io (`GET https://api.postcodes.io/postcodes/{postcode}`). Step 2: Fetch crimes (`GET https://data.police.uk/api/crimes-street/all-crime?lat={lat}&lng={lng}&date={YYYY-MM}`). Returns array with `category` (e.g. "burglary", "anti-social-behaviour", "violent-crime"), `month`, `location`. Create `CrimeStats` table: `id`, `postcode`, `month` (YYYY-MM), `category`, `count`, `fetched_at`. Endpoint: `GET /api/v1/analytics/postcode/{postcode}/crime` returns crime breakdown + 12-month trend. Cache results for 30 days (check `fetched_at`).
-- [ ] **Frontend**: Crime summary section on PropertyDetailPage — pie chart of crime categories (Recharts PieChart), 12-month trend line. Crime comparison column on CompareAreasPage. "Safety score" badge (based on total crimes per 1000 population vs national average). Use dark mode chart theme from existing `chartTheme.ts`.
-- [ ] **Tests**: Test crime endpoint with mocked police API response, test empty/missing data handling, test cache expiry logic.
-- **Why**: Crime is top-3 factor in property purchase decisions. Free API, no auth, easy integration. Adds massive value for buyers evaluating neighbourhoods.
-- **Complexity**: Small
-- **Deps**: None new. Free API, no registration needed.
+### 3. ~~Crime Data by Postcode~~ DONE
+- [x] **Backend**: `CrimeStats` table + `app/enrichment/crime.py` service (Postcodes.io geocoding + Police API, 12-month history, 30-day cache). `GET /api/v1/analytics/postcode/{postcode}/crime` endpoint.
+- [x] **Frontend**: `CrimeSection.tsx` component with pie chart (category breakdown), horizontal bar chart (top categories), monthly trend line. Dark mode support. Shown on PropertyDetailPage.
+- [x] **Tests**: 3 new tests (endpoint exists, empty result, cached data served). 66 total.
+- **Commit**: TBD
 
-### 4. Stamp Duty & Mortgage Calculators
-- [ ] **Frontend only — no backend needed**. Create `StampDutyCalculator.tsx` component. UK SDLT bands (2024-25, check for updates): 0% up to £250k, 5% £250k-£925k, 10% £925k-£1.5M, 12% over £1.5M. First-time buyer relief: 0% up to £425k, 5% £425k-£625k (no relief if over £625k). Additional property surcharge: +3% on all bands. Non-UK resident surcharge: +2%. Inputs: price (pre-filled from property), buyer type radio (standard/first-time/additional/non-resident). Output: total stamp duty, effective rate %, breakdown table by band.
-- [ ] **Mortgage calculator**: `MortgageCalculator.tsx`. Formula: `M = P * [r(1+r)^n] / [(1+r)^n - 1]` where P=principal, r=monthly rate, n=total months. Inputs: property price (pre-filled), deposit % (slider 5-50%, default 10%), interest rate % (default 4.5%), term years (default 25). Output: monthly payment, total interest, total cost, stress test at +2% rate. Show amortization summary.
-- [ ] **Integration**: Place both on PropertyDetailPage (accordion/tabs below price history). Also add as standalone `/calculators` page in nav for general use without a specific property.
-- [ ] **Tests**: Unit test stamp duty calculation for edge cases (exactly on band boundaries, first-time relief cutoff at £625k, additional property surcharge stacking).
-- **Why**: Every property portal has these. Expected functionality. Pure frontend, no API costs, quick to build. Directly connects price data to what buyers actually care about: "can I afford this?"
-- **Complexity**: Small
-
-### 5. Rental Yield Calculator
-- [ ] **Backend**: Create `app/enrichment/rental.py`. Source average rents from ONS Private Rental Market Statistics (free CSV download from ons.gov.uk, updates quarterly) by postcode district and bedroom count. Alternative: scrape Rightmove rental listings for the same postcode (reuse existing scraper with rental URL pattern: `rightmove.co.uk/house-prices/{postcode}.html` → change to `/properties-to-let/`). Create `RentalEstimate` table: `postcode_district` (e.g. "SW20"), `bedrooms`, `avg_monthly_rent`, `median_monthly_rent`, `sample_size`, `source`, `updated_at`. Endpoint: `GET /api/v1/analytics/postcode/{postcode}/rental-yield` returns gross yield, net yield, monthly rent estimate. Gross yield = (annual_rent / purchase_price) × 100. Net yield subtracts: management 10%, maintenance 1% of value, void periods 4 weeks/year, insurance ~£300/yr, landlord license where applicable.
-- [ ] **Frontend**: Yield calculator widget on PropertyDetailPage — shows gross/net yield with breakdown. Yield heatmap on MarketOverviewPage (colour postcodes by average yield). Add yield column to investment deals table on HousingInsightsPage. Yield comparison on CompareAreasPage.
-- [ ] **Tests**: Test yield calculations, test with missing rental data returns appropriate fallback.
-- **Why**: Single most important metric for buy-to-let investors. Transforms the app from price viewer into investment analysis tool. Your HousingInsights page already identifies "investment deals" — adding yield data makes that 10x more useful.
-- **Complexity**: Medium
-
-### 6. Flood Risk Assessment
+### 5. Flood Risk Assessment
 - [ ] **Backend**: Environment Agency API is free, no auth. Create `app/enrichment/flood.py`. Two data sources: (1) EA Flood Risk API: `GET https://environment.data.gov.uk/flood-monitoring/id/floods?lat={lat}&lng={lng}&dist=1` for current warnings. (2) Open Flood Risk by Postcode: download CSV from https://www.getthedata.com/open-flood-risk-by-postcode (maps every UK postcode to flood risk zone 1/2/3). Add `flood_risk_level` column to Property model (values: "very_low", "low", "medium", "high"). Endpoint: `GET /api/v1/analytics/postcode/{postcode}/flood-risk` returns risk level + any active flood warnings.
 - [ ] **Frontend**: Flood risk badge on PropertyCard (green/amber/red). Flood risk section on PropertyDetailPage with explanation text. Flood risk comparison on CompareAreasPage. Filter by flood risk on HousingInsightsPage.
 - [ ] **Tests**: Test risk classification logic, test with/without active warnings.
 - **Why**: Directly impacts property values, insurance costs, and mortgage approvals. Many buyers don't check until late in the process — surfacing it early saves time and money. Free data, simple integration.
 - **Complexity**: Small
 
-### 7. Capital Growth Tracker & Forecasting
+### 6. Capital Growth Tracker & Forecasting
 - [ ] **Backend**: Extend existing analytics in `app/routers/analytics.py`. New endpoint: `GET /api/v1/analytics/postcode/{postcode}/growth` with `?periods=1,3,5,10` param. For each period: calculate CAGR (Compound Annual Growth Rate) = `(end_price/start_price)^(1/years) - 1`. Use median prices per year to smooth outliers. Also calculate: volatility (standard deviation of annual returns), max drawdown (largest peak-to-trough decline), Sharpe-like ratio (growth / volatility). For forecasting: use scipy `curve_fit` with linear and polynomial (degree 2) models on historical median prices. Return predicted price at +1yr, +3yr, +5yr with confidence bands (±1 std dev of residuals). New endpoint: `GET /api/v1/analytics/growth-leaderboard?limit=20` returns top postcodes by 5yr CAGR.
 - [ ] **Frontend**: Growth dashboard section on PropertyDetailPage (CAGR badges for 1/3/5/10yr). Growth forecast chart with confidence bands (Recharts AreaChart with gradient fill for confidence). Growth leaderboard table on MarketOverviewPage (sortable by period). Growth comparison overlay on CompareAreasPage.
 - [ ] **Tests**: Test CAGR calculation, test with insufficient data (< 2 years), test forecast confidence band width.
 - **Why**: Builds on existing data with no new external sources. Growth metrics are what investors use to evaluate areas. Forecasting (even simple) adds perceived sophistication. The leaderboard creates a "discovery" use case — which areas are growing fastest?
 - **Complexity**: Small-Medium
 
-### 8. Planning Applications Nearby
+### 7. Planning Applications Nearby
 - [ ] **Backend**: Use Planning Data platform API: `GET https://www.planning.data.gov.uk/api/v1/entity.json?dataset=planning-application&geometry_reference={postcode_lat_lng}&limit=50`. Also available as bulk CSV download. Create `PlanningApplication` table: `reference`, `description`, `status` (submitted/approved/refused), `decision_date`, `application_type` (householder/full/outline/listed-building), `latitude`, `longitude`, `local_authority`, `fetched_at`. Create `app/enrichment/planning.py`. Endpoint: `GET /api/v1/analytics/postcode/{postcode}/planning` returns recent applications within ~500m radius. Flag major developments (10+ dwellings, commercial, infrastructure) separately.
 - [ ] **Frontend**: Planning applications section on PropertyDetailPage — list with status badges (green=approved, amber=pending, red=refused). Map overlay showing application locations (integrate with map view from task 1). "Major developments" alert badge on PropertyCard if significant applications nearby. Filter: show only major/all applications.
 - [ ] **Tests**: Test planning endpoint with mocked response, test radius filtering, test major development flagging logic.
 - **Why**: Nearby developments significantly affect property values (positively: regeneration; negatively: overlooking, traffic). Investors need this to avoid nasty surprises. Data is free via gov.uk open data.
 - **Complexity**: Medium
 
-### 9. PDF Report Export
+### 8. PDF Report Export
 - [ ] **Backend**: Install `weasyprint` (HTML-to-PDF) or `reportlab` (programmatic PDF). Create `app/export/pdf_report.py`. Endpoint: `POST /api/v1/export/report` with body `{postcode, include_sections: ["summary","charts","properties","crime","epc"]}`. Generate HTML template using Jinja2 (already a FastAPI dependency). Render charts as static SVGs using matplotlib (add to requirements.txt) — Recharts/Plotly are client-side only. Sections: cover page (postcode, date, property count), summary stats table, price trend chart (matplotlib line), property type breakdown (matplotlib bar), top 10 properties table, growth metrics, and any enrichment data available (crime, EPC, flood risk). Return PDF as `StreamingResponse` with `content-type: application/pdf`.
 - [ ] **Frontend**: "Download Report" button on SearchPage analytics dashboard and MarketOverviewPage. Section checkboxes in a dropdown to customise report contents. Loading spinner while PDF generates. Use `window.open()` or `<a download>` to trigger download.
 - [ ] **Config**: Add `REPORT_TEMPLATE_DIR` to config (default: `app/export/templates/`).
@@ -131,16 +111,15 @@ _Researched 2026-02-10. Each task has full implementation details so it can be p
 - **Complexity**: Medium
 - **Deps**: `weasyprint` or `reportlab`, `matplotlib` for server-side charts, `jinja2` (already installed).
 
-### 10. Skip Already-Scraped Postcodes
-- [ ] **Backend**: Add `skip_existing` query param (default: `true`) to `POST /scrape/postcode/{postcode}` and `POST /scrape/area/{partial}`. When true: check `GET /properties/postcode/{postcode}/status` — if `has_data` is true AND `last_updated` is within a configurable freshness window (default 7 days, add `SCRAPER_FRESHNESS_DAYS` to config.py), skip the scrape and return a response like `{"message": "Postcode SW20 8ND already scraped (42 properties, last updated 2026-02-08)", "skipped": true, "properties_scraped": 0}`. For area scraping: filter the postcode list before the loop, log which were skipped. Add `force` query param to override skip behaviour.
-- [ ] **Frontend**: Show skip feedback in UI — "Already have data for X postcodes, scraping Y new ones". Option checkbox: "Re-scrape existing postcodes" (maps to `skip_existing=false`). Progress indicator showing "Skipped 3, Scraping 5 of 8 postcodes".
-- [ ] **Tests**: Test skip logic with fresh data (should skip), test with stale data (should re-scrape), test `force=true` overrides skip, test area scrape correctly filters postcode list.
-- **Why**: Currently every scrape request hits Rightmove even if data exists. This wastes rate limit quota, slows down area scrapes, and risks getting blocked. With 30/min rate limit, skipping existing data means you can cover more ground faster.
-- **Complexity**: Small
+### 9. ~~Skip Already-Scraped Postcodes~~ DONE
+- [x] **Backend**: `skip_existing` + `force` params on both scrape endpoints, `_is_postcode_fresh()` helper with `SCRAPER_FRESHNESS_DAYS` config (default 7), `postcodes_skipped` in area response, `skipped` in single response.
+- [x] **Frontend**: "Re-scrape existing" checkbox in SearchBar, skip message shown in UI.
+- [x] **Tests**: 5 new tests (fresh/stale/unknown postcode, schema fields). 60 total passing.
+- **Commit**: `e372b25`
 
 ---
 
 ## Verification
-- 55 backend tests passing: `pytest tests/ -v`
+- 66 backend tests passing: `pytest tests/ -v`
 - Frontend types clean: `npx tsc --noEmit`
-- App loads: `python -c "from app.main import app"` (27 routes)
+- App loads: `python -c "from app.main import app"` (29 routes)

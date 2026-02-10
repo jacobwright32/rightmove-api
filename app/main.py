@@ -11,7 +11,7 @@ from slowapi.util import get_remote_address
 
 from .config import CORS_ORIGINS, LOG_LEVEL, RATE_LIMIT_DEFAULT
 from .database import Base, _migrate_db, engine
-from .routers import analytics, properties, scraper
+from .routers import analytics, enrichment, properties, scraper
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
@@ -54,6 +54,8 @@ app.include_router(scraper.router, prefix="/api/v1")
 app.include_router(properties.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(analytics.postcode_router, prefix="/api/v1")
+app.include_router(enrichment.router, prefix="/api/v1")
+app.include_router(enrichment.crime_router, prefix="/api/v1")
 
 
 @app.get("/health")

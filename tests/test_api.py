@@ -332,6 +332,92 @@ class TestSkipExistingScrape:
         assert resp.postcodes_skipped == ["SW20 8ND"]
 
 
+class TestEPCEnrichment:
+    """Tests for EPC enrichment feature."""
+
+    def test_epc_no_properties(self, client, db_session):
+        """EPC enrichment should 404 if no properties exist for postcode."""
+        resp = client.post("/api/v1/enrich/epc/XX1 1XX")
+        assert resp.status_code == 404
+
+    def test_epc_properties_without_credentials(self, client, db_session):
+        """EPC enrichment without API creds should return 0 updated."""
+        db_session.add(Property(address="10 High St, SW20 8NE", postcode="SW20 8NE"))
+        db_session.commit()
+
+        resp = client.post("/api/v1/enrich/epc/SW20 8NE")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["properties_updated"] == 0
+        assert data["certificates_found"] == 0
+
+    def test_epc_fields_on_property(self, client, db_session):
+        """Property response should include EPC fields."""
+        prop = Property(
+            address="10 High St, SW20 8NE", postcode="SW20 8NE",
+            epc_rating="C", epc_score=72, epc_environment_impact=65,
+            estimated_energy_cost=1200,
+        )
+        db_session.add(prop)
+        db_session.commit()
+
+        resp = client.get(f"/api/v1/properties/{prop.id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["epc_rating"] == "C"
+        assert data["epc_score"] == 72
+        assert data["epc_environment_impact"] == 65
+        assert data["estimated_energy_cost"] == 1200
+
+
+class TestCrimeEndpoint:
+    """Tests for crime data endpoint."""
+
+    def test_crime_endpoint_exists(self, client):
+        """Crime endpoint should exist and return valid response."""
+        resp = client.get("/api/v1/analytics/postcode/SW20 8NE/crime")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["postcode"] == "SW20 8NE"
+        assert "categories" in data
+        assert "monthly_trend" in data
+        assert "total_crimes" in data
+
+    def test_crime_empty_result(self, client):
+        """Crime endpoint should handle postcodes with no data gracefully."""
+        resp = client.get("/api/v1/analytics/postcode/XX1 1XX/crime")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_crimes"] == 0
+        assert data["categories"] == {}
+
+    def test_crime_cached_data(self, client, db_session):
+        """Crime stats should be servable from cache."""
+        from datetime import datetime, timezone
+
+        from app.models import CrimeStats
+
+        db_session.add(CrimeStats(
+            postcode="SW20 8NE", month="2025-12",
+            category="burglary", count=5,
+            fetched_at=datetime.now(timezone.utc),
+        ))
+        db_session.add(CrimeStats(
+            postcode="SW20 8NE", month="2025-12",
+            category="anti-social-behaviour", count=12,
+            fetched_at=datetime.now(timezone.utc),
+        ))
+        db_session.commit()
+
+        resp = client.get("/api/v1/analytics/postcode/SW20 8NE/crime")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["cached"] is True
+        assert data["total_crimes"] == 17
+        assert data["categories"]["anti-social-behaviour"] == 12
+        assert data["categories"]["burglary"] == 5
+
+
 class TestScrapePropertyValidation:
     def test_invalid_url(self, client):
         resp = client.post("/api/v1/scrape/property", json={"url": "https://example.com"})

@@ -21,6 +21,10 @@ def _migrate_db():
             "ALTER TABLE properties ADD COLUMN floorplan_urls TEXT",
             "ALTER TABLE sales ADD COLUMN price_numeric INTEGER",
             "ALTER TABLE sales ADD COLUMN date_sold_iso TEXT",
+            "ALTER TABLE properties ADD COLUMN epc_rating TEXT",
+            "ALTER TABLE properties ADD COLUMN epc_score INTEGER",
+            "ALTER TABLE properties ADD COLUMN epc_environment_impact INTEGER",
+            "ALTER TABLE properties ADD COLUMN estimated_energy_cost INTEGER",
         ]
         for sql in migrations:
             try:
