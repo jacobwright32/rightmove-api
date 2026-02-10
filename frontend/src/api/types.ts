@@ -97,3 +97,25 @@ export interface PostcodeAnalytics {
   bedroom_distribution: BedroomDistribution[];
   sales_volume: SalesVolumePoint[];
 }
+
+// Market Overview types
+
+export interface PriceRangeBucket {
+  range: string;
+  count: number;
+}
+
+export interface MarketOverview {
+  total_postcodes: number;
+  total_properties: number;
+  total_sales: number;
+  date_range: { earliest: string | null; latest: string | null };
+  avg_price: number | null;
+  median_price: number | null;
+  price_distribution: PriceRangeBucket[];
+  top_postcodes: PostcodeComparison[];
+  property_types: PropertyTypeBreakdown[];
+  bedroom_distribution: BedroomDistribution[];
+  yearly_trends: SalesVolumePoint[];
+  price_trends: PriceTrendPoint[];
+}

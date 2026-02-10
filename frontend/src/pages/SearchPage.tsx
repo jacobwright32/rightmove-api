@@ -3,7 +3,6 @@ import { exportSalesData } from "../api/client";
 import AnalyticsDashboard from "../components/AnalyticsDashboard";
 import LoadingOverlay from "../components/LoadingOverlay";
 import SearchBar from "../components/SearchBar";
-import ThemeToggle from "../components/ThemeToggle";
 import { usePostcodeSearch } from "../hooks/usePostcodeSearch";
 
 export default function SearchPage() {
@@ -27,22 +26,17 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white shadow-sm dark:bg-gray-800 dark:shadow-gray-900/50">
-        <div className="mx-auto max-w-6xl px-4 py-6">
-          <div className="flex justify-end"><ThemeToggle /></div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 text-center">
-            Rightmove House Prices
-          </h1>
-          <p className="mt-1 text-center text-gray-500 dark:text-gray-400">
-            Enter a postcode to see property sale histories and analytics
-          </p>
-        </div>
-      </header>
+    <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="mb-6 text-center">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          House Price Search
+        </h1>
+        <p className="mt-1 text-gray-500 dark:text-gray-400">
+          Enter a postcode to see property sale histories and analytics
+        </p>
+      </div>
 
-      {/* Search */}
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div>
         <SearchBar onSearch={search} disabled={isLoading} />
 
         {/* Loading */}

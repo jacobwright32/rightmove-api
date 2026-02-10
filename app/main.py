@@ -53,6 +53,7 @@ app.add_middleware(
 app.include_router(scraper.router, prefix="/api/v1")
 app.include_router(properties.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(analytics.postcode_router, prefix="/api/v1")
 
 
 @app.get("/health")
@@ -82,7 +83,19 @@ def root():
     }
 
 
-# Serve React production build if it exists
+# Serve React production build if it exists (with SPA fallback)
 _frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 if os.path.isdir(_frontend_dist):
-    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="frontend")
+    from fastapi.responses import FileResponse
+
+    _index_html = os.path.join(_frontend_dist, "index.html")
+
+    app.mount("/assets", StaticFiles(directory=os.path.join(_frontend_dist, "assets")), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """SPA fallback — serve index.html for all non-API routes."""
+        file_path = os.path.join(_frontend_dist, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(_index_html)

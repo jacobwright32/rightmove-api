@@ -35,9 +35,21 @@ _Session started: 2026-02-10_
 **Bug fix (session 2):**
 - [x] Fix 7 failing API tests (URL prefix mismatch after /api/v1/ migration)
 
+**New pages (session 3):**
+- [x] Add react-router-dom + NavBar component (top nav with links, ThemeToggle moved from SearchPage)
+- [x] Update App.tsx with BrowserRouter (routes: /, /market, /compare, /property/:id)
+- [x] Market Overview page (GET /analytics/market-overview backend endpoint + full frontend page with 6 chart sections + summary table)
+- [x] Compare Areas page (PostcodeMultiInput chip component + side-by-side multi-postcode charts using existing getAnalytics)
+- [x] Property Detail page (GET /properties/{id}/similar backend endpoint + price history chart + appreciation stats + features/floorplans + similar properties)
+- [x] PropertyCard "View full details" link to /property/:id
+- [x] SPA fallback for production (FastAPI serves index.html for non-API routes)
+- [x] New backend schemas (MarketOverview, PriceRangeBucket in schemas.py)
+- [x] 4 new API tests (market-overview empty + with data, similar properties not found + with similar)
+- [x] TypeScript types + API client functions (MarketOverview, getMarketOverview, getProperty, getSimilarProperties)
+
 ---
 
 ## Verification
-- 48 backend tests passing: `pytest tests/ -v`
+- 52 backend tests passing: `pytest tests/ -v`
 - Frontend types clean: `npx tsc --noEmit`
-- App loads: `python -c "from app.main import app"`
+- App loads: `python -c "from app.main import app"` (26 routes)

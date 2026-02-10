@@ -139,3 +139,23 @@ class PostcodeAnalytics(BaseModel):
     postcode_comparison: List[PostcodeComparison] = []
     bedroom_distribution: List[BedroomDistribution] = []
     sales_volume: List[SalesVolumePoint] = []
+
+
+class PriceRangeBucket(BaseModel):
+    range: str
+    count: int
+
+
+class MarketOverview(BaseModel):
+    total_postcodes: int
+    total_properties: int
+    total_sales: int
+    date_range: dict
+    avg_price: Optional[float] = None
+    median_price: Optional[float] = None
+    price_distribution: List[PriceRangeBucket] = []
+    top_postcodes: List[PostcodeComparison] = []
+    property_types: List[PropertyTypeBreakdown] = []
+    bedroom_distribution: List[BedroomDistribution] = []
+    yearly_trends: List[SalesVolumePoint] = []
+    price_trends: List[PriceTrendPoint] = []

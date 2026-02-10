@@ -1,3 +1,4 @@
+import re
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -6,9 +7,11 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
 from ..export import SALES_DATA_DIR, save_property_parquet
-from ..models import Property
+from ..models import Property, Sale
 from ..schemas import ExportResponse, PostcodeSummary, PostcodeStatus, PropertyBrief, PropertyDetail
 from ..scraper.rightmove import scrape_postcode_from_listing
+
+_OUTCODE_RE = re.compile(r"^([A-Z]{1,2}\d[A-Z\d]?)\s", re.IGNORECASE)
 
 router = APIRouter(tags=["properties"])
 
@@ -49,6 +52,110 @@ def get_property(property_id: int, db: Session = Depends(get_db)):
     if not prop:
         raise HTTPException(status_code=404, detail="Property not found")
     return prop
+
+
+@router.get("/properties/{property_id}/similar", response_model=List[PropertyDetail])
+def get_similar_properties(
+    property_id: int,
+    limit: int = Query(default=5, ge=1, le=20, description="Number of similar properties to return"),
+    db: Session = Depends(get_db),
+):
+    """Find properties similar to the target based on type, bedrooms, and location."""
+    # 1. Fetch target property
+    target = (
+        db.query(Property)
+        .options(joinedload(Property.sales))
+        .filter(Property.id == property_id)
+        .first()
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    # 2. Get target's latest sale price_numeric
+    target_latest_sale = (
+        db.query(Sale)
+        .filter(Sale.property_id == target.id, Sale.price_numeric.isnot(None))
+        .order_by(Sale.date_sold_iso.desc())
+        .first()
+    )
+    if not target_latest_sale:
+        raise HTTPException(
+            status_code=404,
+            detail="Target property has no sales with price data",
+        )
+    target_price = target_latest_sale.price_numeric
+
+    # 3. Extract outcode from postcode (e.g. "SW20" from "SW20 8NE")
+    if not target.postcode:
+        raise HTTPException(
+            status_code=404,
+            detail="Target property has no postcode",
+        )
+    outcode_match = _OUTCODE_RE.match(target.postcode.strip())
+    if not outcode_match:
+        raise HTTPException(
+            status_code=404,
+            detail="Could not extract outcode from target postcode",
+        )
+    target_outcode = outcode_match.group(1).upper()
+
+    # 4. Build query for similar properties
+    target_type = (target.property_type or "").strip()
+    target_beds = target.bedrooms
+
+    # Subquery: latest sale price per property
+    latest_sale_sub = (
+        db.query(
+            Sale.property_id,
+            func.max(Sale.date_sold_iso).label("max_date"),
+        )
+        .filter(Sale.price_numeric.isnot(None))
+        .group_by(Sale.property_id)
+        .subquery()
+    )
+    latest_price_sub = (
+        db.query(
+            Sale.property_id,
+            Sale.price_numeric.label("latest_price"),
+        )
+        .join(
+            latest_sale_sub,
+            (Sale.property_id == latest_sale_sub.c.property_id)
+            & (Sale.date_sold_iso == latest_sale_sub.c.max_date),
+        )
+        .filter(Sale.price_numeric.isnot(None))
+        .subquery()
+    )
+
+    query = (
+        db.query(Property)
+        .options(joinedload(Property.sales))
+        .join(latest_price_sub, Property.id == latest_price_sub.c.property_id)
+        .filter(Property.id != target.id)
+    )
+
+    # Same outcode prefix
+    query = query.filter(
+        func.upper(Property.postcode).like(f"{target_outcode} %")
+    )
+
+    # Property type match (case-insensitive)
+    if target_type:
+        query = query.filter(func.upper(Property.property_type) == target_type.upper())
+
+    # Bedrooms within +/- 1
+    if target_beds is not None:
+        query = query.filter(
+            Property.bedrooms >= target_beds - 1,
+            Property.bedrooms <= target_beds + 1,
+        )
+
+    # Order by price proximity and limit
+    query = query.order_by(func.abs(latest_price_sub.c.latest_price - target_price))
+    query = query.limit(limit)
+
+    results = query.all()
+    return results
 
 
 @router.get("/properties/postcode/{postcode}/status", response_model=PostcodeStatus)

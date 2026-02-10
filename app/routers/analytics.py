@@ -1,7 +1,7 @@
 import re
 import statistics
 from collections import defaultdict
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
@@ -11,15 +11,192 @@ from ..database import get_db
 from ..models import Property, Sale
 from ..schemas import (
     BedroomDistribution,
+    MarketOverview,
     PostcodeAnalytics,
     PostcodeComparison,
+    PriceRangeBucket,
     PriceTrendPoint,
     PropertyTypeBreakdown,
     SalesVolumePoint,
     StreetComparison,
 )
 
-router = APIRouter(prefix="/analytics/postcode", tags=["analytics"])
+router = APIRouter(prefix="/analytics", tags=["analytics"])
+
+
+@router.get("/market-overview", response_model=MarketOverview)
+def get_market_overview(db: Session = Depends(get_db)):
+    """Database-wide aggregated statistics across all properties and sales."""
+    # 1. Count distinct postcodes, properties, sales
+    total_postcodes = (
+        db.query(func.count(func.distinct(Property.postcode)))
+        .filter(Property.postcode.isnot(None))
+        .scalar()
+    ) or 0
+    total_properties = db.query(func.count(Property.id)).scalar() or 0
+    total_sales = db.query(func.count(Sale.id)).scalar() or 0
+
+    # 2. Date range (earliest/latest date_sold_iso)
+    earliest_date = db.query(func.min(Sale.date_sold_iso)).filter(Sale.date_sold_iso.isnot(None)).scalar()
+    latest_date = db.query(func.max(Sale.date_sold_iso)).filter(Sale.date_sold_iso.isnot(None)).scalar()
+    date_range = {"earliest": earliest_date, "latest": latest_date}
+
+    # 3. Average and median price_numeric across all sales
+    all_prices = [
+        row[0]
+        for row in db.query(Sale.price_numeric).filter(Sale.price_numeric.isnot(None)).all()
+    ]
+    avg_price: Optional[float] = round(statistics.mean(all_prices)) if all_prices else None
+    median_price: Optional[float] = round(statistics.median(all_prices)) if all_prices else None
+
+    # 4. Price distribution buckets
+    buckets = [
+        ("Under \u00a3200k", 0, 200000),
+        ("\u00a3200k-\u00a3400k", 200000, 400000),
+        ("\u00a3400k-\u00a3600k", 400000, 600000),
+        ("\u00a3600k-\u00a31M", 600000, 1000000),
+        ("Over \u00a31M", 1000000, None),
+    ]
+    price_distribution = []
+    for label, low, high in buckets:
+        q = db.query(func.count(Sale.id)).filter(Sale.price_numeric.isnot(None))
+        q = q.filter(Sale.price_numeric >= low)
+        if high is not None:
+            q = q.filter(Sale.price_numeric < high)
+        count = q.scalar() or 0
+        price_distribution.append(PriceRangeBucket(range=label, count=count))
+
+    # 5. Top 10 postcodes by sale volume
+    top_pc_rows = (
+        db.query(
+            Property.postcode,
+            func.count(Sale.id).label("sale_count"),
+            func.avg(Sale.price_numeric).label("avg_price"),
+        )
+        .join(Sale, Sale.property_id == Property.id)
+        .filter(Property.postcode.isnot(None))
+        .group_by(Property.postcode)
+        .order_by(func.count(Sale.id).desc())
+        .limit(10)
+        .all()
+    )
+    top_postcodes = [
+        PostcodeComparison(
+            postcode=row[0],
+            avg_price=round(row[2]) if row[2] else None,
+            count=row[1],
+        )
+        for row in top_pc_rows
+    ]
+
+    # 6. Property type breakdown
+    type_rows = (
+        db.query(
+            Sale.property_type,
+            Property.property_type,
+            Sale.price_numeric,
+        )
+        .join(Property, Sale.property_id == Property.id)
+        .all()
+    )
+    type_data: dict = defaultdict(list)
+    for sale_type, prop_type, price in type_rows:
+        ptype = sale_type or prop_type or "Unknown"
+        ptype = ptype.strip().upper() or "Unknown"
+        if price is not None:
+            type_data[ptype].append(price)
+    property_types = sorted(
+        [
+            PropertyTypeBreakdown(
+                property_type=ptype,
+                count=len(prices),
+                avg_price=round(statistics.mean(prices)) if prices else None,
+            )
+            for ptype, prices in type_data.items()
+        ],
+        key=lambda x: x.count,
+        reverse=True,
+    )
+
+    # 7. Bedroom distribution
+    bed_rows = (
+        db.query(Property.bedrooms, Sale.price_numeric)
+        .join(Sale, Sale.property_id == Property.id)
+        .filter(Property.bedrooms.isnot(None))
+        .all()
+    )
+    bed_data: dict = defaultdict(list)
+    for beds, price in bed_rows:
+        if price is not None:
+            bed_data[beds].append(price)
+    bedroom_distribution = sorted(
+        [
+            BedroomDistribution(
+                bedrooms=beds,
+                count=len(prices),
+                avg_price=round(statistics.mean(prices)) if prices else None,
+            )
+            for beds, prices in bed_data.items()
+        ],
+        key=lambda x: x.bedrooms,
+    )
+
+    # 8. Yearly sales volume
+    year_rows = (
+        db.query(Sale.date_sold_iso)
+        .filter(Sale.date_sold_iso.isnot(None))
+        .all()
+    )
+    year_counts: dict = defaultdict(int)
+    for (date_iso,) in year_rows:
+        year = int(date_iso[:4])
+        year_counts[year] += 1
+    yearly_trends = [
+        SalesVolumePoint(year=year, count=count)
+        for year, count in sorted(year_counts.items())
+    ]
+
+    # 9. Monthly price trends
+    monthly_rows = (
+        db.query(Sale.date_sold_iso, Sale.price_numeric)
+        .filter(Sale.date_sold_iso.isnot(None), Sale.price_numeric.isnot(None))
+        .all()
+    )
+    monthly: dict = defaultdict(list)
+    for date_iso, price in monthly_rows:
+        month = date_iso[:7]
+        monthly[month].append(price)
+    price_trends = [
+        PriceTrendPoint(
+            month=m,
+            avg_price=round(statistics.mean(p)),
+            median_price=round(statistics.median(p)),
+            min_price=min(p),
+            max_price=max(p),
+            count=len(p),
+        )
+        for m, p in sorted(monthly.items())
+    ]
+
+    return MarketOverview(
+        total_postcodes=total_postcodes,
+        total_properties=total_properties,
+        total_sales=total_sales,
+        date_range=date_range,
+        avg_price=avg_price,
+        median_price=median_price,
+        price_distribution=price_distribution,
+        top_postcodes=top_postcodes,
+        property_types=property_types,
+        bedroom_distribution=bedroom_distribution,
+        yearly_trends=yearly_trends,
+        price_trends=price_trends,
+    )
+
+
+# --- Postcode-specific analytics ---
+
+postcode_router = APIRouter(prefix="/analytics/postcode", tags=["analytics"])
 
 
 def _get_sales_for_postcode(db: Session, postcode: str):
@@ -86,7 +263,7 @@ def _extract_street(address: str) -> str:
     return "Unknown"
 
 
-@router.get("/{postcode}/price-trends", response_model=List[PriceTrendPoint])
+@postcode_router.get("/{postcode}/price-trends", response_model=List[PriceTrendPoint])
 def get_price_trends(postcode: str, db: Session = Depends(get_db)):
     """Monthly average/median/min/max prices for a postcode."""
     rows = _get_sales_for_postcode(db, postcode)
@@ -114,7 +291,7 @@ def get_price_trends(postcode: str, db: Session = Depends(get_db)):
     return result
 
 
-@router.get("/{postcode}/property-types", response_model=List[PropertyTypeBreakdown])
+@postcode_router.get("/{postcode}/property-types", response_model=List[PropertyTypeBreakdown])
 def get_property_types(postcode: str, db: Session = Depends(get_db)):
     """Count and average price per property type."""
     rows = _get_sales_for_postcode(db, postcode)
@@ -142,7 +319,7 @@ def get_property_types(postcode: str, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/{postcode}/street-comparison", response_model=List[StreetComparison])
+@postcode_router.get("/{postcode}/street-comparison", response_model=List[StreetComparison])
 def get_street_comparison(postcode: str, db: Session = Depends(get_db)):
     """Average price per street, extracted from property addresses."""
     rows = _get_sales_for_postcode(db, postcode)
@@ -169,7 +346,7 @@ def get_street_comparison(postcode: str, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/{postcode}/postcode-comparison", response_model=List[PostcodeComparison])
+@postcode_router.get("/{postcode}/postcode-comparison", response_model=List[PostcodeComparison])
 def get_postcode_comparison(postcode: str, db: Session = Depends(get_db)):
     """Average price per full postcode within the searched area."""
     rows = _get_sales_for_postcode(db, postcode)
@@ -195,7 +372,7 @@ def get_postcode_comparison(postcode: str, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/{postcode}/bedroom-distribution", response_model=List[BedroomDistribution])
+@postcode_router.get("/{postcode}/bedroom-distribution", response_model=List[BedroomDistribution])
 def get_bedroom_distribution(postcode: str, db: Session = Depends(get_db)):
     """Count and average price per bedroom count."""
     rows = _get_sales_for_postcode(db, postcode)
@@ -221,7 +398,7 @@ def get_bedroom_distribution(postcode: str, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/{postcode}/sales-volume", response_model=List[SalesVolumePoint])
+@postcode_router.get("/{postcode}/sales-volume", response_model=List[SalesVolumePoint])
 def get_sales_volume(postcode: str, db: Session = Depends(get_db)):
     """Sales count per year."""
     rows = _get_sales_for_postcode(db, postcode)
@@ -240,7 +417,7 @@ def get_sales_volume(postcode: str, db: Session = Depends(get_db)):
     ]
 
 
-@router.get("/{postcode}/summary", response_model=PostcodeAnalytics)
+@postcode_router.get("/{postcode}/summary", response_model=PostcodeAnalytics)
 def get_summary(postcode: str, db: Session = Depends(get_db)):
     """All analytics combined in a single call."""
     rows = _get_sales_for_postcode(db, postcode)

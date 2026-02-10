@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { PropertyDetail } from "../api/types";
 import SaleHistoryTable from "./SaleHistoryTable";
 
@@ -120,6 +121,15 @@ export default function PropertyCard({ property }: Props) {
 
           {/* Sale history */}
           <SaleHistoryTable sales={sales} />
+
+          {/* Detail page link */}
+          <Link
+            to={`/property/${property.id}`}
+            className="inline-block text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+            onClick={(e) => e.stopPropagation()}
+          >
+            View full details &rarr;
+          </Link>
         </div>
       )}
     </div>

@@ -1,8 +1,10 @@
 import axios from "axios";
 import type {
   AreaScrapeResponse,
+  MarketOverview,
   PostcodeAnalytics,
   PostcodeStatus,
+  PropertyBrief,
   PropertyDetail,
   ScrapeResponse,
 } from "./types";
@@ -78,6 +80,26 @@ export async function getProperties(
 ): Promise<PropertyDetail[]> {
   const res = await api.get<PropertyDetail[]>("/properties", {
     params: { postcode, limit: 0 },
+  });
+  return res.data;
+}
+
+export async function getMarketOverview(): Promise<MarketOverview> {
+  const res = await api.get<MarketOverview>("/analytics/market-overview");
+  return res.data;
+}
+
+export async function getProperty(id: number): Promise<PropertyDetail> {
+  const res = await api.get<PropertyDetail>(`/properties/${id}`);
+  return res.data;
+}
+
+export async function getSimilarProperties(
+  id: number,
+  limit = 5
+): Promise<PropertyBrief[]> {
+  const res = await api.get<PropertyBrief[]>(`/properties/${id}/similar`, {
+    params: { limit },
   });
   return res.data;
 }
