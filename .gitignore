@@ -20,6 +20,7 @@ build/
 # Node
 node_modules/
 frontend/dist/
+*.tsbuildinfo
 
 # Data / exports
 *.parquet

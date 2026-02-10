@@ -1,5 +1,11 @@
 # Lessons Learned
 
+## Session 4: 2026-02-10 (housing insights)
+- **Commit as you go**: Don't batch all changes into one big commit at the end. Commit after each logical unit of work (e.g., backend endpoint done → commit, frontend page done → commit, tests done → commit).
+- **Update tasks at every step**: Mark tasks `in_progress` before starting, `completed` immediately after finishing. Update `tasks/todo.md` checkboxes in lockstep. Never let task state drift from actual progress.
+- **Plotly.js-dist-min needs a .d.ts**: The minified Plotly bundle has no TypeScript declarations. Create `src/plotly.d.ts` with `declare module "plotly.js-dist-min"` to avoid TS7016.
+- **Use `createPlotlyComponent` factory**: When using `plotly.js-dist-min` (not full `plotly.js`), import via factory: `createPlotlyComponent(Plotly)` from `react-plotly.js/factory`.
+
 ## Session 3: 2026-02-10 (new pages)
 - **SPA fallback for FastAPI**: When using react-router-dom BrowserRouter, FastAPI's `StaticFiles(html=True)` doesn't handle SPA routing for paths like `/market`. Need a catch-all `/{full_path:path}` route that serves `index.html` for non-file paths.
 - **TypeScript strict mode and Record<string, unknown>**: Typed interfaces can't be directly cast to `Record<string, unknown>[]` — use a helper function with `any` instead of inline casts.

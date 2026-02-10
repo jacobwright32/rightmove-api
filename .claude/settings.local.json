@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx claude-code-templates@latest:*)",
+      "Bash(find:*)",
+      "Bash(xargs ls:*)",
+      "Bash(pip freeze:*)",
+      "Bash(pip install:*)",
+      "Bash(python -c:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(npx tsc:*)",
+      "Bash(dir:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: full-stack Rightmove house price scraper\n\nFastAPI backend with SQLite storage, Rightmove scraper with retry logic\nand rate limiting, React 19 frontend with dark mode, analytics charts,\nand postcode search. Includes 48 tests, CI pipeline, and env-based config.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(gh repo view:*)",
+      "Bash(where:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git rm:*)",
+      "Bash(git commit:*)",
+      "Bash(printf:*)",
+      "Bash(git credential fill:*)",
+      "Bash(python:*)",
+      "Bash(git branch:*)",
+      "WebSearch",
+      "Bash(npm install:*)",
+      "Bash(gh run list:*)",
+      "Bash(ruff check:*)",
+      "Bash(npm run build:*)",
+      "Bash(pip show:*)",
+      "WebFetch(domain:data.police.uk)",
+      "WebFetch(domain:epc.opendatacommunities.org)",
+      "WebFetch(domain:api.planning.org.uk)",
+      "WebFetch(domain:www.planning.data.gov.uk)",
+      "Bash(git -C C:Usersjacobdevrightmove-api status)"
+    ]
+  }
+}
