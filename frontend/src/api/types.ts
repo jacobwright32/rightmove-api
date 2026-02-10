@@ -34,11 +34,13 @@ export interface ScrapeResponse {
   properties_scraped: number;
   pages_scraped: number;
   detail_pages_visited: number;
+  skipped: boolean;
 }
 
 export interface AreaScrapeResponse {
   message: string;
   postcodes_scraped: string[];
+  postcodes_skipped: string[];
   total_properties: number;
 }
 

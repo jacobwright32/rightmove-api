@@ -52,11 +52,13 @@ class ScrapeResponse(BaseModel):
     properties_scraped: int
     pages_scraped: int = 1
     detail_pages_visited: int = 0
+    skipped: bool = False
 
 
 class AreaScrapeResponse(BaseModel):
     message: str
     postcodes_scraped: list[str]
+    postcodes_skipped: list[str] = []
     postcodes_failed: list[str] = []
     total_properties: int
 

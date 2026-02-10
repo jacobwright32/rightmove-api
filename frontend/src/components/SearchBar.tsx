@@ -18,6 +18,7 @@ export default function SearchBar({ onSearch, disabled }: Props) {
   const [floorplan, setFloorplan] = useState(false);
   const [extraFeatures, setExtraFeatures] = useState(false);
   const [saveParquet, setSaveParquet] = useState(false);
+  const [force, setForce] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -75,7 +76,7 @@ export default function SearchBar({ onSearch, disabled }: Props) {
     }
     setValidationError(null);
     setShowSuggestions(false);
-    onSearch(normalised, { pages, linkCount, maxPostcodes, floorplan, extraFeatures, saveParquet });
+    onSearch(normalised, { pages, linkCount, maxPostcodes, floorplan, extraFeatures, saveParquet, force });
   }
 
   return (
@@ -203,6 +204,16 @@ export default function SearchBar({ onSearch, disabled }: Props) {
             className="rounded border-gray-300 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600"
           />
           Save as you go
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={force}
+            onChange={(e) => setForce(e.target.checked)}
+            disabled={disabled}
+            className="rounded border-gray-300 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600"
+          />
+          Re-scrape existing
         </label>
         <span className="text-xs text-gray-400">Off = fast mode</span>
       </div>

@@ -24,7 +24,7 @@ export async function checkPostcodeStatus(
 
 export async function scrapePostcode(
   postcode: string,
-  opts?: { pages?: number; linkCount?: number; floorplan?: boolean; extraFeatures?: boolean; saveParquet?: boolean }
+  opts?: { pages?: number; linkCount?: number; floorplan?: boolean; extraFeatures?: boolean; saveParquet?: boolean; skipExisting?: boolean; force?: boolean }
 ): Promise<ScrapeResponse> {
   const params: Record<string, number | boolean> = {};
   if (opts?.pages) params.pages = opts.pages;
@@ -32,6 +32,8 @@ export async function scrapePostcode(
   if (opts?.floorplan) params.floorplan = true;
   if (opts?.extraFeatures) params.extra_features = true;
   if (opts?.saveParquet) params.save_parquet = true;
+  if (opts?.skipExisting === false) params.skip_existing = false;
+  if (opts?.force) params.force = true;
   const res = await api.post<ScrapeResponse>(
     `/scrape/postcode/${encodeURIComponent(postcode)}`,
     null,
@@ -51,7 +53,7 @@ export async function getAnalytics(
 
 export async function scrapeArea(
   partial: string,
-  opts?: { pages?: number; linkCount?: number; maxPostcodes?: number; floorplan?: boolean; extraFeatures?: boolean; saveParquet?: boolean }
+  opts?: { pages?: number; linkCount?: number; maxPostcodes?: number; floorplan?: boolean; extraFeatures?: boolean; saveParquet?: boolean; skipExisting?: boolean; force?: boolean }
 ): Promise<AreaScrapeResponse> {
   const params: Record<string, number | boolean> = {};
   if (opts?.pages) params.pages = opts.pages;
@@ -60,6 +62,8 @@ export async function scrapeArea(
   if (opts?.floorplan) params.floorplan = true;
   if (opts?.extraFeatures) params.extra_features = true;
   if (opts?.saveParquet) params.save_parquet = true;
+  if (opts?.skipExisting === false) params.skip_existing = false;
+  if (opts?.force) params.force = true;
   const res = await api.post<AreaScrapeResponse>(
     `/scrape/area/${encodeURIComponent(partial)}`,
     null,

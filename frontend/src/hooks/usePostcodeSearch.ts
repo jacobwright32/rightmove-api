@@ -22,6 +22,7 @@ export interface ScrapeOptions {
   floorplan: boolean;
   extraFeatures: boolean;
   saveParquet: boolean;
+  force: boolean;
 }
 
 export interface SearchResult {
@@ -63,13 +64,17 @@ export function usePostcodeSearch() {
 
       if (isFullPostcode) {
         // Single postcode scrape
-        await scrapePostcode(clean, {
+        const result = await scrapePostcode(clean, {
           pages: opts.pages,
           linkCount: apiLinkCount,
           floorplan: opts.floorplan,
           extraFeatures: opts.extraFeatures,
           saveParquet: opts.saveParquet,
+          force: opts.force,
         });
+        if (result.skipped) {
+          setScrapeMessage(result.message);
+        }
       } else {
         // Area scrape — discover postcodes and scrape each
         const areaResult = await scrapeArea(clean, {
@@ -79,6 +84,7 @@ export function usePostcodeSearch() {
           floorplan: opts.floorplan,
           extraFeatures: opts.extraFeatures,
           saveParquet: opts.saveParquet,
+          force: opts.force,
         });
         setScrapeMessage(areaResult.message);
       }

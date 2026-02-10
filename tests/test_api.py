@@ -257,6 +257,81 @@ class TestHousingInsights:
         assert data["kpis"]["total_sales"] == 1
 
 
+class TestSkipExistingScrape:
+    """Tests for the skip-already-scraped feature."""
+
+    def test_fresh_postcode_is_skipped(self, client, db_session):
+        """If postcode has fresh data, scrape should be skipped by default."""
+        from datetime import datetime, timezone
+
+        prop = Property(
+            address="10 High St, SW20 8NE",
+            postcode="SW20 8NE",
+            updated_at=datetime.now(timezone.utc),
+        )
+        db_session.add(prop)
+        db_session.commit()
+
+        from app.routers.scraper import _is_postcode_fresh
+
+        is_fresh, count = _is_postcode_fresh(db_session, "SW20 8NE")
+        assert is_fresh is True
+        assert count == 1
+
+    def test_stale_postcode_is_not_fresh(self, client, db_session):
+        """If postcode data is older than freshness window, it should not be considered fresh."""
+        from datetime import datetime, timedelta, timezone
+
+        stale_time = datetime.now(timezone.utc) - timedelta(days=30)
+        prop = Property(
+            address="10 High St, SW20 8NE",
+            postcode="SW20 8NE",
+            updated_at=stale_time,
+        )
+        db_session.add(prop)
+        db_session.commit()
+
+        from app.routers.scraper import _is_postcode_fresh
+
+        is_fresh, count = _is_postcode_fresh(db_session, "SW20 8NE")
+        assert is_fresh is False
+        assert count == 1
+
+    def test_unknown_postcode_is_not_fresh(self, client, db_session):
+        """If postcode has no data at all, it should not be considered fresh."""
+        from app.routers.scraper import _is_postcode_fresh
+
+        is_fresh, count = _is_postcode_fresh(db_session, "E1 6AA")
+        assert is_fresh is False
+        assert count == 0
+
+    def test_scrape_response_includes_skipped_field(self, client, db_session):
+        """ScrapeResponse schema should include the skipped field."""
+        from app.schemas import ScrapeResponse
+
+        resp = ScrapeResponse(
+            message="test", properties_scraped=0, skipped=True,
+        )
+        assert resp.skipped is True
+
+        resp2 = ScrapeResponse(
+            message="test", properties_scraped=5,
+        )
+        assert resp2.skipped is False
+
+    def test_area_response_includes_skipped_postcodes(self, client, db_session):
+        """AreaScrapeResponse schema should include postcodes_skipped."""
+        from app.schemas import AreaScrapeResponse
+
+        resp = AreaScrapeResponse(
+            message="test",
+            postcodes_scraped=["SW20 8NE"],
+            postcodes_skipped=["SW20 8ND"],
+            total_properties=5,
+        )
+        assert resp.postcodes_skipped == ["SW20 8ND"]
+
+
 class TestScrapePropertyValidation:
     def test_invalid_url(self, client):
         resp = client.post("/api/v1/scrape/property", json={"url": "https://example.com"})

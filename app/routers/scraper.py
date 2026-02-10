@@ -10,7 +10,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
-from ..config import RATE_LIMIT_SCRAPE
+from ..config import RATE_LIMIT_SCRAPE, SCRAPER_FRESHNESS_DAYS
 from ..database import get_db
 from ..export import save_property_parquet
 from ..models import Property, Sale
@@ -67,6 +67,35 @@ def _normalise_price(price: str) -> str:
         amount = int(match.group(1))
         return f"\u00a3{amount:,}"
     return price
+
+
+def _is_postcode_fresh(db: Session, postcode: str) -> tuple[bool, int]:
+    """Check if a postcode has fresh data within the configured freshness window.
+
+    Returns (is_fresh, property_count).
+    """
+    from datetime import datetime, timedelta, timezone
+
+    clean = postcode.upper().replace("-", " ").strip()
+    # Match by postcode prefix (e.g. "SW20 8ND" matches properties with postcode "SW20 8ND")
+    props = db.query(Property).filter(Property.postcode == clean).all()
+    if not props:
+        return False, 0
+
+    # Check the most recent update time
+    latest_update = max(
+        (p.updated_at for p in props if p.updated_at),
+        default=None,
+    )
+    if latest_update is None:
+        return False, len(props)
+
+    # Make comparison timezone-aware if needed
+    if latest_update.tzinfo is None:
+        latest_update = latest_update.replace(tzinfo=timezone.utc)
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=SCRAPER_FRESHNESS_DAYS)
+    return latest_update >= cutoff, len(props)
 
 
 def _upsert_property(db: Session, data: PropertyData) -> Property:
@@ -149,6 +178,8 @@ def scrape_postcode(
     floorplan: bool = Query(default=False, description="Extract floorplan image URLs (requires detail page visits)"),
     extra_features: bool = Query(default=False, description="Extract key features (requires detail page visits)"),
     save_parquet: bool = Query(default=False, description="Save each property to parquet as it's scraped"),
+    skip_existing: bool = Query(default=True, description="Skip if postcode already has fresh data"),
+    force: bool = Query(default=False, description="Force re-scrape even if data is fresh"),
     db: Session = Depends(get_db),
 ):
     """Scrape properties for a given postcode from Rightmove house prices.
@@ -159,7 +190,22 @@ def scrape_postcode(
     **Slow path** (when `link_count`, `floorplan`, or `extra_features` is set):
     Visits individual detail pages for richer data including key features,
     full sale history, and optionally floorplan URLs.
+
+    Set `skip_existing=false` or `force=true` to re-scrape postcodes that already have data.
     """
+    # Check if we should skip this postcode
+    if skip_existing and not force:
+        is_fresh, prop_count = _is_postcode_fresh(db, postcode)
+        if is_fresh:
+            logger.info("Skipping %s: already has %d properties (fresh data)", postcode, prop_count)
+            return ScrapeResponse(
+                message=f"Postcode {postcode} already scraped ({prop_count} properties, data is less than {SCRAPER_FRESHNESS_DAYS} days old)",
+                properties_scraped=0,
+                pages_scraped=0,
+                detail_pages_visited=0,
+                skipped=True,
+            )
+
     properties, detail_pages_visited = _scrape_postcode_properties(
         postcode,
         max_properties=max_properties,
@@ -205,12 +251,16 @@ def scrape_area(
     floorplan: bool = Query(default=False, description="Extract floorplan image URLs (requires detail page visits)"),
     extra_features: bool = Query(default=False, description="Extract key features (requires detail page visits)"),
     save_parquet: bool = Query(default=False, description="Save each property to parquet as it's scraped"),
+    skip_existing: bool = Query(default=True, description="Skip postcodes that already have fresh data"),
+    force: bool = Query(default=False, description="Force re-scrape even if data is fresh"),
     db: Session = Depends(get_db),
 ):
     """Scrape all postcodes matching a partial (e.g. 'SW208N' finds SW20 8ND, SW20 8NE, ...).
 
     Reads postcodes from local parquet files (data/postcodes/{OUTCODE}.parquet)
     generated from the ONS Postcode Directory.
+
+    Set `skip_existing=false` or `force=true` to re-scrape postcodes that already have data.
     """
     import pyarrow.parquet as pq
 
@@ -259,9 +309,18 @@ def scrape_area(
     total = 0
     use_detail_pages = floorplan or extra_features or link_count is not None
     scraped_postcodes = []
+    skipped_postcodes = []
     failed_postcodes = []
 
     for i, pc in enumerate(postcodes):
+        # Check freshness before scraping
+        if skip_existing and not force:
+            is_fresh, prop_count = _is_postcode_fresh(db, pc)
+            if is_fresh:
+                logger.info("Area scrape: [%d/%d] skipping %s (%d properties, fresh data)", i + 1, len(postcodes), pc, prop_count)
+                skipped_postcodes.append(pc)
+                continue
+
         pc_norm = normalise_postcode_for_url(pc)
         logger.info("Area scrape: [%d/%d] scraping %s", i + 1, len(postcodes), pc)
         try:
@@ -300,12 +359,15 @@ def scrape_area(
             failed_postcodes.append(pc)
 
     msg = f"Scraped {total} properties across {len(scraped_postcodes)}/{len(all_postcodes)} postcodes for '{partial}'"
+    if skipped_postcodes:
+        msg += f" ({len(skipped_postcodes)} skipped — already fresh)"
     if failed_postcodes:
         msg += f" ({len(failed_postcodes)} failed)"
 
     return AreaScrapeResponse(
         message=msg,
         postcodes_scraped=scraped_postcodes,
+        postcodes_skipped=skipped_postcodes,
         postcodes_failed=failed_postcodes,
         total_properties=total,
     )
