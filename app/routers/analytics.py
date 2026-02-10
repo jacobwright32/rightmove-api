@@ -1,7 +1,7 @@
 import re
 import statistics
 from collections import defaultdict
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
@@ -263,7 +263,7 @@ def _extract_street(address: str) -> str:
     return "Unknown"
 
 
-@postcode_router.get("/{postcode}/price-trends", response_model=List[PriceTrendPoint])
+@postcode_router.get("/{postcode}/price-trends", response_model=list[PriceTrendPoint])
 def get_price_trends(postcode: str, db: Session = Depends(get_db)):
     """Monthly average/median/min/max prices for a postcode."""
     rows = _get_sales_for_postcode(db, postcode)
@@ -291,7 +291,7 @@ def get_price_trends(postcode: str, db: Session = Depends(get_db)):
     return result
 
 
-@postcode_router.get("/{postcode}/property-types", response_model=List[PropertyTypeBreakdown])
+@postcode_router.get("/{postcode}/property-types", response_model=list[PropertyTypeBreakdown])
 def get_property_types(postcode: str, db: Session = Depends(get_db)):
     """Count and average price per property type."""
     rows = _get_sales_for_postcode(db, postcode)
@@ -319,7 +319,7 @@ def get_property_types(postcode: str, db: Session = Depends(get_db)):
     )
 
 
-@postcode_router.get("/{postcode}/street-comparison", response_model=List[StreetComparison])
+@postcode_router.get("/{postcode}/street-comparison", response_model=list[StreetComparison])
 def get_street_comparison(postcode: str, db: Session = Depends(get_db)):
     """Average price per street, extracted from property addresses."""
     rows = _get_sales_for_postcode(db, postcode)
@@ -346,7 +346,7 @@ def get_street_comparison(postcode: str, db: Session = Depends(get_db)):
     )
 
 
-@postcode_router.get("/{postcode}/postcode-comparison", response_model=List[PostcodeComparison])
+@postcode_router.get("/{postcode}/postcode-comparison", response_model=list[PostcodeComparison])
 def get_postcode_comparison(postcode: str, db: Session = Depends(get_db)):
     """Average price per full postcode within the searched area."""
     rows = _get_sales_for_postcode(db, postcode)
@@ -372,7 +372,7 @@ def get_postcode_comparison(postcode: str, db: Session = Depends(get_db)):
     )
 
 
-@postcode_router.get("/{postcode}/bedroom-distribution", response_model=List[BedroomDistribution])
+@postcode_router.get("/{postcode}/bedroom-distribution", response_model=list[BedroomDistribution])
 def get_bedroom_distribution(postcode: str, db: Session = Depends(get_db)):
     """Count and average price per bedroom count."""
     rows = _get_sales_for_postcode(db, postcode)
@@ -381,9 +381,8 @@ def get_bedroom_distribution(postcode: str, db: Session = Depends(get_db)):
 
     bed_data: dict[int, list[int]] = defaultdict(list)
     for sale, prop in rows:
-        if prop.bedrooms is not None:
-            if sale.price_numeric:
-                bed_data[prop.bedrooms].append(sale.price_numeric)
+        if prop.bedrooms is not None and sale.price_numeric:
+            bed_data[prop.bedrooms].append(sale.price_numeric)
 
     return sorted(
         [
@@ -398,7 +397,7 @@ def get_bedroom_distribution(postcode: str, db: Session = Depends(get_db)):
     )
 
 
-@postcode_router.get("/{postcode}/sales-volume", response_model=List[SalesVolumePoint])
+@postcode_router.get("/{postcode}/sales-volume", response_model=list[SalesVolumePoint])
 def get_sales_volume(postcode: str, db: Session = Depends(get_db)):
     """Sales count per year."""
     rows = _get_sales_for_postcode(db, postcode)

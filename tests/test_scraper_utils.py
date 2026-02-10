@@ -1,14 +1,11 @@
 """Tests for scraper utility functions."""
 
-import pytest
 
 from app.scraper.rightmove import (
-    PropertyData,
-    SaleRecord,
-    extract_postcode,
-    normalise_postcode_for_url,
     _format_price,
     _resolve_ref,
+    extract_postcode,
+    normalise_postcode_for_url,
 )
 
 

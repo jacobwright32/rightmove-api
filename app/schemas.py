@@ -1,8 +1,7 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel
-
 
 # --- Sale schemas ---
 
@@ -38,7 +37,7 @@ class PropertyBrief(BaseModel):
 
 class PropertyDetail(PropertyBrief):
     extra_features: Optional[str] = None
-    sales: List[SaleOut] = []
+    sales: list[SaleOut] = []
 
 
 # --- Scrape request/response schemas ---
@@ -57,8 +56,8 @@ class ScrapeResponse(BaseModel):
 
 class AreaScrapeResponse(BaseModel):
     message: str
-    postcodes_scraped: List[str]
-    postcodes_failed: List[str] = []
+    postcodes_scraped: list[str]
+    postcodes_failed: list[str] = []
     total_properties: int
 
 
@@ -133,12 +132,12 @@ class SalesVolumePoint(BaseModel):
 
 class PostcodeAnalytics(BaseModel):
     postcode: str
-    price_trends: List[PriceTrendPoint] = []
-    property_types: List[PropertyTypeBreakdown] = []
-    street_comparison: List[StreetComparison] = []
-    postcode_comparison: List[PostcodeComparison] = []
-    bedroom_distribution: List[BedroomDistribution] = []
-    sales_volume: List[SalesVolumePoint] = []
+    price_trends: list[PriceTrendPoint] = []
+    property_types: list[PropertyTypeBreakdown] = []
+    street_comparison: list[StreetComparison] = []
+    postcode_comparison: list[PostcodeComparison] = []
+    bedroom_distribution: list[BedroomDistribution] = []
+    sales_volume: list[SalesVolumePoint] = []
 
 
 class PriceRangeBucket(BaseModel):
@@ -153,9 +152,9 @@ class MarketOverview(BaseModel):
     date_range: dict
     avg_price: Optional[float] = None
     median_price: Optional[float] = None
-    price_distribution: List[PriceRangeBucket] = []
-    top_postcodes: List[PostcodeComparison] = []
-    property_types: List[PropertyTypeBreakdown] = []
-    bedroom_distribution: List[BedroomDistribution] = []
-    yearly_trends: List[SalesVolumePoint] = []
-    price_trends: List[PriceTrendPoint] = []
+    price_distribution: list[PriceRangeBucket] = []
+    top_postcodes: list[PostcodeComparison] = []
+    property_types: list[PropertyTypeBreakdown] = []
+    bedroom_distribution: list[BedroomDistribution] = []
+    yearly_trends: list[SalesVolumePoint] = []
+    price_trends: list[PriceTrendPoint] = []

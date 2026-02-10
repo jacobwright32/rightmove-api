@@ -1,5 +1,5 @@
 import re
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from ..database import get_db
 from ..export import SALES_DATA_DIR, save_property_parquet
 from ..models import Property, Sale
-from ..schemas import ExportResponse, PostcodeSummary, PostcodeStatus, PropertyBrief, PropertyDetail
+from ..schemas import ExportResponse, PostcodeStatus, PostcodeSummary, PropertyDetail
 from ..scraper.rightmove import scrape_postcode_from_listing
 
 _OUTCODE_RE = re.compile(r"^([A-Z]{1,2}\d[A-Z\d]?)\s", re.IGNORECASE)
@@ -16,7 +16,7 @@ _OUTCODE_RE = re.compile(r"^([A-Z]{1,2}\d[A-Z\d]?)\s", re.IGNORECASE)
 router = APIRouter(tags=["properties"])
 
 
-@router.get("/properties", response_model=List[PropertyDetail])
+@router.get("/properties", response_model=list[PropertyDetail])
 def list_properties(
     postcode: Optional[str] = Query(default=None, description="Filter by postcode"),
     property_type: Optional[str] = Query(default=None, description="Filter by property type"),
@@ -54,7 +54,7 @@ def get_property(property_id: int, db: Session = Depends(get_db)):
     return prop
 
 
-@router.get("/properties/{property_id}/similar", response_model=List[PropertyDetail])
+@router.get("/properties/{property_id}/similar", response_model=list[PropertyDetail])
 def get_similar_properties(
     property_id: int,
     limit: int = Query(default=5, ge=1, le=20, description="Number of similar properties to return"),
@@ -169,7 +169,7 @@ def get_postcode_status(postcode: str, db: Session = Depends(get_db)):
     return PostcodeStatus(has_data=True, property_count=len(props), last_updated=last_updated)
 
 
-@router.get("/postcodes/suggest/{partial}", response_model=List[str])
+@router.get("/postcodes/suggest/{partial}", response_model=list[str])
 def suggest_postcodes(partial: str, db: Session = Depends(get_db)):
     """Suggest full postcodes for a partial input like 'SW20 8'.
 
@@ -202,7 +202,7 @@ def suggest_postcodes(partial: str, db: Session = Depends(get_db)):
     return sorted(found)
 
 
-@router.get("/postcodes", response_model=List[PostcodeSummary])
+@router.get("/postcodes", response_model=list[PostcodeSummary])
 def list_postcodes(db: Session = Depends(get_db)):
     """List all scraped postcodes with property counts."""
     results = (

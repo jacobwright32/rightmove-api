@@ -3,7 +3,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
@@ -73,10 +73,10 @@ class PropertyData:
     property_type: str = ""
     bedrooms: int = 0
     bathrooms: int = 0
-    extra_features: List[str] = field(default_factory=list)
-    floorplan_urls: List[str] = field(default_factory=list)
+    extra_features: list[str] = field(default_factory=list)
+    floorplan_urls: list[str] = field(default_factory=list)
     url: str = ""
-    sales: List[SaleRecord] = field(default_factory=list)
+    sales: list[SaleRecord] = field(default_factory=list)
 
 
 def extract_postcode(address: str) -> str:
@@ -176,9 +176,9 @@ def _resolve_list(flat: list, lst: list) -> list:
 # Postcode listing page
 # ---------------------------------------------------------------------------
 
-def _extract_urls_from_stream(flat: list, max_items: int) -> List[str]:
+def _extract_urls_from_stream(flat: list, max_items: int) -> list[str]:
     """Extract property detail URLs from a parsed turbo stream flat array."""
-    detail_urls: List[str] = []
+    detail_urls: list[str] = []
     for i, item in enumerate(flat):
         if item == "properties" and i + 1 < len(flat):
             prop_refs = flat[i + 1]
@@ -201,9 +201,9 @@ def _extract_urls_from_stream(flat: list, max_items: int) -> List[str]:
 
 def _extract_properties_from_stream(
     flat: list, postcode: str, max_items: int,
-) -> List[PropertyData]:
+) -> list[PropertyData]:
     """Extract PropertyData objects from a parsed turbo stream flat array."""
-    properties: List[PropertyData] = []
+    properties: list[PropertyData] = []
     for i, item in enumerate(flat):
         if item == "properties" and i + 1 < len(flat):
             prop_refs = flat[i + 1]
@@ -239,14 +239,14 @@ def _fetch_listing_page(normalised: str, page: int) -> Optional[list]:
 
 def get_postcode_page_urls(
     postcode: str, max_properties: int = 50, pages: int = 1,
-) -> List[str]:
+) -> list[str]:
     """Fetch property detail URLs for a postcode from Rightmove house prices.
 
     Parses the React Router Turbo Stream data embedded in the page HTML
     to extract property detail URLs. Supports multi-page pagination.
     """
     normalised = normalise_postcode_for_url(postcode)
-    all_urls: List[str] = []
+    all_urls: list[str] = []
 
     for page in range(1, pages + 1):
         flat = _fetch_listing_page(normalised, page)
@@ -267,7 +267,7 @@ def get_postcode_page_urls(
 
 def scrape_postcode_from_listing(
     postcode: str, max_properties: int = 50, pages: int = 1,
-) -> List[PropertyData]:
+) -> list[PropertyData]:
     """Scrape property data directly from the postcode listing page.
 
     This extracts basic property info and latest transaction from the listing
@@ -275,7 +275,7 @@ def scrape_postcode_from_listing(
     Supports multi-page pagination.
     """
     normalised = normalise_postcode_for_url(postcode)
-    all_properties: List[PropertyData] = []
+    all_properties: list[PropertyData] = []
 
     for page in range(1, pages + 1):
         flat = _fetch_listing_page(normalised, page)
@@ -422,14 +422,14 @@ def get_single_house_details(
     return prop
 
 
-def _extract_sales_from_table(soup: BeautifulSoup) -> List[SaleRecord]:
+def _extract_sales_from_table(soup: BeautifulSoup) -> list[SaleRecord]:
     """Extract sale history from the HTML table.
 
     Rightmove detail pages have tables with either 4 or 5 columns:
     5-col: Date sold | Price change % | Price | Property | Tenure
     4-col: Date sold | Price change % | Price | Tenure
     """
-    sales: List[SaleRecord] = []
+    sales: list[SaleRecord] = []
     tables = soup.find_all("table")
     if not tables:
         return sales
@@ -498,9 +498,8 @@ def _extract_detail_from_stream(flat: list, prop: PropertyData) -> None:
             if isinstance(next_val, int) and next_val > 0:
                 prop.bedrooms = next_val
 
-        elif item == "bathrooms" and not prop.bathrooms:
-            if isinstance(next_val, int) and next_val > 0:
-                prop.bathrooms = next_val
+        elif item == "bathrooms" and not prop.bathrooms and isinstance(next_val, int) and next_val > 0:
+            prop.bathrooms = next_val
 
     # If we still don't have sales, try extracting transactions from stream
     if not prop.sales:
@@ -562,43 +561,42 @@ def _extract_details_from_dt_dd(soup: BeautifulSoup, prop: PropertyData) -> None
 # Floorplan extraction
 # ---------------------------------------------------------------------------
 
-def _extract_floorplan_urls_from_stream(flat: Optional[list]) -> List[str]:
+def _extract_floorplan_urls_from_stream(flat: Optional[list]) -> list[str]:
     """Scan turbo stream data for floorplan image URLs."""
     if not flat:
         return []
 
-    urls: List[str] = []
+    urls: list[str] = []
     for i, item in enumerate(flat):
         if not isinstance(item, str):
             continue
         # Look for keys that indicate floorplan data
-        if "floorplan" in item.lower():
+        if "floorplan" in item.lower() and i + 1 < len(flat):
             # The next value might be a URL string, a list of URLs, or an object
-            if i + 1 < len(flat):
-                next_val = flat[i + 1]
-                if isinstance(next_val, str) and (
-                    next_val.startswith("http") or next_val.startswith("/")
-                ):
-                    urls.append(next_val)
-                elif isinstance(next_val, list):
-                    resolved = _resolve_list(flat, next_val)
-                    for v in resolved:
-                        if isinstance(v, str) and (
-                            v.startswith("http") or v.startswith("/")
-                        ):
-                            urls.append(v)
-                        elif isinstance(v, dict):
-                            # Might have url/src keys
-                            for k in ("url", "src", "href", "imageUrl"):
-                                u = v.get(k, "")
-                                if u and isinstance(u, str):
-                                    urls.append(u)
-                elif isinstance(next_val, dict):
-                    resolved = _resolve_object(flat, next_val)
-                    for k in ("url", "src", "href", "imageUrl"):
-                        u = resolved.get(k, "")
-                        if u and isinstance(u, str):
-                            urls.append(u)
+            next_val = flat[i + 1]
+            if isinstance(next_val, str) and (
+                next_val.startswith("http") or next_val.startswith("/")
+            ):
+                urls.append(next_val)
+            elif isinstance(next_val, list):
+                resolved = _resolve_list(flat, next_val)
+                for v in resolved:
+                    if isinstance(v, str) and (
+                        v.startswith("http") or v.startswith("/")
+                    ):
+                        urls.append(v)
+                    elif isinstance(v, dict):
+                        # Might have url/src keys
+                        for k in ("url", "src", "href", "imageUrl"):
+                            u = v.get(k, "")
+                            if u and isinstance(u, str):
+                                urls.append(u)
+            elif isinstance(next_val, dict):
+                resolved = _resolve_object(flat, next_val)
+                for k in ("url", "src", "href", "imageUrl"):
+                    u = resolved.get(k, "")
+                    if u and isinstance(u, str):
+                        urls.append(u)
         # Also catch direct URL strings containing "floorplan"
         if isinstance(item, str) and "floorplan" in item.lower() and (
             item.startswith("http") or item.startswith("/")
@@ -608,9 +606,9 @@ def _extract_floorplan_urls_from_stream(flat: Optional[list]) -> List[str]:
     return urls
 
 
-def _extract_floorplan_urls_from_html(soup: BeautifulSoup) -> List[str]:
+def _extract_floorplan_urls_from_html(soup: BeautifulSoup) -> list[str]:
     """Find floorplan image URLs from HTML img tags and links."""
-    urls: List[str] = []
+    urls: list[str] = []
 
     # Look for img tags with floorplan in alt, class, or data attributes
     for img in soup.find_all("img"):
@@ -618,9 +616,8 @@ def _extract_floorplan_urls_from_html(soup: BeautifulSoup) -> List[str]:
         cls = " ".join(img.get("class") or []).lower()
         src = img.get("src") or ""
 
-        if "floorplan" in alt or "floorplan" in cls or "floorplan" in src.lower():
-            if src:
-                urls.append(src)
+        if ("floorplan" in alt or "floorplan" in cls or "floorplan" in src.lower()) and src:
+            urls.append(src)
 
     # Look for links to floorplan images
     for a_tag in soup.find_all("a", href=True):
@@ -640,14 +637,14 @@ def _extract_floorplan_urls_from_html(soup: BeautifulSoup) -> List[str]:
 
 def extract_floorplan_urls(
     soup: BeautifulSoup, flat: Optional[list],
-) -> List[str]:
+) -> list[str]:
     """Extract floorplan URLs from stream data with HTML fallback. Deduplicates."""
     urls = _extract_floorplan_urls_from_stream(flat)
     urls.extend(_extract_floorplan_urls_from_html(soup))
 
     # Deduplicate while preserving order
     seen = set()
-    unique: List[str] = []
+    unique: list[str] = []
     for url in urls:
         if url not in seen:
             seen.add(url)
@@ -665,7 +662,7 @@ def scrape_postcode_with_details(
     pages: int = 1,
     extract_floorplan: bool = False,
     link_count: Optional[int] = None,
-) -> List[PropertyData]:
+) -> list[PropertyData]:
     """Scrape a postcode by visiting individual detail pages for richer data.
 
     Fetches property URLs from listing pages, then visits each detail page.
@@ -676,7 +673,7 @@ def scrape_postcode_with_details(
     if link_count is not None and link_count > 0:
         urls = urls[:link_count]
 
-    properties: List[PropertyData] = []
+    properties: list[PropertyData] = []
     for i, url in enumerate(urls):
         if i > 0 and SCRAPER_DELAY_BETWEEN_REQUESTS > 0:
             time.sleep(SCRAPER_DELAY_BETWEEN_REQUESTS)

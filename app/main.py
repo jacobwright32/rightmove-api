@@ -10,7 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from .config import CORS_ORIGINS, LOG_LEVEL, RATE_LIMIT_DEFAULT
-from .database import Base, engine, _migrate_db
+from .database import Base, _migrate_db, engine
 from .routers import analytics, properties, scraper
 
 logging.basicConfig(

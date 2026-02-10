@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import DATABASE_URL
 
@@ -34,8 +34,9 @@ def _migrate_db():
 
 def _backfill_parsed_fields():
     """Parse existing price/date strings into the new numeric/ISO columns."""
-    from .parsing import parse_price_to_int, parse_date_to_iso
     import sqlalchemy
+
+    from .parsing import parse_date_to_iso, parse_price_to_int
 
     with engine.connect() as conn:
         rows = conn.execute(sqlalchemy.text(

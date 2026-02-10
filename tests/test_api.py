@@ -1,6 +1,5 @@
 """Integration tests for the FastAPI endpoints."""
 
-import pytest
 
 from app.models import Property, Sale
 

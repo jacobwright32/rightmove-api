@@ -213,6 +213,7 @@ def scrape_area(
     generated from the ONS Postcode Directory.
     """
     import pyarrow.parquet as pq
+
     from ..scraper.rightmove import normalise_postcode_for_url
 
     partial_clean = partial.upper().replace("-", "").replace(" ", "")
@@ -234,7 +235,6 @@ def scrape_area(
             candidates.append(shorter.group(1))
 
     all_postcodes: list[str] = []
-    matched_outcode = None
     for outcode in candidates:
         parquet_path = parquet_dir / f"{outcode}.parquet"
         if not parquet_path.exists():
@@ -244,7 +244,6 @@ def scrape_area(
         matches = sorted(pc for pc in raw if pc.replace(" ", "").startswith(partial_clean))
         if matches:
             all_postcodes = matches
-            matched_outcode = outcode
             break
 
     if not all_postcodes:

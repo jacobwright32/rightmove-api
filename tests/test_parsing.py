@@ -1,6 +1,5 @@
 """Tests for price and date parsing utilities."""
 
-import pytest
 
 from app.parsing import parse_date_to_iso, parse_price_to_int
 
