@@ -8,6 +8,7 @@ import requests as req_lib
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..config import RATE_LIMIT_SCRAPE, SCRAPER_FRESHNESS_DAYS
@@ -148,7 +149,12 @@ def _upsert_property(db: Session, data: PropertyData) -> Property:
             )
             .first()
         )
-        if not exists:
+        if exists:
+            continue
+
+        # Use savepoint so a constraint violation only rolls back this sale
+        try:
+            nested = db.begin_nested()
             sale = Sale(
                 property_id=prop.id,
                 date_sold=norm_date,
@@ -160,6 +166,9 @@ def _upsert_property(db: Session, data: PropertyData) -> Property:
                 tenure=sale_data.tenure.upper() if sale_data.tenure else "",
             )
             db.add(sale)
+            nested.commit()
+        except IntegrityError:
+            nested.rollback()
 
     return prop
 
