@@ -81,6 +81,12 @@ _Researched 2026-02-10. Each task has full implementation details so it can be p
 - [x] **Tests**: 3 new tests (endpoint exists, empty result, cached data served). 66 total.
 - **Commit**: TBD
 
+### 4. Property Price Modelling Tab — DONE
+- [x] **Backend**: `app/modelling/` package (data_assembly, trainer, predictor). LightGBM + XGBoost with temporal/random splits. Feature registry from Property + Sale + CrimeStats + parsed extra_features (50+ features). In-memory model store. Metrics: R², RMSE, MAE, MAPE (no sklearn). 3 endpoints: `GET /model/features`, `POST /model/train`, `GET /model/{id}/predict`.
+- [x] **Frontend**: `ModellingPage.tsx` — two-column layout. Sidebar: target (price, price/sqft, price change %), model (LightGBM/XGBoost), split (random slider / temporal date picker), feature selection (grouped by category, select all/none). Results: metrics stat cards, feature importance bar chart (Recharts), predicted vs actual scatter (Plotly), residual histogram (Plotly), worst predictions table, single-property prediction input.
+- [x] **Tests**: 12 new tests (features endpoint, validation, LightGBM/XGBoost training, temporal/random splits, prediction). 95 total passing.
+- **Commits**: `5c31945`, `e83e98c`, `b992dd6`, `fb623c4`, `706be09`, `a2f1616`, `4c3a580`
+
 ### 5. Flood Risk Assessment
 - [ ] **Backend**: Environment Agency API is free, no auth. Create `app/enrichment/flood.py`. Two data sources: (1) EA Flood Risk API: `GET https://environment.data.gov.uk/flood-monitoring/id/floods?lat={lat}&lng={lng}&dist=1` for current warnings. (2) Open Flood Risk by Postcode: download CSV from https://www.getthedata.com/open-flood-risk-by-postcode (maps every UK postcode to flood risk zone 1/2/3). Add `flood_risk_level` column to Property model (values: "very_low", "low", "medium", "high"). Endpoint: `GET /api/v1/analytics/postcode/{postcode}/flood-risk` returns risk level + any active flood warnings.
 - [ ] **Frontend**: Flood risk badge on PropertyCard (green/amber/red). Flood risk section on PropertyDetailPage with explanation text. Flood risk comparison on CompareAreasPage. Filter by flood risk on HousingInsightsPage.
@@ -120,6 +126,7 @@ _Researched 2026-02-10. Each task has full implementation details so it can be p
 ---
 
 ## Verification
-- 66 backend tests passing: `pytest tests/ -v`
+- 95 backend tests passing: `pytest tests/ -v`
 - Frontend types clean: `npx tsc --noEmit`
-- App loads: `python -c "from app.main import app"` (29 routes)
+- Ruff lint clean: `ruff check app/ tests/`
+- App loads: `python -c "from app.main import app"` (32 routes)
