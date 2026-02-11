@@ -1,7 +1,7 @@
 import L from "leaflet";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { getPropertiesGeo } from "../api/client";
 import type { PropertyGeoPoint } from "../api/types";
@@ -11,13 +11,18 @@ import { formatPriceFull } from "../utils/formatting";
 const DEFAULT_CENTER: [number, number] = [51.5074, -0.1278];
 const DEFAULT_ZOOM = 11;
 
-function createColoredIcon(color: string) {
-  return L.divIcon({
-    className: "",
-    html: `<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>`,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
-  });
+// Pre-built icon cache — only 5 possible colors
+const ICON_CACHE: Record<string, L.DivIcon> = {};
+function getColoredIcon(color: string): L.DivIcon {
+  if (!ICON_CACHE[color]) {
+    ICON_CACHE[color] = L.divIcon({
+      className: "",
+      html: `<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    });
+  }
+  return ICON_CACHE[color];
 }
 
 function getPriceColor(price: number | null, quartiles: number[]): string {
@@ -36,6 +41,22 @@ function computeQuartiles(prices: number[]): number[] {
     sorted[Math.floor(sorted.length * 0.5)],
     sorted[Math.floor(sorted.length * 0.75)],
   ];
+}
+
+/** Imperatively re-center the map when the center changes. */
+function RecenterMap({ center }: { center: [number, number] }) {
+  const map = useMap();
+  const prevCenter = useRef(center);
+  useEffect(() => {
+    if (
+      center[0] !== prevCenter.current[0] ||
+      center[1] !== prevCenter.current[1]
+    ) {
+      map.setView(center, map.getZoom());
+      prevCenter.current = center;
+    }
+  }, [center, map]);
+  return null;
 }
 
 export default function MapViewPage() {
@@ -82,7 +103,9 @@ export default function MapViewPage() {
     <div className="flex h-[calc(100vh-56px)] flex-col">
       {/* Filter bar */}
       <div className="flex items-center gap-3 border-b bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-800">
+        <label htmlFor="postcode-filter" className="sr-only">Filter by postcode</label>
         <input
+          id="postcode-filter"
           type="text"
           placeholder="Filter by postcode..."
           value={filter}
@@ -118,11 +141,12 @@ export default function MapViewPage() {
       {/* Map */}
       <div className="flex-1">
         <MapContainer
-          center={center}
+          center={DEFAULT_CENTER}
           zoom={DEFAULT_ZOOM}
           className="h-full w-full"
           scrollWheelZoom={true}
         >
+          <RecenterMap center={center} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -132,7 +156,7 @@ export default function MapViewPage() {
               <Marker
                 key={p.id}
                 position={[p.latitude, p.longitude]}
-                icon={createColoredIcon(getPriceColor(p.latest_price, quartiles))}
+                icon={getColoredIcon(getPriceColor(p.latest_price, quartiles))}
               >
                 <Popup>
                   <div className="min-w-[200px]">

@@ -89,24 +89,40 @@ def get_properties_geo(
             db.rollback()
             logger.warning("Failed to save geocoded coordinates")
 
-    # Build response with latest sale price
+    # Single query: latest sale price per property (avoids N+1)
+    prop_ids = [p.id for p in props if p.latitude is not None]
+    latest_sale_sub = (
+        db.query(
+            Sale.property_id,
+            func.max(Sale.date_sold_iso).label("max_date"),
+        )
+        .filter(Sale.property_id.in_(prop_ids), Sale.price_numeric.isnot(None))
+        .group_by(Sale.property_id)
+        .subquery()
+    )
+    price_rows = (
+        db.query(Sale.property_id, Sale.price_numeric)
+        .join(
+            latest_sale_sub,
+            (Sale.property_id == latest_sale_sub.c.property_id)
+            & (Sale.date_sold_iso == latest_sale_sub.c.max_date),
+        )
+        .filter(Sale.price_numeric.isnot(None))
+        .all()
+    )
+    price_map = {row[0]: row[1] for row in price_rows}
+
     result = []
     for p in props:
         if p.latitude is None or p.longitude is None:
             continue
-        latest_sale = (
-            db.query(Sale.price_numeric)
-            .filter(Sale.property_id == p.id, Sale.price_numeric.isnot(None))
-            .order_by(Sale.date_sold_iso.desc())
-            .first()
-        )
         result.append(PropertyGeoPoint(
             id=p.id,
             address=p.address,
             postcode=p.postcode,
             latitude=p.latitude,
             longitude=p.longitude,
-            latest_price=latest_sale[0] if latest_sale else None,
+            latest_price=price_map.get(p.id),
             property_type=p.property_type,
             bedrooms=p.bedrooms,
             epc_rating=p.epc_rating,

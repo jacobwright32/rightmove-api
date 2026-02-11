@@ -5,6 +5,7 @@ Requires EPC_API_EMAIL and EPC_API_KEY in config.
 """
 
 import base64
+import contextlib
 import logging
 from typing import Optional
 
@@ -67,7 +68,11 @@ def fetch_epc_for_postcode(postcode: str) -> list[dict]:
         logger.warning("EPC API request failed for %s: %s", postcode, e)
         return []
 
-    data = resp.json()
+    try:
+        data = resp.json()
+    except Exception:
+        logger.warning("EPC API returned non-JSON response for %s", postcode)
+        return []
     rows = data.get("rows", [])
 
     results = []
@@ -77,10 +82,8 @@ def fetch_epc_for_postcode(postcode: str) -> list[dict]:
         for cost_key in ("heating-cost-current", "hot-water-cost-current", "lighting-cost-current"):
             val = row.get(cost_key)
             if val:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     energy_cost += int(float(val))
-                except (ValueError, TypeError):
-                    pass
 
         results.append({
             "address": row.get("address", "").upper(),

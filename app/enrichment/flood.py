@@ -5,7 +5,6 @@ Geocodes postcodes via Postcodes.io.
 """
 
 import logging
-from typing import Optional
 
 import httpx
 
@@ -61,7 +60,7 @@ def get_flood_risk(postcode: str) -> dict:
     }
 
 
-def _fetch_active_warnings(lat: float, lng: float) -> list[dict]:
+def _fetch_active_warnings(lat: float, lng: float) -> list:
     """Fetch active flood warnings near coordinates from EA API."""
     try:
         resp = httpx.get(
@@ -89,7 +88,7 @@ def _fetch_active_warnings(lat: float, lng: float) -> list[dict]:
 
 def _assess_risk_from_areas(
     lat: float, lng: float
-) -> tuple[str, Optional[int], str]:
+) -> tuple:
     """Determine flood risk zone from EA flood areas near coordinates.
 
     Returns (risk_level, flood_zone, description).

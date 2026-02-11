@@ -1,6 +1,7 @@
 """Enrichment endpoints — EPC data and crime statistics."""
 
 import logging
+import re
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -83,13 +84,11 @@ def enrich_epc(postcode: str, db: Session = Depends(get_db)):
     )
 
 
-def _fuzzy_match(prop_address: str, epc_lookup: dict[str, dict]) -> Optional[dict]:
+def _fuzzy_match(prop_address: str, epc_lookup: dict) -> Optional[dict]:
     """Try to match a property address to an EPC certificate.
 
     Strips commas, extra spaces, and tries matching the first line of the address.
     """
-    import re
-
     # Normalize: remove commas, collapse spaces
     norm = re.sub(r"[,]+", " ", prop_address).strip()
     norm = re.sub(r"\s+", " ", norm)

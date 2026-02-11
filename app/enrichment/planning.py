@@ -5,6 +5,7 @@ No authentication required. Geocodes postcodes via Postcodes.io.
 """
 
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -21,6 +22,8 @@ PLANNING_API_URL = "https://www.planning.data.gov.uk/entity.json"
 # Cache planning data for 30 days
 PLANNING_CACHE_DAYS = 30
 
+_DWELLING_RE = re.compile(r"(\d+)\s*(dwelling|flat|apartment|house|unit)")
+
 # Keywords that indicate major developments
 _MAJOR_KEYWORDS = [
     "demolition", "new build", "erection of", "residential development",
@@ -36,8 +39,7 @@ def _is_major_development(description: str) -> bool:
         return False
     lower = description.lower()
     # Check for dwelling counts (e.g. "10 dwellings", "15 flats")
-    import re
-    dwelling_match = re.search(r"(\d+)\s*(dwelling|flat|apartment|house|unit)", lower)
+    dwelling_match = _DWELLING_RE.search(lower)
     if dwelling_match and int(dwelling_match.group(1)) >= 10:
         return True
     # Check keyword list

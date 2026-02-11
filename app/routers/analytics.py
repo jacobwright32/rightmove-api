@@ -1,4 +1,3 @@
-import json
 import math
 import re
 import statistics
@@ -306,8 +305,6 @@ def get_housing_insights(
     postcode_dates: dict[str, list[tuple[str, int]]] = defaultdict(list)
     bedroom_prices: dict[int, list[int]] = defaultdict(list)
     yearly_counts: dict[int, int] = defaultdict(int)
-    prev_year_count = 0
-    curr_year_count = 0
     property_ids: set[int] = set()
     # For investment deals: track latest sale per property
     latest_sale_per_prop: dict[int, tuple] = {}  # prop_id -> (sale, prop)
@@ -483,7 +480,7 @@ def get_housing_insights(
     # --- Investment deals ---
     # Properties whose latest sale is >5% below their postcode average
     investment_deals: list[InvestmentDeal] = []
-    for prop_id, (sale, prop) in latest_sale_per_prop.items():
+    for _prop_id, (sale, prop) in latest_sale_per_prop.items():
         if not sale.price_numeric or not prop.postcode:
             continue
         pc_prices = postcode_prices.get(prop.postcode, [])
@@ -891,7 +888,7 @@ def get_summary(postcode: str, db: Session = Depends(get_db)):
 
 def _compute_annual_medians(
     db: Session, postcode: str
-) -> list[AnnualMedian]:
+) -> list:
     """Get median sale price per year for a postcode."""
     rows = _get_sales_for_postcode(db, postcode)
     yearly: dict[int, list[int]] = defaultdict(list)
@@ -918,8 +915,8 @@ def _compute_cagr(start: float, end: float, years: int) -> Optional[float]:
 
 
 def _compute_growth_metrics(
-    medians: list[AnnualMedian], periods: list[int]
-) -> list[GrowthPeriodMetric]:
+    medians: list, periods: list
+) -> list:
     """Compute CAGR for each requested period."""
     if not medians:
         return []
@@ -949,7 +946,7 @@ def _compute_growth_metrics(
     return results
 
 
-def _compute_volatility(medians: list[AnnualMedian]) -> Optional[float]:
+def _compute_volatility(medians: list) -> Optional[float]:
     """Annual return volatility (std dev of year-over-year % changes)."""
     if len(medians) < 3:
         return None
@@ -964,7 +961,7 @@ def _compute_volatility(medians: list[AnnualMedian]) -> Optional[float]:
     return round(statistics.stdev(returns), 2)
 
 
-def _compute_max_drawdown(medians: list[AnnualMedian]) -> Optional[float]:
+def _compute_max_drawdown(medians: list) -> Optional[float]:
     """Largest peak-to-trough decline in median prices (percentage)."""
     if len(medians) < 2:
         return None
@@ -981,8 +978,8 @@ def _compute_max_drawdown(medians: list[AnnualMedian]) -> Optional[float]:
 
 
 def _compute_forecast(
-    medians: list[AnnualMedian],
-) -> list[GrowthForecastPoint]:
+    medians: list,
+) -> list:
     """Linear forecast with confidence bands. Uses scipy if available."""
     if len(medians) < 3:
         return []
@@ -1025,8 +1022,8 @@ def _compute_forecast(
 
 
 def _linear_forecast_fallback(
-    medians: list[AnnualMedian],
-) -> list[GrowthForecastPoint]:
+    medians: list,
+) -> list:
     """Simple linear regression fallback without scipy."""
     n = len(medians)
     if n < 2:
@@ -1072,6 +1069,7 @@ def get_postcode_growth(
         raise HTTPException(status_code=404, detail="No sale data for this postcode")
 
     period_list = [int(p.strip()) for p in periods.split(",") if p.strip().isdigit()]
+    period_list = [p for p in period_list if 1 <= p <= 30][:10]  # Cap at 10 periods, max 30yr
     metrics = _compute_growth_metrics(medians, period_list)
     volatility = _compute_volatility(medians)
     max_drawdown = _compute_max_drawdown(medians)
@@ -1098,11 +1096,12 @@ def get_growth_leaderboard(
     db: Session = Depends(get_db),
 ):
     """Top postcodes by CAGR over the specified period."""
-    # Get all distinct postcodes with sales
+    # Get distinct postcodes with sales — cap at 500 to bound computation
     postcodes = [
         row[0]
         for row in db.query(func.distinct(Property.postcode))
         .filter(Property.postcode.isnot(None))
+        .limit(500)
         .all()
     ]
 

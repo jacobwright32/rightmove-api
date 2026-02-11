@@ -23,7 +23,7 @@ POLICE_API_URL = "https://data.police.uk/api/crimes-street/all-crime"
 CRIME_CACHE_DAYS = 30
 
 
-def fetch_crimes(lat: float, lng: float, date: Optional[str] = None) -> list[dict]:
+def fetch_crimes(lat: float, lng: float, date: Optional[str] = None) -> list:
     """Fetch street-level crimes from Police API.
 
     Args:
@@ -129,7 +129,7 @@ def get_crime_summary(
     return _build_summary(all_stats, cached=False)
 
 
-def _build_summary(stats: list[CrimeStats], cached: bool) -> dict:
+def _build_summary(stats: list, cached: bool) -> dict:
     """Build summary dict from CrimeStats rows."""
     categories: dict[str, int] = defaultdict(int)
     monthly: dict[str, int] = defaultdict(int)
