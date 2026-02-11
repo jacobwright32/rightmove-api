@@ -18,6 +18,7 @@ import FloodRiskSection from "../components/FloodRiskSection";
 import GrowthSection from "../components/GrowthSection";
 import ListingStatusSection from "../components/ListingStatusSection";
 import PlanningSection from "../components/PlanningSection";
+import TransportSection from "../components/TransportSection";
 import SaleHistoryTable from "../components/SaleHistoryTable";
 import { useDarkMode } from "../hooks/useDarkMode";
 import { getChartColors } from "../utils/chartTheme";
@@ -361,6 +362,13 @@ export default function PropertyDetailPage() {
       {property.postcode && (
         <div className="mb-6">
           <FloodRiskSection postcode={property.postcode} />
+        </div>
+      )}
+
+      {/* Transport links */}
+      {property.postcode && (
+        <div className="mb-6">
+          <TransportSection property={property} onRefresh={setProperty} />
         </div>
       )}
 
