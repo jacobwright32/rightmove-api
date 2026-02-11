@@ -88,6 +88,14 @@ _Researched 2026-02-10. Each task has full implementation details so it can be p
 - [x] **Fixes**: Dtype coercion for crime/EPC/numeric columns (object→float), SPA catch-all API guard, 7 new DB indexes across all tables.
 - **Commits**: `5c31945`→`a2f1616`, `3818340`, `8c9f5da`
 
+### 4b. Transport Distance Enrichment — DONE
+- [x] **Backend**: `app/enrichment/transport.py` — NaPTAN CSV download + parquet cache (~96MB→~15MB), static UK airports (25) + ports (20) dicts, haversine math, scipy `cKDTree` for O(log n) nearest-neighbour. 10 new Property columns (6 distances, 3 names, bus count). `POST /api/v1/enrich/transport/{postcode}` endpoint. Auto-geocodes properties without coordinates.
+- [x] **Modelling**: 10 transport features in FEATURE_REGISTRY under "Transport" category (7 numeric distances + 3 categorical station/airport names). Integrated into `_build_record()` and `_CATEGORICAL_FEATURES`.
+- [x] **Frontend**: `TransportSection.tsx` component with 2x3 distance grid (rail, tube, tram, bus, airport, port), station names, bus stops within 500m count. "Compute Transport Distances" button for enrichment. Added to PropertyDetailPage.
+- [x] **Tests**: 14 new tests (haversine, cartesian, static data validation, endpoint, feature registry). 109 total passing.
+- [x] **Bug fix**: Scraper duplicate sale IntegrityError — wrapped sale inserts in `db.begin_nested()` savepoint.
+- **Commits**: `66fc6fa`, `af0a094`, `98359b9`, `8ffaa2f`
+
 ### 5. Flood Risk Assessment
 - [ ] **Backend**: Environment Agency API is free, no auth. Create `app/enrichment/flood.py`. Two data sources: (1) EA Flood Risk API: `GET https://environment.data.gov.uk/flood-monitoring/id/floods?lat={lat}&lng={lng}&dist=1` for current warnings. (2) Open Flood Risk by Postcode: download CSV from https://www.getthedata.com/open-flood-risk-by-postcode (maps every UK postcode to flood risk zone 1/2/3). Add `flood_risk_level` column to Property model (values: "very_low", "low", "medium", "high"). Endpoint: `GET /api/v1/analytics/postcode/{postcode}/flood-risk` returns risk level + any active flood warnings.
 - [ ] **Frontend**: Flood risk badge on PropertyCard (green/amber/red). Flood risk section on PropertyDetailPage with explanation text. Flood risk comparison on CompareAreasPage. Filter by flood risk on HousingInsightsPage.
@@ -127,7 +135,7 @@ _Researched 2026-02-10. Each task has full implementation details so it can be p
 ---
 
 ## Verification
-- 95 backend tests passing: `pytest tests/ -v`
+- 109 backend tests passing: `pytest tests/ -v`
 - Frontend types clean: `npx tsc --noEmit`
 - Ruff lint clean: `ruff check app/ tests/`
 - App loads: `python -c "from app.main import app"` (34 routes)
