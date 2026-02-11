@@ -15,6 +15,7 @@ import type {
   PostcodeStatus,
   PropertyBrief,
   PropertyDetail,
+  PropertyListingResponse,
   ScrapeResponse,
 } from "./types";
 
@@ -207,6 +208,15 @@ export async function getPlanningApplications(
 ): Promise<PlanningResponse> {
   const res = await api.get<PlanningResponse>(
     `/analytics/postcode/${encodeURIComponent(postcode)}/planning`
+  );
+  return res.data;
+}
+
+export async function getPropertyListing(
+  propertyId: number,
+): Promise<PropertyListingResponse> {
+  const res = await api.get<PropertyListingResponse>(
+    `/properties/${propertyId}/listing`
   );
   return res.data;
 }

@@ -16,6 +16,7 @@ import EPCBadge from "../components/EPCBadge";
 import FloodRiskBadge from "../components/FloodRiskBadge";
 import FloodRiskSection from "../components/FloodRiskSection";
 import GrowthSection from "../components/GrowthSection";
+import ListingStatusSection from "../components/ListingStatusSection";
 import PlanningSection from "../components/PlanningSection";
 import SaleHistoryTable from "../components/SaleHistoryTable";
 import { useDarkMode } from "../hooks/useDarkMode";
@@ -182,6 +183,11 @@ export default function PropertyDetailPage() {
             View on Rightmove
           </a>
         )}
+      </div>
+
+      {/* Listing status */}
+      <div className="mb-6">
+        <ListingStatusSection propertyId={property.id} />
       </div>
 
       {/* Price appreciation stats */}

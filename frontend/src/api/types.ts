@@ -25,6 +25,12 @@ export interface PropertyBrief {
   epc_environment_impact: number | null;
   estimated_energy_cost: number | null;
   flood_risk_level: string | null;
+  listing_status: string | null;
+  listing_price: number | null;
+  listing_price_display: string | null;
+  listing_date: string | null;
+  listing_url: string | null;
+  listing_checked_at: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -302,6 +308,19 @@ export interface PlanningResponse {
   total_count: number;
   major_count: number;
   cached: boolean;
+}
+
+// Listing Status
+
+export interface PropertyListingResponse {
+  property_id: number;
+  listing_status: string | null;
+  listing_price: number | null;
+  listing_price_display: string | null;
+  listing_date: string | null;
+  listing_url: string | null;
+  listing_checked_at: string | null;
+  stale: boolean;
 }
 
 // Crime Data

@@ -35,6 +35,13 @@ class Property(Base):
     estimated_energy_cost = Column(Integer, nullable=True)  # Annual £
     # Flood risk (populated via flood assessment endpoint)
     flood_risk_level = Column(String, nullable=True)  # very_low/low/medium/high
+    # Listing status (populated via listing check endpoint)
+    listing_status = Column(String, nullable=True)  # for_sale/under_offer/sold_stc/not_listed
+    listing_price = Column(Integer, nullable=True)  # Numeric asking price
+    listing_price_display = Column(String, nullable=True)  # "Guide Price £450,000"
+    listing_date = Column(String, nullable=True)  # When listed, e.g. "16th January 2026"
+    listing_url = Column(String, nullable=True)  # Rightmove for-sale page URL
+    listing_checked_at = Column(DateTime, nullable=True)  # Last check timestamp
     # Geocoded coordinates (populated via /properties/geo endpoint)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)

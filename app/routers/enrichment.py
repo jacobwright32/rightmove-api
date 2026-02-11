@@ -11,13 +11,16 @@ from ..database import get_db
 from ..enrichment.crime import get_crime_summary
 from ..enrichment.epc import fetch_epc_for_postcode
 from ..enrichment.flood import get_flood_risk
+from ..enrichment.listing import check_property_listing, enrich_postcode_listings
 from ..enrichment.planning import get_planning_data
 from ..models import Property
 from ..schemas import (
     CrimeSummaryResponse,
     EPCEnrichmentResponse,
     FloodRiskResponse,
+    ListingEnrichmentResponse,
     PlanningResponse,
+    PropertyListingResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -171,6 +174,51 @@ def get_postcode_planning(postcode: str, db: Session = Depends(get_db)):
         applications=result["applications"],
         total_count=result["total_count"],
         major_count=result["major_count"],
+        cached=result["cached"],
+    )
+
+
+# Listing status endpoint
+listing_router = APIRouter(tags=["enrichment"])
+
+
+@listing_router.get(
+    "/properties/{property_id}/listing",
+    response_model=PropertyListingResponse,
+)
+def get_property_listing(property_id: int, db: Session = Depends(get_db)):
+    """Get current listing status for a single property.
+
+    Returns cached data if fresh, otherwise scrapes Rightmove for the
+    property's postcode and matches by address.
+    """
+    result = check_property_listing(db, property_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Property not found")
+    return PropertyListingResponse(**result)
+
+
+@router.post("/listing/{postcode}", response_model=ListingEnrichmentResponse)
+def enrich_listing(postcode: str, db: Session = Depends(get_db)):
+    """Check which properties in a postcode are currently for sale on Rightmove.
+
+    Scrapes Rightmove's for-sale search, matches to stored properties by address.
+    Results are cached for LISTING_FRESHNESS_HOURS.
+    """
+    clean = postcode.upper().strip()
+    props = db.query(Property).filter(Property.postcode == clean).all()
+    if not props:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No properties found for postcode {clean}. Scrape first.",
+        )
+
+    result = enrich_postcode_listings(db, clean)
+    return ListingEnrichmentResponse(
+        postcode=clean,
+        listings_found=result["listings_found"],
+        properties_matched=result["properties_matched"],
+        properties_not_listed=result["properties_not_listed"],
         cached=result["cached"],
     )
 

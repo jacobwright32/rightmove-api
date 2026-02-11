@@ -34,6 +34,12 @@ class PropertyBrief(BaseModel):
     epc_environment_impact: Optional[int] = None
     estimated_energy_cost: Optional[int] = None
     flood_risk_level: Optional[str] = None
+    listing_status: Optional[str] = None
+    listing_price: Optional[int] = None
+    listing_price_display: Optional[str] = None
+    listing_date: Optional[str] = None
+    listing_url: Optional[str] = None
+    listing_checked_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -329,6 +335,28 @@ class PlanningResponse(BaseModel):
     applications: list[PlanningApplicationOut] = []
     total_count: int = 0
     major_count: int = 0
+    cached: bool = False
+
+
+# --- Listing status schemas ---
+
+
+class PropertyListingResponse(BaseModel):
+    property_id: int
+    listing_status: Optional[str] = None
+    listing_price: Optional[int] = None
+    listing_price_display: Optional[str] = None
+    listing_date: Optional[str] = None
+    listing_url: Optional[str] = None
+    listing_checked_at: Optional[datetime] = None
+    stale: bool = False
+
+
+class ListingEnrichmentResponse(BaseModel):
+    postcode: str
+    listings_found: int
+    properties_matched: int
+    properties_not_listed: int
     cached: bool = False
 
 

@@ -28,6 +28,12 @@ def _migrate_db():
             "ALTER TABLE properties ADD COLUMN flood_risk_level TEXT",
             "ALTER TABLE properties ADD COLUMN latitude REAL",
             "ALTER TABLE properties ADD COLUMN longitude REAL",
+            "ALTER TABLE properties ADD COLUMN listing_status TEXT",
+            "ALTER TABLE properties ADD COLUMN listing_price INTEGER",
+            "ALTER TABLE properties ADD COLUMN listing_price_display TEXT",
+            "ALTER TABLE properties ADD COLUMN listing_date TEXT",
+            "ALTER TABLE properties ADD COLUMN listing_url TEXT",
+            "ALTER TABLE properties ADD COLUMN listing_checked_at TIMESTAMP",
         ]
         for sql in migrations:
             try:

@@ -667,6 +667,60 @@ class TestPlanningApplications:
         assert data["major_count"] == 1
 
 
+class TestListingStatus:
+    """Tests for listing status / currently-for-sale feature."""
+
+    def test_listing_endpoint_not_found(self, client):
+        """Listing endpoint returns 404 for non-existent property."""
+        resp = client.get("/api/v1/properties/999/listing")
+        assert resp.status_code == 404
+
+    def test_listing_cached_data(self, client, db_session):
+        """Property with fresh listing data returns cached result."""
+        from datetime import datetime, timezone
+
+        prop = Property(
+            address="10 High St, SW20 8NE", postcode="SW20 8NE",
+            listing_status="for_sale", listing_price=450000,
+            listing_price_display="£450,000",
+            listing_url="https://www.rightmove.co.uk/properties/12345",
+            listing_date="16th January 2026",
+            listing_checked_at=datetime.now(timezone.utc),
+        )
+        db_session.add(prop)
+        db_session.commit()
+
+        resp = client.get(f"/api/v1/properties/{prop.id}/listing")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["listing_status"] == "for_sale"
+        assert data["listing_price"] == 450000
+        assert data["listing_price_display"] == "£450,000"
+        assert data["stale"] is False
+
+    def test_listing_fields_on_property_response(self, client, db_session):
+        """Property detail response should include listing fields."""
+        prop = Property(
+            address="10 High St, SW20 8NE", postcode="SW20 8NE",
+            listing_status="for_sale", listing_price=450000,
+            listing_price_display="Guide Price £450,000",
+        )
+        db_session.add(prop)
+        db_session.commit()
+
+        resp = client.get(f"/api/v1/properties/{prop.id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["listing_status"] == "for_sale"
+        assert data["listing_price"] == 450000
+        assert data["listing_price_display"] == "Guide Price £450,000"
+
+    def test_listing_enrichment_no_properties(self, client):
+        """Listing enrichment should 404 with no properties for postcode."""
+        resp = client.post("/api/v1/enrich/listing/XX1 1XX")
+        assert resp.status_code == 404
+
+
 class TestScrapePropertyValidation:
     def test_invalid_url(self, client):
         resp = client.post("/api/v1/scrape/property", json={"url": "https://example.com"})
