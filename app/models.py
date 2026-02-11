@@ -33,6 +33,8 @@ class Property(Base):
     epc_score = Column(Integer, nullable=True)  # 1-100
     epc_environment_impact = Column(Integer, nullable=True)
     estimated_energy_cost = Column(Integer, nullable=True)  # Annual £
+    # Flood risk (populated via flood assessment endpoint)
+    flood_risk_level = Column(String, nullable=True)  # very_low/low/medium/high
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,

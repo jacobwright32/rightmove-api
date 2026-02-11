@@ -25,6 +25,7 @@ def _migrate_db():
             "ALTER TABLE properties ADD COLUMN epc_score INTEGER",
             "ALTER TABLE properties ADD COLUMN epc_environment_impact INTEGER",
             "ALTER TABLE properties ADD COLUMN estimated_energy_cost INTEGER",
+            "ALTER TABLE properties ADD COLUMN flood_risk_level TEXT",
         ]
         for sql in migrations:
             try:

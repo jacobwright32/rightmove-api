@@ -3,6 +3,7 @@ import type {
   AreaScrapeResponse,
   CrimeSummaryResponse,
   EPCEnrichmentResponse,
+  FloodRiskResponse,
   GrowthLeaderboardEntry,
   HousingInsightsFilters,
   HousingInsightsResponse,
@@ -156,6 +157,15 @@ export async function enrichEPC(
 ): Promise<EPCEnrichmentResponse> {
   const res = await api.post<EPCEnrichmentResponse>(
     `/enrich/epc/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function getFloodRisk(
+  postcode: string,
+): Promise<FloodRiskResponse> {
+  const res = await api.get<FloodRiskResponse>(
+    `/analytics/postcode/${encodeURIComponent(postcode)}/flood-risk`
   );
   return res.data;
 }

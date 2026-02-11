@@ -56,6 +56,7 @@ app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(analytics.postcode_router, prefix="/api/v1")
 app.include_router(enrichment.router, prefix="/api/v1")
 app.include_router(enrichment.crime_router, prefix="/api/v1")
+app.include_router(enrichment.flood_router, prefix="/api/v1")
 
 
 @app.get("/health")

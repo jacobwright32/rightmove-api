@@ -13,6 +13,8 @@ import { getProperty, getSimilarProperties } from "../api/client";
 import type { PropertyBrief, PropertyDetail } from "../api/types";
 import CrimeSection from "../components/CrimeSection";
 import EPCBadge from "../components/EPCBadge";
+import FloodRiskBadge from "../components/FloodRiskBadge";
+import FloodRiskSection from "../components/FloodRiskSection";
 import GrowthSection from "../components/GrowthSection";
 import SaleHistoryTable from "../components/SaleHistoryTable";
 import { useDarkMode } from "../hooks/useDarkMode";
@@ -148,6 +150,7 @@ export default function PropertyDetailPage() {
             <span>{property.bathrooms} bath</span>
           )}
           <EPCBadge rating={property.epc_rating} score={property.epc_score} size="md" />
+          <FloodRiskBadge riskLevel={property.flood_risk_level} size="md" />
         </div>
         {property.url && (
           <a
@@ -307,6 +310,13 @@ export default function PropertyDetailPage() {
       {property.postcode && (
         <div className="mb-6">
           <GrowthSection postcode={property.postcode} />
+        </div>
+      )}
+
+      {/* Flood risk */}
+      {property.postcode && (
+        <div className="mb-6">
+          <FloodRiskSection postcode={property.postcode} />
         </div>
       )}
 

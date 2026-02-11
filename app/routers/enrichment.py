@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..enrichment.crime import get_crime_summary
 from ..enrichment.epc import fetch_epc_for_postcode
+from ..enrichment.flood import get_flood_risk
 from ..models import Property
-from ..schemas import CrimeSummaryResponse, EPCEnrichmentResponse
+from ..schemas import CrimeSummaryResponse, EPCEnrichmentResponse, FloodRiskResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/enrich", tags=["enrichment"])
@@ -107,6 +108,40 @@ def _fuzzy_match(prop_address: str, epc_lookup: dict[str, dict]) -> Optional[dic
                 return cert
 
     return None
+
+
+# Flood risk endpoint
+flood_router = APIRouter(tags=["analytics"])
+
+
+@flood_router.get(
+    "/analytics/postcode/{postcode}/flood-risk",
+    response_model=FloodRiskResponse,
+)
+def get_postcode_flood_risk(postcode: str, db: Session = Depends(get_db)):
+    """Get flood risk assessment for a postcode.
+
+    Uses the free Environment Agency Flood Monitoring API (no auth required).
+    Caches risk_level on properties for the postcode.
+    """
+    clean = postcode.upper().strip()
+    result = get_flood_risk(clean)
+
+    # Cache the risk level on matching properties
+    if result["risk_level"] != "unknown":
+        props = db.query(Property).filter(Property.postcode == clean).all()
+        for prop in props:
+            prop.flood_risk_level = result["risk_level"]
+        if props:
+            db.commit()
+
+    return FloodRiskResponse(
+        postcode=clean,
+        risk_level=result["risk_level"],
+        flood_zone=result["flood_zone"],
+        active_warnings=result["active_warnings"],
+        description=result["description"],
+    )
 
 
 # Crime endpoint lives under analytics for consistency

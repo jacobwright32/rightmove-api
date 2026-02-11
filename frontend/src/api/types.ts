@@ -24,6 +24,7 @@ export interface PropertyBrief {
   epc_score: number | null;
   epc_environment_impact: number | null;
   estimated_energy_cost: number | null;
+  flood_risk_level: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -211,6 +212,22 @@ export interface EPCEnrichmentResponse {
   message: string;
   properties_updated: number;
   certificates_found: number;
+}
+
+// Flood Risk
+
+export interface FloodWarning {
+  severity: string;
+  message: string;
+  area: string;
+}
+
+export interface FloodRiskResponse {
+  postcode: string;
+  risk_level: string;
+  flood_zone: number | null;
+  active_warnings: FloodWarning[];
+  description: string;
 }
 
 // Growth & Forecasting

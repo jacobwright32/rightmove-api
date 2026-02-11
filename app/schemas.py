@@ -33,6 +33,7 @@ class PropertyBrief(BaseModel):
     epc_score: Optional[int] = None
     epc_environment_impact: Optional[int] = None
     estimated_energy_cost: Optional[int] = None
+    flood_risk_level: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -235,6 +236,23 @@ class EPCEnrichmentResponse(BaseModel):
     message: str
     properties_updated: int
     certificates_found: int
+
+
+# --- Flood Risk schemas ---
+
+
+class FloodWarning(BaseModel):
+    severity: str
+    message: str
+    area: str
+
+
+class FloodRiskResponse(BaseModel):
+    postcode: str
+    risk_level: str  # very_low, low, medium, high, unknown
+    flood_zone: Optional[int] = None
+    active_warnings: list[FloodWarning] = []
+    description: str = ""
 
 
 # --- Growth & Forecasting schemas ---

@@ -418,6 +418,49 @@ class TestCrimeEndpoint:
         assert data["categories"]["burglary"] == 5
 
 
+class TestFloodRisk:
+    """Tests for flood risk assessment endpoint."""
+
+    def test_flood_endpoint_exists(self, client):
+        """Flood risk endpoint should exist and return valid response."""
+        resp = client.get("/api/v1/analytics/postcode/SW20 8NE/flood-risk")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["postcode"] == "SW20 8NE"
+        assert "risk_level" in data
+        assert data["risk_level"] in ("very_low", "low", "medium", "high", "unknown")
+        assert "active_warnings" in data
+
+    def test_flood_risk_cached_on_property(self, client, db_session):
+        """Flood risk level should be cached on property after assessment."""
+        prop = Property(address="10 High St, SW20 8NE", postcode="SW20 8NE")
+        db_session.add(prop)
+        db_session.commit()
+
+        resp = client.get("/api/v1/analytics/postcode/SW20 8NE/flood-risk")
+        assert resp.status_code == 200
+
+        # Refresh property from DB
+        db_session.refresh(prop)
+        # If geocoding succeeded, risk_level should be cached
+        if resp.json()["risk_level"] != "unknown":
+            assert prop.flood_risk_level is not None
+
+    def test_flood_risk_on_property_response(self, client, db_session):
+        """Property response should include flood_risk_level field."""
+        prop = Property(
+            address="10 High St, SW20 8NE", postcode="SW20 8NE",
+            flood_risk_level="low",
+        )
+        db_session.add(prop)
+        db_session.commit()
+
+        resp = client.get(f"/api/v1/properties/{prop.id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["flood_risk_level"] == "low"
+
+
 class TestCapitalGrowth:
     """Tests for capital growth & forecasting endpoints."""
 
