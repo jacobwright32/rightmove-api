@@ -27,6 +27,7 @@ frontend/dist/
 sales_data/
 rightmove_export.csv
 data/postcodes/
+data/
 
 # OS
 Thumbs.db

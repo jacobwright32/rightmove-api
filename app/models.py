@@ -45,6 +45,17 @@ class Property(Base):
     # Geocoded coordinates (populated via /properties/geo endpoint)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
+    # Transport distances (populated via /enrich/transport endpoint)
+    dist_nearest_rail_km = Column(Float, nullable=True)
+    dist_nearest_tube_km = Column(Float, nullable=True)
+    dist_nearest_tram_km = Column(Float, nullable=True)
+    dist_nearest_bus_km = Column(Float, nullable=True)
+    dist_nearest_airport_km = Column(Float, nullable=True)
+    dist_nearest_port_km = Column(Float, nullable=True)
+    nearest_rail_station = Column(String, nullable=True)
+    nearest_tube_station = Column(String, nullable=True)
+    nearest_airport = Column(String, nullable=True)
+    bus_stops_within_500m = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,

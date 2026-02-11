@@ -31,6 +31,17 @@ export interface PropertyBrief {
   listing_date: string | null;
   listing_url: string | null;
   listing_checked_at: string | null;
+  // Transport distances
+  dist_nearest_rail_km: number | null;
+  dist_nearest_tube_km: number | null;
+  dist_nearest_tram_km: number | null;
+  dist_nearest_bus_km: number | null;
+  dist_nearest_airport_km: number | null;
+  dist_nearest_port_km: number | null;
+  nearest_rail_station: string | null;
+  nearest_tube_station: string | null;
+  nearest_airport: string | null;
+  bus_stops_within_500m: number | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -221,6 +232,14 @@ export interface HousingInsightsResponse {
   kpis: KPIData;
   investment_deals: InvestmentDeal[];
   filters_applied: Record<string, unknown>;
+}
+
+// Transport Enrichment
+
+export interface TransportEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
 }
 
 // EPC Enrichment

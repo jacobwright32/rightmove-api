@@ -13,6 +13,7 @@ from ..enrichment.epc import fetch_epc_for_postcode
 from ..enrichment.flood import get_flood_risk
 from ..enrichment.listing import check_property_listing, enrich_postcode_listings
 from ..enrichment.planning import get_planning_data
+from ..enrichment.transport import enrich_postcode_transport
 from ..models import Property
 from ..schemas import (
     CrimeSummaryResponse,
@@ -21,6 +22,7 @@ from ..schemas import (
     ListingEnrichmentResponse,
     PlanningResponse,
     PropertyListingResponse,
+    TransportEnrichmentResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -116,6 +118,30 @@ def _fuzzy_match(prop_address: str, epc_lookup: dict) -> Optional[dict]:
                 return cert
 
     return None
+
+
+@router.post("/transport/{postcode}", response_model=TransportEnrichmentResponse)
+def enrich_transport(postcode: str, db: Session = Depends(get_db)):
+    """Compute transport distances for all properties in a postcode.
+
+    Downloads NaPTAN data on first call (~96MB, cached as parquet).
+    Uses cKDTree for O(log n) nearest-neighbour lookups.
+    Properties without coordinates are geocoded first.
+    """
+    clean = postcode.upper().strip()
+    props = db.query(Property).filter(Property.postcode == clean).all()
+    if not props:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No properties found for postcode {clean}. Scrape first.",
+        )
+
+    result = enrich_postcode_transport(db, clean)
+    return TransportEnrichmentResponse(
+        message=result["message"],
+        properties_updated=result["properties_updated"],
+        properties_skipped=result["properties_skipped"],
+    )
 
 
 # Flood risk endpoint

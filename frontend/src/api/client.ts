@@ -22,6 +22,7 @@ import type {
   SinglePredictionResponse,
   TrainRequest,
   TrainResponse,
+  TransportEnrichmentResponse,
 } from "./types";
 
 const api = axios.create({ baseURL: "/api/v1" });
@@ -222,6 +223,15 @@ export async function getPropertyListing(
 ): Promise<PropertyListingResponse> {
   const res = await api.get<PropertyListingResponse>(
     `/properties/${propertyId}/listing`
+  );
+  return res.data;
+}
+
+export async function enrichTransport(
+  postcode: string
+): Promise<TransportEnrichmentResponse> {
+  const res = await api.post<TransportEnrichmentResponse>(
+    `/enrich/transport/${encodeURIComponent(postcode)}`
   );
   return res.data;
 }

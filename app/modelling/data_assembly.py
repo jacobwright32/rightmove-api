@@ -71,6 +71,15 @@ def _build_registry() -> list[dict[str, str]]:
     registry.append({"name": "longitude", "category": "Location", "label": "Longitude", "dtype": "numeric"})
     registry.append({"name": "flood_risk_level", "category": "Location", "label": "Flood Risk Level", "dtype": "categorical"})
 
+    # Transport
+    registry.append({"name": "dist_nearest_rail_km", "category": "Transport", "label": "Dist. to Nearest Rail (km)", "dtype": "numeric"})
+    registry.append({"name": "dist_nearest_tube_km", "category": "Transport", "label": "Dist. to Nearest Tube (km)", "dtype": "numeric"})
+    registry.append({"name": "dist_nearest_tram_km", "category": "Transport", "label": "Dist. to Nearest Tram (km)", "dtype": "numeric"})
+    registry.append({"name": "dist_nearest_bus_km", "category": "Transport", "label": "Dist. to Nearest Bus (km)", "dtype": "numeric"})
+    registry.append({"name": "dist_nearest_airport_km", "category": "Transport", "label": "Dist. to Nearest Airport (km)", "dtype": "numeric"})
+    registry.append({"name": "dist_nearest_port_km", "category": "Transport", "label": "Dist. to Nearest Port (km)", "dtype": "numeric"})
+    registry.append({"name": "bus_stops_within_500m", "category": "Transport", "label": "Bus Stops within 500m", "dtype": "numeric"})
+
     # Crime
     registry.append({"name": "total_crime", "category": "Crime", "label": "Total Crime Count", "dtype": "numeric"})
     for cat, col in CRIME_COL_MAP.items():
@@ -302,6 +311,14 @@ def _build_record(
         "flood_risk_level": prop.flood_risk_level,
         "latitude": prop.latitude,
         "longitude": prop.longitude,
+        # Transport distances
+        "dist_nearest_rail_km": prop.dist_nearest_rail_km,
+        "dist_nearest_tube_km": prop.dist_nearest_tube_km,
+        "dist_nearest_tram_km": prop.dist_nearest_tram_km,
+        "dist_nearest_bus_km": prop.dist_nearest_bus_km,
+        "dist_nearest_airport_km": prop.dist_nearest_airport_km,
+        "dist_nearest_port_km": prop.dist_nearest_port_km,
+        "bus_stops_within_500m": prop.bus_stops_within_500m,
         "sale_year": sale_year,
         "sale_month": sale_month,
         "sale_quarter": sale_quarter,

@@ -34,6 +34,16 @@ def _migrate_db():
             "ALTER TABLE properties ADD COLUMN listing_date TEXT",
             "ALTER TABLE properties ADD COLUMN listing_url TEXT",
             "ALTER TABLE properties ADD COLUMN listing_checked_at TIMESTAMP",
+            "ALTER TABLE properties ADD COLUMN dist_nearest_rail_km REAL",
+            "ALTER TABLE properties ADD COLUMN dist_nearest_tube_km REAL",
+            "ALTER TABLE properties ADD COLUMN dist_nearest_tram_km REAL",
+            "ALTER TABLE properties ADD COLUMN dist_nearest_bus_km REAL",
+            "ALTER TABLE properties ADD COLUMN dist_nearest_airport_km REAL",
+            "ALTER TABLE properties ADD COLUMN dist_nearest_port_km REAL",
+            "ALTER TABLE properties ADD COLUMN nearest_rail_station TEXT",
+            "ALTER TABLE properties ADD COLUMN nearest_tube_station TEXT",
+            "ALTER TABLE properties ADD COLUMN nearest_airport TEXT",
+            "ALTER TABLE properties ADD COLUMN bus_stops_within_500m INTEGER",
         ]
         for sql in migrations:
             try:

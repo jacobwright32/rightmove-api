@@ -54,3 +54,8 @@ LISTING_FRESHNESS_HOURS: int = int(os.getenv("LISTING_FRESHNESS_HOURS", "24"))
 # Rate limiting
 RATE_LIMIT_SCRAPE: str = os.getenv("RATE_LIMIT_SCRAPE", "30/minute")
 RATE_LIMIT_DEFAULT: str = os.getenv("RATE_LIMIT_DEFAULT", "60/minute")
+
+# Transport enrichment (NaPTAN data cache)
+NAPTAN_CACHE_DIR: Path = Path(__file__).resolve().parent.parent / "data"
+NAPTAN_CACHE_PATH: Path = NAPTAN_CACHE_DIR / "naptan_stops.parquet"
+NAPTAN_MAX_AGE_DAYS: int = int(os.getenv("NAPTAN_MAX_AGE_DAYS", "90"))

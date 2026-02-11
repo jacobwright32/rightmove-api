@@ -40,6 +40,17 @@ class PropertyBrief(BaseModel):
     listing_date: Optional[str] = None
     listing_url: Optional[str] = None
     listing_checked_at: Optional[datetime] = None
+    # Transport distances
+    dist_nearest_rail_km: Optional[float] = None
+    dist_nearest_tube_km: Optional[float] = None
+    dist_nearest_tram_km: Optional[float] = None
+    dist_nearest_bus_km: Optional[float] = None
+    dist_nearest_airport_km: Optional[float] = None
+    dist_nearest_port_km: Optional[float] = None
+    nearest_rail_station: Optional[str] = None
+    nearest_tube_station: Optional[str] = None
+    nearest_airport: Optional[str] = None
+    bus_stops_within_500m: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -253,6 +264,15 @@ class EPCEnrichmentResponse(BaseModel):
     message: str
     properties_updated: int
     certificates_found: int
+
+
+# --- Transport Enrichment schemas ---
+
+
+class TransportEnrichmentResponse(BaseModel):
+    message: str
+    properties_updated: int
+    properties_skipped: int
 
 
 # --- Geo schemas ---
