@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { getProperty, getSimilarProperties } from "../api/client";
+import { enrichEPC, getProperty, getSimilarProperties } from "../api/client";
 import type { PropertyBrief, PropertyDetail } from "../api/types";
 import CrimeSection from "../components/CrimeSection";
 import EPCBadge from "../components/EPCBadge";
@@ -38,8 +38,27 @@ export default function PropertyDetailPage() {
   const [similar, setSimilar] = useState<PropertyBrief[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [epcLoading, setEpcLoading] = useState(false);
+  const [epcMessage, setEpcMessage] = useState<string | null>(null);
   const dark = useDarkMode();
   const colors = getChartColors(dark);
+
+  const handleEnrichEPC = async () => {
+    if (!property?.postcode) return;
+    setEpcLoading(true);
+    setEpcMessage(null);
+    try {
+      const result = await enrichEPC(property.postcode);
+      setEpcMessage(result.message);
+      // Refresh property data to show new EPC fields
+      const updated = await getProperty(Number(id));
+      setProperty(updated);
+    } catch (err) {
+      setEpcMessage(err instanceof Error ? err.message : "Failed to fetch EPC data");
+    } finally {
+      setEpcLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -265,11 +284,11 @@ export default function PropertyDetailPage() {
       )}
 
       {/* EPC details */}
-      {property.epc_rating && (
-        <div className="mb-6 rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
-            Energy Performance
-          </h3>
+      <div className="mb-6 rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
+          Energy Performance
+        </h3>
+        {property.epc_rating ? (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div className="text-center">
               <EPCBadge rating={property.epc_rating} score={property.epc_score} size="md" />
@@ -296,8 +315,26 @@ export default function PropertyDetailPage() {
               </div>
             )}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="flex flex-col items-center gap-3 py-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              No EPC data yet for this property.
+            </p>
+            {property.postcode && (
+              <button
+                onClick={handleEnrichEPC}
+                disabled={epcLoading}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+              >
+                {epcLoading ? "Fetching EPC data..." : "Fetch EPC Data"}
+              </button>
+            )}
+            {epcMessage && (
+              <p className="text-sm text-gray-600 dark:text-gray-400">{epcMessage}</p>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Sale history table */}
       <div className="mb-6 rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
