@@ -3,6 +3,7 @@ import logging
 import re
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests as req_lib
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -390,7 +391,8 @@ def scrape_single_property(
     db: Session = Depends(get_db),
 ):
     """Scrape a single property by its Rightmove URL."""
-    if "rightmove.co.uk" not in body.url:
+    parsed = urlparse(body.url)
+    if not parsed.hostname or not parsed.hostname.endswith("rightmove.co.uk"):
         raise HTTPException(
             status_code=400,
             detail="URL must be a Rightmove URL.",

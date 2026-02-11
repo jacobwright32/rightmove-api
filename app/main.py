@@ -99,12 +99,16 @@ if os.path.isdir(_frontend_dist):
 
     app.mount("/assets", StaticFiles(directory=os.path.join(_frontend_dist, "assets")), name="assets")
 
+    _frontend_dist_real = os.path.realpath(_frontend_dist)
+
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
         """SPA fallback — serve index.html for all non-API routes."""
         if full_path.startswith("api/"):
             return JSONResponse(status_code=404, content={"detail": "Not Found"})
-        file_path = os.path.join(_frontend_dist, full_path)
+        file_path = os.path.realpath(os.path.join(_frontend_dist, full_path))
+        if not file_path.startswith(_frontend_dist_real):
+            return JSONResponse(status_code=403, content={"detail": "Forbidden"})
         if os.path.isfile(file_path):
             return FileResponse(file_path)
         return FileResponse(_index_html)
