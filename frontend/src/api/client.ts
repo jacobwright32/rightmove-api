@@ -1,6 +1,7 @@
 import axios from "axios";
 import type {
   AreaScrapeResponse,
+  AvailableFeaturesResponse,
   CrimeSummaryResponse,
   EPCEnrichmentResponse,
   FloodRiskResponse,
@@ -17,6 +18,9 @@ import type {
   PropertyDetail,
   PropertyListingResponse,
   ScrapeResponse,
+  SinglePredictionResponse,
+  TrainRequest,
+  TrainResponse,
 } from "./types";
 
 const api = axios.create({ baseURL: "/api/v1" });
@@ -226,6 +230,31 @@ export async function getCrimeData(
 ): Promise<CrimeSummaryResponse> {
   const res = await api.get<CrimeSummaryResponse>(
     `/analytics/postcode/${encodeURIComponent(postcode)}/crime`
+  );
+  return res.data;
+}
+
+// Modelling
+
+export async function getModelFeatures(): Promise<AvailableFeaturesResponse> {
+  const res = await api.get<AvailableFeaturesResponse>("/model/features");
+  return res.data;
+}
+
+export async function trainModel(
+  request: TrainRequest
+): Promise<TrainResponse> {
+  const res = await api.post<TrainResponse>("/model/train", request);
+  return res.data;
+}
+
+export async function predictProperty(
+  modelId: string,
+  propertyId: number
+): Promise<SinglePredictionResponse> {
+  const res = await api.get<SinglePredictionResponse>(
+    `/model/${modelId}/predict`,
+    { params: { property_id: propertyId } }
   );
   return res.data;
 }

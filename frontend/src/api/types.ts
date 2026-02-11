@@ -338,3 +338,67 @@ export interface CrimeSummaryResponse {
   months_covered: number;
   cached: boolean;
 }
+
+// Modelling
+
+export interface FeatureInfo {
+  name: string;
+  category: string;
+  label: string;
+  dtype: string;
+}
+
+export interface TargetInfo {
+  name: string;
+  label: string;
+}
+
+export interface AvailableFeaturesResponse {
+  features: FeatureInfo[];
+  targets: TargetInfo[];
+  total_properties_with_sales: number;
+}
+
+export interface TrainRequest {
+  target: string;
+  features: string[];
+  model_type: string;
+  split_strategy: string;
+  split_params: Record<string, string | number>;
+  hyperparameters?: Record<string, unknown>;
+}
+
+export interface ModelMetrics {
+  r_squared: number;
+  rmse: number;
+  mae: number;
+  mape: number;
+}
+
+export interface FeatureImportance {
+  feature: string;
+  importance: number;
+}
+
+export interface PredictionPoint {
+  actual: number;
+  predicted: number;
+  residual: number;
+  property_id: number;
+  address: string;
+}
+
+export interface TrainResponse {
+  model_id: string;
+  metrics: ModelMetrics;
+  feature_importances: FeatureImportance[];
+  predictions: PredictionPoint[];
+  train_size: number;
+  test_size: number;
+}
+
+export interface SinglePredictionResponse {
+  property_id: number;
+  address: string;
+  predicted_value: number;
+}
