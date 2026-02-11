@@ -49,6 +49,17 @@ export default function ModellingPage() {
   const [cutoffDate, setCutoffDate] = useState("2024-01-01");
   const [selectedFeatures, setSelectedFeatures] = useState<Set<string>>(new Set());
 
+  // Log transform
+  const [logTransform, setLogTransform] = useState(false);
+
+  // Hyperparameters
+  const [customHyperparams, setCustomHyperparams] = useState(false);
+  const [learningRate, setLearningRate] = useState(0.1);
+  const [nEstimators, setNEstimators] = useState(100);
+  const [numLeaves, setNumLeaves] = useState(31);
+  const [linearTree, setLinearTree] = useState(false);
+  const [maxDepth, setMaxDepth] = useState(6);
+
   // Training state
   const [training, setTraining] = useState(false);
   const [trainError, setTrainError] = useState("");
@@ -115,7 +126,7 @@ export default function ModellingPage() {
     setResult(null);
     setPrediction(null);
     try {
-      const resp = await trainModel({
+      const req: Parameters<typeof trainModel>[0] = {
         target,
         features: [...selectedFeatures],
         model_type: modelType,
@@ -123,14 +134,29 @@ export default function ModellingPage() {
         split_params: splitStrategy === "temporal"
           ? { cutoff_date: cutoffDate }
           : { test_ratio: testRatio },
-      });
+        log_transform: logTransform,
+      };
+      if (customHyperparams) {
+        const hp: Record<string, unknown> = {
+          learning_rate: learningRate,
+          n_estimators: nEstimators,
+        };
+        if (modelType === "lightgbm") {
+          hp.num_leaves = numLeaves;
+          hp.linear_tree = linearTree;
+        } else {
+          hp.max_depth = maxDepth;
+        }
+        req.hyperparameters = hp;
+      }
+      const resp = await trainModel(req);
       setResult(resp);
     } catch (e: any) {
       setTrainError(e?.response?.data?.detail || "Training failed");
     } finally {
       setTraining(false);
     }
-  }, [target, selectedFeatures, modelType, splitStrategy, cutoffDate, testRatio]);
+  }, [target, selectedFeatures, modelType, splitStrategy, cutoffDate, testRatio, logTransform, customHyperparams, learningRate, nEstimators, numLeaves, linearTree, maxDepth]);
 
   const handlePredict = useCallback(async () => {
     if (!result || !predictId) return;
@@ -286,6 +312,108 @@ export default function ModellingPage() {
                   onChange={(e) => setCutoffDate(e.target.value)}
                   className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                 />
+              </div>
+            )}
+          </div>
+
+          {/* Log transform + Hyperparameters */}
+          <div className="rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={logTransform}
+                onChange={(e) => setLogTransform(e.target.checked)}
+                className="accent-blue-600"
+              />
+              Log Transform Target
+            </label>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+              Applies ln(1+y) before training, exp back after prediction. Often improves accuracy for skewed price data.
+            </p>
+          </div>
+
+          <div className="rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={customHyperparams}
+                onChange={(e) => setCustomHyperparams(e.target.checked)}
+                className="accent-blue-600"
+              />
+              Custom Hyperparameters
+            </label>
+            {customHyperparams && (
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400">
+                    Learning Rate
+                  </label>
+                  <input
+                    type="number"
+                    min={0.001}
+                    max={1}
+                    step={0.01}
+                    value={learningRate}
+                    onChange={(e) => setLearningRate(Number(e.target.value))}
+                    className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400">
+                    Boosting Rounds
+                  </label>
+                  <input
+                    type="number"
+                    min={10}
+                    max={1000}
+                    step={10}
+                    value={nEstimators}
+                    onChange={(e) => setNEstimators(Number(e.target.value))}
+                    className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  />
+                </div>
+                {modelType === "lightgbm" ? (
+                  <>
+                    <div>
+                      <label className="text-xs text-gray-500 dark:text-gray-400">
+                        Num Leaves
+                      </label>
+                      <input
+                        type="number"
+                        min={2}
+                        max={256}
+                        step={1}
+                        value={numLeaves}
+                        onChange={(e) => setNumLeaves(Number(e.target.value))}
+                        className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={linearTree}
+                        onChange={(e) => setLinearTree(e.target.checked)}
+                        className="accent-blue-600"
+                      />
+                      Linear Tree
+                    </label>
+                  </>
+                ) : (
+                  <div>
+                    <label className="text-xs text-gray-500 dark:text-gray-400">
+                      Max Depth
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      step={1}
+                      value={maxDepth}
+                      onChange={(e) => setMaxDepth(Number(e.target.value))}
+                      className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

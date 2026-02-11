@@ -118,6 +118,16 @@ export interface PriceRangeBucket {
   count: number;
 }
 
+export interface RecentSale {
+  property_id: number;
+  address: string;
+  postcode: string | null;
+  price: number;
+  date_sold: string | null;
+  property_type: string | null;
+  bedrooms: number | null;
+}
+
 export interface MarketOverview {
   total_postcodes: number;
   total_properties: number;
@@ -131,6 +141,7 @@ export interface MarketOverview {
   bedroom_distribution: BedroomDistribution[];
   yearly_trends: SalesVolumePoint[];
   price_trends: PriceTrendPoint[];
+  recent_sales: RecentSale[];
 }
 
 // Housing Insights types
@@ -366,6 +377,7 @@ export interface TrainRequest {
   split_strategy: string;
   split_params: Record<string, string | number>;
   hyperparameters?: Record<string, unknown>;
+  log_transform?: boolean;
 }
 
 export interface ModelMetrics {

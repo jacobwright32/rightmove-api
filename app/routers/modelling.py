@@ -94,6 +94,7 @@ def train(request: TrainRequest, db: Session = Depends(get_db)):
             split_strategy=request.split_strategy,
             split_params=request.split_params,
             hyperparameters=request.hyperparameters,
+            log_transform=request.log_transform,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

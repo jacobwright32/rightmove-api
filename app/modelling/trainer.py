@@ -25,6 +25,7 @@ _LGB_DEFAULTS = {
     "metric": "rmse",
     "num_leaves": 31,
     "learning_rate": 0.1,
+    "linear_tree": False,
     "verbose": -1,
 }
 
@@ -47,6 +48,7 @@ def train_model(
     split_strategy: str,
     split_params: dict,
     hyperparameters: Optional[dict] = None,
+    log_transform: bool = False,
 ) -> dict:
     """Train a model and return results.
 
@@ -77,20 +79,27 @@ def train_model(
     X_test = test_df[available_features]
     y_test = test_df[target]
 
+    # Log-transform target if requested
+    if log_transform:
+        y_train = np.log1p(y_train)
+
     # Train
     if model_type == "lightgbm":
         model, importances = _train_lgb(
             X_train, y_train, cat_features, hyperparameters,
         )
-        y_pred = model.predict(X_test)
+        y_pred_raw = model.predict(X_test)
     else:
         model, importances = _train_xgb(
             X_train, y_train, cat_features, hyperparameters,
         )
         dtest = xgb.DMatrix(X_test, enable_categorical=True)
-        y_pred = model.predict(dtest)
+        y_pred_raw = model.predict(dtest)
 
-    # Metrics
+    # Inverse-transform predictions for metrics and output
+    y_pred = np.expm1(y_pred_raw) if log_transform else y_pred_raw
+
+    # Metrics (always on original scale)
     metrics = _compute_metrics(y_test.values, y_pred)
 
     # Feature importances (normalized to %)
@@ -100,7 +109,7 @@ def train_model(
         for f, v in sorted(importances.items(), key=lambda x: -x[1])
     ]
 
-    # Predictions with metadata
+    # Predictions with metadata (original scale)
     predictions = []
     for i, (_idx, row) in enumerate(test_df.iterrows()):
         predictions.append({
@@ -119,6 +128,7 @@ def train_model(
         "model_type": model_type,
         "target": target,
         "categorical_features": cat_features,
+        "log_transform": log_transform,
     }
 
     return {

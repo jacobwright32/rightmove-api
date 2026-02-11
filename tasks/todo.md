@@ -82,10 +82,11 @@ _Researched 2026-02-10. Each task has full implementation details so it can be p
 - **Commit**: TBD
 
 ### 4. Property Price Modelling Tab — DONE
-- [x] **Backend**: `app/modelling/` package (data_assembly, trainer, predictor). LightGBM + XGBoost with temporal/random splits. Feature registry from Property + Sale + CrimeStats + parsed extra_features (50+ features). In-memory model store. Metrics: R², RMSE, MAE, MAPE (no sklearn). 3 endpoints: `GET /model/features`, `POST /model/train`, `GET /model/{id}/predict`.
-- [x] **Frontend**: `ModellingPage.tsx` — two-column layout. Sidebar: target (price, price/sqft, price change %), model (LightGBM/XGBoost), split (random slider / temporal date picker), feature selection (grouped by category, select all/none). Results: metrics stat cards, feature importance bar chart (Recharts), predicted vs actual scatter (Plotly), residual histogram (Plotly), worst predictions table, single-property prediction input.
+- [x] **Backend**: `app/modelling/` package (data_assembly, trainer, predictor). LightGBM + XGBoost with temporal/random splits. Feature registry from Property + Sale + CrimeStats + parsed extra_features (60 features incl. sale_year/month/quarter). In-memory model store. Metrics: R², RMSE, MAE, MAPE (no sklearn). 5 endpoints: `GET /model/features`, `POST /model/train`, `GET /model/{id}/predict`, `GET /model/{id}/predict-postcode`.
+- [x] **Frontend**: `ModellingPage.tsx` — two-column layout. Sidebar: target (price, price/sqft, price change %), model (LightGBM/XGBoost), split (random slider / temporal date picker), feature selection (grouped by category, select all/none). Results: metrics stat cards, feature importance bar chart (Recharts), predicted vs actual scatter (Plotly), residual histogram (Plotly), worst predictions table, single-property prediction, postcode prediction table (top 50/100/200 with predicted vs last sale + diff %), prediction date picker.
 - [x] **Tests**: 12 new tests (features endpoint, validation, LightGBM/XGBoost training, temporal/random splits, prediction). 95 total passing.
-- **Commits**: `5c31945`, `e83e98c`, `b992dd6`, `fb623c4`, `706be09`, `a2f1616`, `4c3a580`
+- [x] **Fixes**: Dtype coercion for crime/EPC/numeric columns (object→float), SPA catch-all API guard, 7 new DB indexes across all tables.
+- **Commits**: `5c31945`→`a2f1616`, `3818340`, `8c9f5da`
 
 ### 5. Flood Risk Assessment
 - [ ] **Backend**: Environment Agency API is free, no auth. Create `app/enrichment/flood.py`. Two data sources: (1) EA Flood Risk API: `GET https://environment.data.gov.uk/flood-monitoring/id/floods?lat={lat}&lng={lng}&dist=1` for current warnings. (2) Open Flood Risk by Postcode: download CSV from https://www.getthedata.com/open-flood-risk-by-postcode (maps every UK postcode to flood risk zone 1/2/3). Add `flood_risk_level` column to Property model (values: "very_low", "low", "medium", "high"). Endpoint: `GET /api/v1/analytics/postcode/{postcode}/flood-risk` returns risk level + any active flood warnings.
@@ -129,4 +130,5 @@ _Researched 2026-02-10. Each task has full implementation details so it can be p
 - 95 backend tests passing: `pytest tests/ -v`
 - Frontend types clean: `npx tsc --noEmit`
 - Ruff lint clean: `ruff check app/ tests/`
-- App loads: `python -c "from app.main import app"` (32 routes)
+- App loads: `python -c "from app.main import app"` (34 routes)
+- 7 new DB indexes on Property, Sale, CrimeStats, PlanningApplication

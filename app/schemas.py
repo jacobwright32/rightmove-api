@@ -158,6 +158,16 @@ class PriceRangeBucket(BaseModel):
     count: int
 
 
+class RecentSale(BaseModel):
+    property_id: int
+    address: str
+    postcode: Optional[str] = None
+    price: int
+    date_sold: Optional[str] = None
+    property_type: Optional[str] = None
+    bedrooms: Optional[int] = None
+
+
 class MarketOverview(BaseModel):
     total_postcodes: int
     total_properties: int
@@ -171,6 +181,7 @@ class MarketOverview(BaseModel):
     bedroom_distribution: list[BedroomDistribution] = []
     yearly_trends: list[SalesVolumePoint] = []
     price_trends: list[PriceTrendPoint] = []
+    recent_sales: list[RecentSale] = []
 
 
 # --- Housing Insights schemas ---
@@ -404,6 +415,7 @@ class TrainRequest(BaseModel):
     split_strategy: str = "random"
     split_params: dict = {}
     hyperparameters: Optional[dict] = None
+    log_transform: bool = False
 
 
 class ModelMetrics(BaseModel):

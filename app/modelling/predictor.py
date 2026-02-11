@@ -3,6 +3,7 @@
 import logging
 from typing import Optional
 
+import numpy as np
 import xgboost as xgb
 from sqlalchemy.orm import Session
 
@@ -36,6 +37,7 @@ def predict_single(
     feature_names = entry["features"]
     model_type = entry["model_type"]
     cat_features = entry["categorical_features"]
+    log_transform = entry.get("log_transform", False)
 
     df = assemble_single_property(
         db, property_id, feature_names, cat_features, prediction_date,
@@ -50,10 +52,14 @@ def predict_single(
     else:
         pred = model.predict(df)
 
+    predicted = float(pred[0])
+    if log_transform:
+        predicted = float(np.expm1(predicted))
+
     return {
         "property_id": property_id,
         "address": prop.address,
-        "predicted_value": round(float(pred[0]), 2),
+        "predicted_value": round(predicted, 2),
     }
 
 
@@ -77,6 +83,7 @@ def predict_postcode(
     feature_names = entry["features"]
     model_type = entry["model_type"]
     cat_features = entry["categorical_features"]
+    log_transform = entry.get("log_transform", False)
     # Find properties in this postcode
     props = (
         db.query(Property)
@@ -115,7 +122,10 @@ def predict_postcode(
             else:
                 pred = model.predict(df)
 
-            predicted = round(float(pred[0]), 2)
+            predicted = float(pred[0])
+            if log_transform:
+                predicted = float(np.expm1(predicted))
+            predicted = round(predicted, 2)
             last_sale = latest_sales.get(prop.id)
 
             results.append({

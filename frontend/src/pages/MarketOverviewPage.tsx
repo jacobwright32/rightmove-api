@@ -235,7 +235,7 @@ export default function MarketOverviewPage() {
 
       {/* Growth leaderboard */}
       {leaderboard.length > 0 && (
-        <div className="rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="mb-6 rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
             Growth Leaderboard (5yr CAGR)
           </h3>
@@ -263,6 +263,47 @@ export default function MarketOverviewPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Recent sales */}
+      {data.recent_sales.length > 0 && (
+        <div className="rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
+            50 Most Recent Sales
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm dark:text-gray-300">
+              <thead>
+                <tr className="border-b text-left text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                  <th scope="col" className="py-2 pr-3">#</th>
+                  <th scope="col" className="py-2 pr-3">Address</th>
+                  <th scope="col" className="py-2 pr-3">Postcode</th>
+                  <th scope="col" className="py-2 pr-3 text-right">Price</th>
+                  <th scope="col" className="py-2 pr-3">Date</th>
+                  <th scope="col" className="py-2 pr-3">Type</th>
+                  <th scope="col" className="py-2 text-right">Beds</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.recent_sales.map((sale, i) => (
+                  <tr key={`${sale.property_id}-${sale.date_sold}`} className="border-b border-gray-100 dark:border-gray-700">
+                    <td className="py-2 pr-3 text-gray-400">{i + 1}</td>
+                    <td className="py-2 pr-3 max-w-xs truncate">
+                      <a href={`/property/${sale.property_id}`} className="text-blue-600 hover:underline dark:text-blue-400">
+                        {sale.address}
+                      </a>
+                    </td>
+                    <td className="py-2 pr-3">{sale.postcode || "—"}</td>
+                    <td className="py-2 pr-3 text-right font-medium">{formatPriceFull(sale.price)}</td>
+                    <td className="py-2 pr-3">{sale.date_sold || "—"}</td>
+                    <td className="py-2 pr-3">{sale.property_type || "—"}</td>
+                    <td className="py-2 text-right">{sale.bedrooms ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

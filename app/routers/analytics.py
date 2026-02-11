@@ -30,6 +30,7 @@ from ..schemas import (
     PriceRangeBucket,
     PriceTrendPoint,
     PropertyTypeBreakdown,
+    RecentSale,
     SalesVolumePoint,
     ScatterPoint,
     StreetComparison,
@@ -192,6 +193,28 @@ def get_market_overview(db: Session = Depends(get_db)):
         for m, p in sorted(monthly.items())
     ]
 
+    # 10. Most recent 50 sales
+    recent_rows = (
+        db.query(Sale, Property)
+        .join(Property, Sale.property_id == Property.id)
+        .filter(Sale.date_sold_iso.isnot(None), Sale.price_numeric.isnot(None))
+        .order_by(Sale.date_sold_iso.desc())
+        .limit(50)
+        .all()
+    )
+    recent_sales = [
+        RecentSale(
+            property_id=prop.id,
+            address=prop.address,
+            postcode=prop.postcode,
+            price=sale.price_numeric,
+            date_sold=sale.date_sold_iso,
+            property_type=(sale.property_type or prop.property_type or "Unknown").strip(),
+            bedrooms=prop.bedrooms,
+        )
+        for sale, prop in recent_rows
+    ]
+
     return MarketOverview(
         total_postcodes=total_postcodes,
         total_properties=total_properties,
@@ -205,6 +228,7 @@ def get_market_overview(db: Session = Depends(get_db)):
         bedroom_distribution=bedroom_distribution,
         yearly_trends=yearly_trends,
         price_trends=price_trends,
+        recent_sales=recent_sales,
     )
 
 
