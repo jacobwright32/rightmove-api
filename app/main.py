@@ -90,6 +90,14 @@ def root():
     }
 
 
+@app.post("/api/v1/admin/reset-database")
+def reset_database():
+    """Drop all data and recreate tables. Irreversible."""
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    return {"message": "Database reset successfully. All data has been deleted."}
+
+
 # Serve React production build if it exists (with SPA fallback)
 _frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 if os.path.isdir(_frontend_dist):

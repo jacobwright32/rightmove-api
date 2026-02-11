@@ -321,3 +321,10 @@ export async function predictPostcode(
   );
   return res.data;
 }
+
+// Admin
+
+export async function resetDatabase(): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>("/admin/reset-database");
+  return res.data;
+}
