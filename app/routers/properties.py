@@ -6,9 +6,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
+from ..enrichment.geocoding import batch_geocode_postcodes
 from ..export import SALES_DATA_DIR, save_property_parquet
 from ..models import Property, Sale
-from ..schemas import ExportResponse, PostcodeStatus, PostcodeSummary, PropertyDetail
+from ..schemas import ExportResponse, PostcodeStatus, PostcodeSummary, PropertyDetail, PropertyGeoPoint
 from ..scraper.rightmove import scrape_postcode_from_listing
 
 _OUTCODE_RE = re.compile(r"^([A-Z]{1,2}\d[A-Z\d]?)\s", re.IGNORECASE)
@@ -43,6 +44,76 @@ def list_properties(
     if limit > 0:
         query = query.limit(limit)
     return query.all()
+
+
+@router.get("/properties/geo", response_model=list[PropertyGeoPoint])
+def get_properties_geo(
+    postcode: Optional[str] = Query(default=None, description="Filter by postcode prefix"),
+    limit: int = Query(default=500, ge=1, le=2000),
+    db: Session = Depends(get_db),
+):
+    """Return properties with lat/lng coordinates for map display.
+
+    Batch geocodes postcodes via Postcodes.io if coordinates are missing.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    query = db.query(Property).filter(Property.postcode.isnot(None))
+
+    if postcode:
+        pc = postcode.upper().replace("-", "").replace(" ", "")
+        query = query.filter(func.replace(func.upper(Property.postcode), " ", "").like(f"%{pc}%"))
+
+    props = query.limit(limit).all()
+    if not props:
+        return []
+
+    # Find postcodes that need geocoding
+    needs_geocoding = set()
+    for p in props:
+        if p.latitude is None and p.postcode:
+            needs_geocoding.add(p.postcode)
+
+    # Batch geocode missing postcodes
+    if needs_geocoding:
+        coords = batch_geocode_postcodes(list(needs_geocoding))
+        for p in props:
+            if p.latitude is None and p.postcode and p.postcode in coords:
+                lat, lng = coords[p.postcode]
+                p.latitude = lat
+                p.longitude = lng
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.warning("Failed to save geocoded coordinates")
+
+    # Build response with latest sale price
+    result = []
+    for p in props:
+        if p.latitude is None or p.longitude is None:
+            continue
+        latest_sale = (
+            db.query(Sale.price_numeric)
+            .filter(Sale.property_id == p.id, Sale.price_numeric.isnot(None))
+            .order_by(Sale.date_sold_iso.desc())
+            .first()
+        )
+        result.append(PropertyGeoPoint(
+            id=p.id,
+            address=p.address,
+            postcode=p.postcode,
+            latitude=p.latitude,
+            longitude=p.longitude,
+            latest_price=latest_sale[0] if latest_sale else None,
+            property_type=p.property_type,
+            bedrooms=p.bedrooms,
+            epc_rating=p.epc_rating,
+            flood_risk_level=p.flood_risk_level,
+        ))
+
+    return result
 
 
 @router.get("/properties/{property_id}", response_model=PropertyDetail)

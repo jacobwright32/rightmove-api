@@ -35,6 +35,9 @@ class Property(Base):
     estimated_energy_cost = Column(Integer, nullable=True)  # Annual £
     # Flood risk (populated via flood assessment endpoint)
     flood_risk_level = Column(String, nullable=True)  # very_low/low/medium/high
+    # Geocoded coordinates (populated via /properties/geo endpoint)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,

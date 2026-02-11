@@ -5,6 +5,7 @@ import type {
   EPCEnrichmentResponse,
   FloodRiskResponse,
   GrowthLeaderboardEntry,
+  PropertyGeoPoint,
   HousingInsightsFilters,
   HousingInsightsResponse,
   MarketOverview,
@@ -158,6 +159,16 @@ export async function enrichEPC(
   const res = await api.post<EPCEnrichmentResponse>(
     `/enrich/epc/${encodeURIComponent(postcode)}`
   );
+  return res.data;
+}
+
+export async function getPropertiesGeo(
+  postcode?: string,
+  limit = 500,
+): Promise<PropertyGeoPoint[]> {
+  const params: Record<string, string | number> = { limit };
+  if (postcode) params.postcode = postcode;
+  const res = await api.get<PropertyGeoPoint[]>("/properties/geo", { params });
   return res.data;
 }
 

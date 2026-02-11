@@ -9,7 +9,7 @@ from typing import Optional
 
 import httpx
 
-from .crime import geocode_postcode
+from .geocoding import geocode_postcode
 
 logger = logging.getLogger(__name__)
 

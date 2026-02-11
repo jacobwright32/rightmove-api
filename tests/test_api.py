@@ -418,6 +418,62 @@ class TestCrimeEndpoint:
         assert data["categories"]["burglary"] == 5
 
 
+class TestPropertiesGeo:
+    """Tests for map view geo endpoint."""
+
+    def test_geo_empty_db(self, client):
+        """Geo endpoint should return empty list with no data."""
+        resp = client.get("/api/v1/properties/geo")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_geo_with_properties(self, client, db_session):
+        """Geo endpoint should return properties with coordinates."""
+        prop = Property(
+            address="10 High St, SW20 8NE", postcode="SW20 8NE",
+            latitude=51.4, longitude=-0.2, property_type="Terraced",
+            bedrooms=3,
+        )
+        db_session.add(prop)
+        db_session.flush()
+        db_session.add(Sale(
+            property_id=prop.id, price_numeric=450000,
+            date_sold_iso="2023-11-04", date_sold="4 Nov 2023",
+            price="£450,000",
+        ))
+        db_session.commit()
+
+        resp = client.get("/api/v1/properties/geo")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["latitude"] == 51.4
+        assert data[0]["longitude"] == -0.2
+        assert data[0]["latest_price"] == 450000
+        assert data[0]["postcode"] == "SW20 8NE"
+
+    def test_geo_schema_fields(self, client, db_session):
+        """Geo response should include all expected fields."""
+        prop = Property(
+            address="10 High St, SW20 8NE", postcode="SW20 8NE",
+            latitude=51.4, longitude=-0.2, epc_rating="C",
+            flood_risk_level="low",
+        )
+        db_session.add(prop)
+        db_session.commit()
+
+        resp = client.get("/api/v1/properties/geo")
+        data = resp.json()
+        assert len(data) == 1
+        item = data[0]
+        assert "id" in item
+        assert "address" in item
+        assert "latitude" in item
+        assert "longitude" in item
+        assert item["epc_rating"] == "C"
+        assert item["flood_risk_level"] == "low"
+
+
 class TestFloodRisk:
     """Tests for flood risk assessment endpoint."""
 

@@ -238,6 +238,22 @@ class EPCEnrichmentResponse(BaseModel):
     certificates_found: int
 
 
+# --- Geo schemas ---
+
+
+class PropertyGeoPoint(BaseModel):
+    id: int
+    address: str
+    postcode: Optional[str] = None
+    latitude: float
+    longitude: float
+    latest_price: Optional[int] = None
+    property_type: Optional[str] = None
+    bedrooms: Optional[int] = None
+    epc_rating: Optional[str] = None
+    flood_risk_level: Optional[str] = None
+
+
 # --- Flood Risk schemas ---
 
 

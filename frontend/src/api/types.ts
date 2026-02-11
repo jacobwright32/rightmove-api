@@ -214,6 +214,21 @@ export interface EPCEnrichmentResponse {
   certificates_found: number;
 }
 
+// Geo / Map
+
+export interface PropertyGeoPoint {
+  id: number;
+  address: string;
+  postcode: string | null;
+  latitude: number;
+  longitude: number;
+  latest_price: number | null;
+  property_type: string | null;
+  bedrooms: number | null;
+  epc_rating: string | null;
+  flood_risk_level: string | null;
+}
+
 // Flood Risk
 
 export interface FloodWarning {

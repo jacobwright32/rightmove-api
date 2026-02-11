@@ -13,29 +13,14 @@ import httpx
 from sqlalchemy.orm import Session
 
 from ..models import CrimeStats
+from .geocoding import geocode_postcode  # noqa: F401 — re-exported for backwards compat
 
 logger = logging.getLogger(__name__)
 
-POSTCODES_IO_URL = "https://api.postcodes.io/postcodes"
 POLICE_API_URL = "https://data.police.uk/api/crimes-street/all-crime"
 
 # Cache crime data for 30 days
 CRIME_CACHE_DAYS = 30
-
-
-def geocode_postcode(postcode: str) -> Optional[tuple[float, float]]:
-    """Convert a UK postcode to lat/lng via Postcodes.io (free, no auth)."""
-    try:
-        resp = httpx.get(f"{POSTCODES_IO_URL}/{postcode}", timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        if data.get("status") == 200 and data.get("result"):
-            lat = data["result"]["latitude"]
-            lng = data["result"]["longitude"]
-            return (lat, lng)
-    except (httpx.RequestError, httpx.HTTPStatusError, KeyError) as e:
-        logger.warning("Geocoding failed for %s: %s", postcode, e)
-    return None
 
 
 def fetch_crimes(lat: float, lng: float, date: Optional[str] = None) -> list[dict]:
