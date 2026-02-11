@@ -374,3 +374,68 @@ class CrimeSummaryResponse(BaseModel):
     total_crimes: int = 0
     months_covered: int = 0
     cached: bool = False
+
+
+# --- Modelling schemas ---
+
+
+class FeatureInfo(BaseModel):
+    name: str
+    category: str
+    label: str
+    dtype: str
+
+
+class TargetInfo(BaseModel):
+    name: str
+    label: str
+
+
+class AvailableFeaturesResponse(BaseModel):
+    features: list[FeatureInfo] = []
+    targets: list[TargetInfo] = []
+    total_properties_with_sales: int = 0
+
+
+class TrainRequest(BaseModel):
+    target: str
+    features: list[str]
+    model_type: str = "lightgbm"
+    split_strategy: str = "random"
+    split_params: dict = {}
+    hyperparameters: Optional[dict] = None
+
+
+class ModelMetrics(BaseModel):
+    r_squared: float
+    rmse: float
+    mae: float
+    mape: float
+
+
+class FeatureImportance(BaseModel):
+    feature: str
+    importance: float
+
+
+class PredictionPoint(BaseModel):
+    actual: float
+    predicted: float
+    residual: float
+    property_id: int
+    address: str
+
+
+class TrainResponse(BaseModel):
+    model_id: str
+    metrics: ModelMetrics
+    feature_importances: list[FeatureImportance] = []
+    predictions: list[PredictionPoint] = []
+    train_size: int
+    test_size: int
+
+
+class SinglePredictionResponse(BaseModel):
+    property_id: int
+    address: str
+    predicted_value: float
