@@ -2,7 +2,7 @@
 
 import json
 
-from app.models import CrimeStats, Property, Sale
+from app.models import Property, Sale
 
 
 def _seed_properties(db, count=35):
@@ -16,7 +16,7 @@ def _seed_properties(db, count=35):
             property_type=["Detached", "Semi-Detached", "Terraced", "Flat"][i % 4],
             latitude=51.5 + i * 0.001,
             longitude=-0.1 + i * 0.001,
-            extra_features=json.dumps({"features": [f"Garden", f"{60 + i * 10} sq ft"]}),
+            extra_features=json.dumps({"features": ["Garden", f"{60 + i * 10} sq ft"]}),
         )
         db.add(prop)
         db.flush()
