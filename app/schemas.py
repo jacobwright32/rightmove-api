@@ -43,13 +43,13 @@ class PropertyBrief(BaseModel):
     # Transport distances
     dist_nearest_rail_km: Optional[float] = None
     dist_nearest_tube_km: Optional[float] = None
-    dist_nearest_tram_km: Optional[float] = None
     dist_nearest_bus_km: Optional[float] = None
     dist_nearest_airport_km: Optional[float] = None
     dist_nearest_port_km: Optional[float] = None
     nearest_rail_station: Optional[str] = None
     nearest_tube_station: Optional[str] = None
     nearest_airport: Optional[str] = None
+    nearest_port: Optional[str] = None
     bus_stops_within_500m: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

@@ -167,6 +167,8 @@ class TestTransportFeatures:
         assert "nearest_rail_station" in names
         assert "nearest_tube_station" in names
         assert "nearest_airport" in names
+        assert "nearest_port" in names
+        assert "dist_nearest_tram_km" not in names
         assert len(transport_features) == 10
 
     def test_station_names_are_categorical(self):
@@ -175,3 +177,4 @@ class TestTransportFeatures:
         assert "nearest_rail_station" in _CATEGORICAL_FEATURES
         assert "nearest_tube_station" in _CATEGORICAL_FEATURES
         assert "nearest_airport" in _CATEGORICAL_FEATURES
+        assert "nearest_port" in _CATEGORICAL_FEATURES

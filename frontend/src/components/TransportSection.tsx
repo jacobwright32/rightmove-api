@@ -17,14 +17,8 @@ const TRANSPORT_TYPES = [
   {
     key: "dist_nearest_tube_km" as const,
     nameKey: "nearest_tube_station" as const,
-    label: "Tube / Underground",
+    label: "Tube",
     icon: "\uD83D\uDE87",
-  },
-  {
-    key: "dist_nearest_tram_km" as const,
-    nameKey: null,
-    label: "Tram / Metro",
-    icon: "\uD83D\uDE8A",
   },
   {
     key: "dist_nearest_bus_km" as const,
@@ -40,7 +34,7 @@ const TRANSPORT_TYPES = [
   },
   {
     key: "dist_nearest_port_km" as const,
-    nameKey: null,
+    nameKey: "nearest_port" as const,
     label: "Port",
     icon: "\u26F4\uFE0F",
   },

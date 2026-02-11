@@ -43,6 +43,7 @@ def _migrate_db():
             "ALTER TABLE properties ADD COLUMN nearest_rail_station TEXT",
             "ALTER TABLE properties ADD COLUMN nearest_tube_station TEXT",
             "ALTER TABLE properties ADD COLUMN nearest_airport TEXT",
+            "ALTER TABLE properties ADD COLUMN nearest_port TEXT",
             "ALTER TABLE properties ADD COLUMN bus_stops_within_500m INTEGER",
         ]
         for sql in migrations:

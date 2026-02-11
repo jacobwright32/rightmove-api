@@ -59,6 +59,7 @@ app.include_router(enrichment.crime_router, prefix="/api/v1")
 app.include_router(enrichment.flood_router, prefix="/api/v1")
 app.include_router(enrichment.planning_router, prefix="/api/v1")
 app.include_router(enrichment.listing_router, prefix="/api/v1")
+app.include_router(enrichment.bulk_router, prefix="/api/v1")
 app.include_router(modelling.router, prefix="/api/v1")
 
 

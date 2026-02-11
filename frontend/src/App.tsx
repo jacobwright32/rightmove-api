@@ -9,6 +9,7 @@ import SearchPage from "./pages/SearchPage";
 
 const MapViewPage = lazy(() => import("./pages/MapViewPage"));
 const ModellingPage = lazy(() => import("./pages/ModellingPage"));
+const EnrichmentPage = lazy(() => import("./pages/EnrichmentPage"));
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/insights" element={<HousingInsightsPage />} />
             <Route path="/map" element={<MapViewPage />} />
             <Route path="/model" element={<ModellingPage />} />
+            <Route path="/enrich" element={<EnrichmentPage />} />
             <Route path="/property/:id" element={<PropertyDetailPage />} />
           </Routes>
         </Suspense>

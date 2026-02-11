@@ -25,9 +25,6 @@ STOP_TYPE_RAIL = "RSE"   # Rail Station Entrance
 STOP_TYPE_METRO = "TMU"  # Tram/Metro/Underground Entrance
 STOP_TYPE_BUS = "BCT"    # On-Street Bus Stop
 
-# ATCO prefix 940 = London Underground stations
-ATCO_TUBE_PREFIX = "940"
-
 EARTH_RADIUS_KM = 6371.0
 
 # ── Static data ──────────────────────────────────────────────────
@@ -185,14 +182,12 @@ def _init_trees() -> bool:
         _initialized = True
         return False
 
-    # Split by stop type, then tube vs tram
+    # Split by stop type (all TMU stops = "tube")
     rail = naptan[naptan["StopType"] == STOP_TYPE_RAIL]
-    metro_all = naptan[naptan["StopType"] == STOP_TYPE_METRO]
-    tube = metro_all[metro_all["ATCOCode"].str.startswith(ATCO_TUBE_PREFIX, na=False)]
-    tram = metro_all[~metro_all["ATCOCode"].str.startswith(ATCO_TUBE_PREFIX, na=False)]
+    tube = naptan[naptan["StopType"] == STOP_TYPE_METRO]
     bus = naptan[naptan["StopType"] == STOP_TYPE_BUS]
 
-    for key, subset in [("rail", rail), ("tube", tube), ("tram", tram), ("bus", bus)]:
+    for key, subset in [("rail", rail), ("tube", tube), ("bus", bus)]:
         if subset.empty:
             continue
         lats = subset["Latitude"].values.astype(float)
@@ -259,15 +254,6 @@ def compute_transport_distances(lat: float, lon: float) -> Optional[dict]:
         result["dist_nearest_tube_km"] = None
         result["nearest_tube_station"] = None
 
-    # Nearest tram/metro stop
-    if "tram" in _trees:
-        tree, coords, names = _trees["tram"]
-        _, idx = tree.query(point_cart)
-        km = _haversine_km(lat, lon, float(coords[idx][0]), float(coords[idx][1]))
-        result["dist_nearest_tram_km"] = round(km, 2)
-    else:
-        result["dist_nearest_tram_km"] = None
-
     # Nearest bus stop + count within 500m
     if "bus" in _trees:
         tree, coords, names = _trees["bus"]
@@ -297,6 +283,7 @@ def compute_transport_distances(lat: float, lon: float) -> Optional[dict]:
         _, idx = tree.query(point_cart)
         km = _haversine_km(lat, lon, ports[idx]["lat"], ports[idx]["lon"])
         result["dist_nearest_port_km"] = round(km, 2)
+        result["nearest_port"] = ports[idx]["name"]
 
     return result
 

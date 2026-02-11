@@ -34,13 +34,13 @@ export interface PropertyBrief {
   // Transport distances
   dist_nearest_rail_km: number | null;
   dist_nearest_tube_km: number | null;
-  dist_nearest_tram_km: number | null;
   dist_nearest_bus_km: number | null;
   dist_nearest_airport_km: number | null;
   dist_nearest_port_km: number | null;
   nearest_rail_station: string | null;
   nearest_tube_station: string | null;
   nearest_airport: string | null;
+  nearest_port: string | null;
   bus_stops_within_500m: number | null;
   created_at: string | null;
   updated_at: string | null;
@@ -447,4 +447,36 @@ export interface PostcodePredictionResponse {
   postcode: string;
   count: number;
   predictions: PostcodePredictionItem[];
+}
+
+// Bulk Enrichment
+
+export interface CoverageFeature {
+  name: string;
+  filled: number;
+  total: number;
+  note: string;
+}
+
+export interface CoverageResponse {
+  total_properties: number;
+  total_postcodes: number;
+  total_sales: number;
+  features: CoverageFeature[];
+}
+
+export interface BulkEnrichmentStatus {
+  running: boolean;
+  current_postcode: string | null;
+  current_type: string | null;
+  postcodes_done: number;
+  postcodes_total: number;
+  properties_enriched: number;
+  errors: number;
+  started_at: string | null;
+  finished_at: string | null;
+  log: string[];
+  types: string[];
+  delay: number;
+  error?: string;
 }

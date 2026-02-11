@@ -26,7 +26,7 @@ _CATEGORICAL_FEATURES = {
     "property_type", "epc_rating", "parking", "garden", "heating",
     "lease_type", "furnished", "floor_level", "council_tax_band",
     "flood_risk_level", "tenure",
-    "nearest_rail_station", "nearest_tube_station", "nearest_airport",
+    "nearest_rail_station", "nearest_tube_station", "nearest_airport", "nearest_port",
 }
 
 # Numeric features from parsed extras
@@ -75,7 +75,6 @@ def _build_registry() -> list[dict[str, str]]:
     # Transport
     registry.append({"name": "dist_nearest_rail_km", "category": "Transport", "label": "Dist. to Nearest Rail (km)", "dtype": "numeric"})
     registry.append({"name": "dist_nearest_tube_km", "category": "Transport", "label": "Dist. to Nearest Tube (km)", "dtype": "numeric"})
-    registry.append({"name": "dist_nearest_tram_km", "category": "Transport", "label": "Dist. to Nearest Tram (km)", "dtype": "numeric"})
     registry.append({"name": "dist_nearest_bus_km", "category": "Transport", "label": "Dist. to Nearest Bus (km)", "dtype": "numeric"})
     registry.append({"name": "dist_nearest_airport_km", "category": "Transport", "label": "Dist. to Nearest Airport (km)", "dtype": "numeric"})
     registry.append({"name": "dist_nearest_port_km", "category": "Transport", "label": "Dist. to Nearest Port (km)", "dtype": "numeric"})
@@ -83,6 +82,7 @@ def _build_registry() -> list[dict[str, str]]:
     registry.append({"name": "nearest_rail_station", "category": "Transport", "label": "Nearest Rail Station", "dtype": "categorical"})
     registry.append({"name": "nearest_tube_station", "category": "Transport", "label": "Nearest Tube Station", "dtype": "categorical"})
     registry.append({"name": "nearest_airport", "category": "Transport", "label": "Nearest Airport", "dtype": "categorical"})
+    registry.append({"name": "nearest_port", "category": "Transport", "label": "Nearest Port", "dtype": "categorical"})
 
     # Crime
     registry.append({"name": "total_crime", "category": "Crime", "label": "Total Crime Count", "dtype": "numeric"})
@@ -318,7 +318,6 @@ def _build_record(
         # Transport distances
         "dist_nearest_rail_km": prop.dist_nearest_rail_km,
         "dist_nearest_tube_km": prop.dist_nearest_tube_km,
-        "dist_nearest_tram_km": prop.dist_nearest_tram_km,
         "dist_nearest_bus_km": prop.dist_nearest_bus_km,
         "dist_nearest_airport_km": prop.dist_nearest_airport_km,
         "dist_nearest_port_km": prop.dist_nearest_port_km,
@@ -326,6 +325,7 @@ def _build_record(
         "nearest_rail_station": prop.nearest_rail_station,
         "nearest_tube_station": prop.nearest_tube_station,
         "nearest_airport": prop.nearest_airport,
+        "nearest_port": prop.nearest_port,
         "sale_year": sale_year,
         "sale_month": sale_month,
         "sale_quarter": sale_quarter,

@@ -55,6 +55,7 @@ class Property(Base):
     nearest_rail_station = Column(String, nullable=True)
     nearest_tube_station = Column(String, nullable=True)
     nearest_airport = Column(String, nullable=True)
+    nearest_port = Column(String, nullable=True)
     bus_stops_within_500m = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(

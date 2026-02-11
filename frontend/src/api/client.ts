@@ -2,6 +2,8 @@ import axios from "axios";
 import type {
   AreaScrapeResponse,
   AvailableFeaturesResponse,
+  BulkEnrichmentStatus,
+  CoverageResponse,
   CrimeSummaryResponse,
   EPCEnrichmentResponse,
   FloodRiskResponse,
@@ -270,6 +272,37 @@ export async function predictProperty(
     `/model/${modelId}/predict`,
     { params }
   );
+  return res.data;
+}
+
+// Bulk Enrichment
+
+export async function getBulkCoverage(): Promise<CoverageResponse> {
+  const res = await api.get<CoverageResponse>("/enrich/bulk/coverage");
+  return res.data;
+}
+
+export async function getBulkStatus(): Promise<BulkEnrichmentStatus> {
+  const res = await api.get<BulkEnrichmentStatus>("/enrich/bulk/status");
+  return res.data;
+}
+
+export async function startBulkEnrichment(
+  types?: string[],
+  delay = 3.0
+): Promise<BulkEnrichmentStatus> {
+  const params: Record<string, string | number> = { delay };
+  if (types && types.length > 0) params.types = types.join(",");
+  const res = await api.post<BulkEnrichmentStatus>(
+    "/enrich/bulk/start",
+    null,
+    { params }
+  );
+  return res.data;
+}
+
+export async function stopBulkEnrichment(): Promise<BulkEnrichmentStatus> {
+  const res = await api.post<BulkEnrichmentStatus>("/enrich/bulk/stop");
   return res.data;
 }
 

@@ -8,6 +8,7 @@ const links = [
   { to: "/insights", label: "Housing Insights" },
   { to: "/map", label: "Map" },
   { to: "/model", label: "Model" },
+  { to: "/enrich", label: "Enrich" },
 ];
 
 export default function NavBar() {

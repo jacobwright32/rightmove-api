@@ -1,4 +1,4 @@
-"""Enrichment endpoints — EPC data and crime statistics."""
+"""Enrichment endpoints — EPC, transport, crime, flood, planning, bulk."""
 
 import logging
 import re
@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..enrichment.bulk import get_coverage, get_status, start, stop
 from ..enrichment.crime import get_crime_summary
 from ..enrichment.epc import fetch_epc_for_postcode
 from ..enrichment.flood import get_flood_risk
@@ -274,3 +275,42 @@ def get_postcode_crime(postcode: str, db: Session = Depends(get_db)):
         months_covered=summary["months_covered"],
         cached=summary["cached"],
     )
+
+
+# ── Bulk enrichment endpoints ──────────────────────────────────────
+
+bulk_router = APIRouter(prefix="/enrich", tags=["enrichment"])
+
+
+@bulk_router.get("/bulk/coverage")
+def bulk_coverage():
+    """Get feature coverage statistics for all properties."""
+    return get_coverage()
+
+
+@bulk_router.get("/bulk/status")
+def bulk_status():
+    """Get current bulk enrichment status."""
+    return get_status()
+
+
+@bulk_router.post("/bulk/start")
+def bulk_start(
+    types: Optional[str] = None,
+    delay: float = 3.0,
+):
+    """Start bulk enrichment in background.
+
+    Args:
+        types: Comma-separated enrichment types (default: all).
+               Options: geocode, transport, epc, crime, flood, planning
+        delay: Seconds between API calls (default: 3.0)
+    """
+    type_list = types.split(",") if types else None
+    return start(types=type_list, delay=delay)
+
+
+@bulk_router.post("/bulk/stop")
+def bulk_stop():
+    """Stop the running bulk enrichment."""
+    return stop()
