@@ -32,6 +32,9 @@ data/postcodes/
 Thumbs.db
 .DS_Store
 
+# Secrets
+secrets/
+
 # Testing
 .pytest_cache/
 .coverage
