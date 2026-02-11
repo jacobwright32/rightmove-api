@@ -9,7 +9,7 @@ import logging
 import math
 import os
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import numpy as np
 from scipy.spatial import cKDTree
@@ -32,7 +32,7 @@ EARTH_RADIUS_KM = 6371.0
 
 # ── Static data ──────────────────────────────────────────────────
 
-UK_AIRPORTS: List[Dict] = [
+UK_AIRPORTS: list[dict] = [
     {"name": "Heathrow", "lat": 51.4700, "lon": -0.4543},
     {"name": "Gatwick", "lat": 51.1537, "lon": -0.1821},
     {"name": "Stansted", "lat": 51.8860, "lon": 0.2389},
@@ -60,7 +60,7 @@ UK_AIRPORTS: List[Dict] = [
     {"name": "Southend", "lat": 51.5714, "lon": 0.6956},
 ]
 
-UK_PORTS: List[Dict] = [
+UK_PORTS: list[dict] = [
     {"name": "Dover", "lat": 51.1279, "lon": 1.3134},
     {"name": "Southampton", "lat": 50.8998, "lon": -1.3969},
     {"name": "Portsmouth", "lat": 50.8376, "lon": -1.0911},
@@ -167,9 +167,9 @@ def _ensure_naptan_data():
 # ── KDTree singletons (lazy init) ───────────────────────────────
 
 # Each value: (tree, original_coords_deg_array, names_list)
-_trees: Dict[str, Tuple[cKDTree, np.ndarray, List[str]]] = {}
-_airport_tree: Optional[Tuple[cKDTree, List[Dict]]] = None
-_port_tree: Optional[Tuple[cKDTree, List[Dict]]] = None
+_trees: dict[str, tuple[cKDTree, np.ndarray, list[str]]] = {}
+_airport_tree: Optional[tuple[cKDTree, list[dict]]] = None
+_port_tree: Optional[tuple[cKDTree, list[dict]]] = None
 _initialized = False
 
 
@@ -225,7 +225,7 @@ def _init_trees() -> bool:
 # ── Distance computation ─────────────────────────────────────────
 
 
-def compute_transport_distances(lat: float, lon: float) -> Optional[Dict]:
+def compute_transport_distances(lat: float, lon: float) -> Optional[dict]:
     """Compute all transport distances for a single lat/lon point.
 
     Returns dict with keys matching Property column names, or None if
@@ -235,7 +235,7 @@ def compute_transport_distances(lat: float, lon: float) -> Optional[Dict]:
         return None
 
     point_cart = _point_to_cartesian(lat, lon)
-    result: Dict = {}
+    result: dict = {}
 
     # Nearest rail station
     if "rail" in _trees:
@@ -304,7 +304,7 @@ def compute_transport_distances(lat: float, lon: float) -> Optional[Dict]:
 # ── Postcode-level enrichment ────────────────────────────────────
 
 
-def enrich_postcode_transport(db, postcode: str) -> Dict:
+def enrich_postcode_transport(db, postcode: str) -> dict:
     """Enrich all properties in a postcode with transport distances.
 
     Properties without lat/lng will be geocoded first via Postcodes.io.
@@ -317,7 +317,7 @@ def enrich_postcode_transport(db, postcode: str) -> Dict:
         return {
             "properties_updated": 0,
             "properties_skipped": 0,
-            "message": "No properties found for {}".format(postcode),
+            "message": f"No properties found for {postcode}",
         }
 
     # Geocode properties that lack coordinates
@@ -352,7 +352,5 @@ def enrich_postcode_transport(db, postcode: str) -> Dict:
     return {
         "properties_updated": updated,
         "properties_skipped": skipped,
-        "message": "Updated {}/{} properties with transport distances".format(
-            updated, len(props)
-        ),
+        "message": f"Updated {updated}/{len(props)} properties with transport distances",
     }
