@@ -190,7 +190,7 @@ def _enrich_crime(db: Session, postcode: str, delay: float) -> str:
 
     try:
         result = get_crime_summary(db, postcode)
-        time.sleep(delay * 2)  # Extra delay — crime makes ~13 API calls
+        # No extra delay — crime.py has its own 0.125s delay between 60 calls
         return f"crimes_{result.get('total_crimes', 0)}"
     except Exception as e:
         return f"error:{e}"

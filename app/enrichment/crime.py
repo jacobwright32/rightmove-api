@@ -2,9 +2,14 @@
 
 Uses the free UK Police API (no auth required): https://data.police.uk/docs/
 Geocodes postcodes via Postcodes.io: https://api.postcodes.io/
+
+Fetches 5 years of monthly crime data per postcode. Data is stored
+per (postcode, month, category) in CrimeStats. The modelling pipeline
+uses time-matched crime features — trailing 12-month window from sale date.
 """
 
 import logging
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -21,6 +26,10 @@ POLICE_API_URL = "https://data.police.uk/api/crimes-street/all-crime"
 
 # Cache crime data for 30 days
 CRIME_CACHE_DAYS = 30
+
+# Fetch 5 years of history (Police API data available from Dec 2010)
+CRIME_FETCH_MONTHS = 60
+CRIME_API_DELAY = 0.125  # seconds between API calls (within 15 req/s limit)
 
 
 def fetch_crimes(lat: float, lng: float, date: Optional[str] = None) -> list:
@@ -91,16 +100,17 @@ def get_crime_summary(
 
     lat, lng = coords
 
-    # Fetch last 12 months
+    # Fetch last 5 years of monthly data
     all_crimes = []
     now = datetime.now(timezone.utc)
-    # Police API data lags ~2 months, try last 14 months to get 12
-    for months_ago in range(2, 14):
+    # Police API data lags ~2 months, fetch from month -2 to -(CRIME_FETCH_MONTHS+2)
+    for months_ago in range(2, CRIME_FETCH_MONTHS + 2):
         dt = now - timedelta(days=30 * months_ago)
         date_str = dt.strftime("%Y-%m")
         crimes = fetch_crimes(lat, lng, date_str)
         if crimes:
             all_crimes.extend(crimes)
+        time.sleep(CRIME_API_DELAY)
 
     if not all_crimes:
         return _empty_summary()

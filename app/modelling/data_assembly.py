@@ -126,30 +126,89 @@ TARGETS = [
 # Crime data aggregation
 # ---------------------------------------------------------------------------
 
-def _get_crime_by_postcode(db: Session) -> dict[str, dict[str, float]]:
-    """Aggregate crime data per postcode from CrimeStats table."""
-    # Total crime per postcode
-    totals = (
-        db.query(CrimeStats.postcode, func.sum(CrimeStats.count))
-        .group_by(CrimeStats.postcode)
+def _get_crime_by_postcode(db: Session) -> dict:
+    """Load monthly crime data per postcode from CrimeStats table.
+
+    Returns nested dict: {postcode: {YYYY-MM: {total: N, burglary: N, ...}}}
+    Used for time-matched crime features — each sale gets trailing 12-month
+    crime counts from the date of sale, not from today.
+    """
+    rows = (
+        db.query(
+            CrimeStats.postcode,
+            CrimeStats.month,
+            CrimeStats.category,
+            CrimeStats.count,
+        )
         .all()
     )
-    crime: dict[str, dict[str, float]] = defaultdict(lambda: {"total_crime": 0.0})
-    for postcode, total in totals:
-        crime[postcode]["total_crime"] = float(total or 0)
 
-    # Per-category counts
-    for cat, col in CRIME_COL_MAP.items():
-        rows = (
-            db.query(CrimeStats.postcode, func.sum(CrimeStats.count))
-            .filter(CrimeStats.category == cat)
-            .group_by(CrimeStats.postcode)
-            .all()
-        )
-        for postcode, count in rows:
-            crime[postcode][col] = float(count or 0)
+    # Build nested: {postcode: {month: {category: count}}}
+    crime: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    for postcode, month, category, count in rows:
+        crime[postcode][month][category] += float(count or 0)
+        crime[postcode][month]["_total"] += float(count or 0)
 
     return dict(crime)
+
+
+def _aggregate_crime_window(
+    crime_monthly: dict,
+    sale_month: Optional[str],
+    window: int = 12,
+) -> dict:
+    """Sum crime counts over trailing `window` months from sale_month.
+
+    Args:
+        crime_monthly: {YYYY-MM: {category: count, _total: N}}
+        sale_month: YYYY-MM string (from sale.date_sold_iso[:7])
+        window: number of months to look back (default 12)
+
+    Returns dict with total_crime and per-category counts.
+    """
+    result = {"total_crime": None}
+    for col in CRIME_COL_MAP.values():
+        result[col] = None
+
+    if not crime_monthly or not sale_month:
+        return result
+
+    # Generate the window of months to sum
+    try:
+        year, month = int(sale_month[:4]), int(sale_month[5:7])
+    except (ValueError, IndexError):
+        return result
+
+    months_to_check = []
+    for i in range(window):
+        m = month - i
+        y = year
+        while m <= 0:
+            m += 12
+            y -= 1
+        months_to_check.append(f"{y:04d}-{m:02d}")
+
+    # Sum across the window
+    total = 0.0
+    cat_totals = defaultdict(float)
+    found_any = False
+
+    for m in months_to_check:
+        month_data = crime_monthly.get(m)
+        if month_data:
+            found_any = True
+            total += month_data.get("_total", 0)
+            for cat, col in CRIME_COL_MAP.items():
+                cat_totals[col] += month_data.get(cat, 0)
+
+    if not found_any:
+        return result
+
+    result["total_crime"] = total
+    for col in CRIME_COL_MAP.values():
+        result[col] = cat_totals.get(col, 0.0)
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -337,11 +396,13 @@ def _build_record(
     for key in _ALL_KEYS:
         record[key] = parsed.get(key)
 
-    # Crime data
-    postcode_crime = crime_data.get(prop.postcode, {})
-    record["total_crime"] = postcode_crime.get("total_crime")
+    # Crime data — time-matched trailing 12-month window from sale date
+    postcode_crime_monthly = crime_data.get(prop.postcode, {})
+    sale_month_str = sale.date_sold_iso[:7] if sale.date_sold_iso and len(sale.date_sold_iso) >= 7 else None
+    crime_window = _aggregate_crime_window(postcode_crime_monthly, sale_month_str)
+    record["total_crime"] = crime_window.get("total_crime")
     for col in CRIME_COL_MAP.values():
-        record[col] = postcode_crime.get(col)
+        record[col] = crime_window.get(col)
 
     return record
 
