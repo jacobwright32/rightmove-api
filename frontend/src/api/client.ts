@@ -251,22 +251,30 @@ export async function trainModel(
 
 export async function predictProperty(
   modelId: string,
-  propertyId: number
+  propertyId: number,
+  predictionDate?: string
 ): Promise<SinglePredictionResponse> {
+  const params: Record<string, unknown> = { property_id: propertyId };
+  if (predictionDate) params.prediction_date = predictionDate;
   const res = await api.get<SinglePredictionResponse>(
     `/model/${modelId}/predict`,
-    { params: { property_id: propertyId } }
+    { params }
   );
   return res.data;
 }
 
 export async function predictPostcode(
   modelId: string,
-  postcode: string
+  postcode: string,
+  predictionDate?: string,
+  limit?: number
 ): Promise<PostcodePredictionResponse> {
+  const params: Record<string, unknown> = { postcode };
+  if (predictionDate) params.prediction_date = predictionDate;
+  if (limit) params.limit = limit;
   const res = await api.get<PostcodePredictionResponse>(
     `/model/${modelId}/predict-postcode`,
-    { params: { postcode } }
+    { params }
   );
   return res.data;
 }

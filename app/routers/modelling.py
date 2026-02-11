@@ -1,6 +1,7 @@
 """Modelling router — train models and predict property prices."""
 
 import logging
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
@@ -106,10 +107,15 @@ def train(request: TrainRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/{model_id}/predict", response_model=SinglePredictionResponse)
-def predict(model_id: str, property_id: int, db: Session = Depends(get_db)):
+def predict(
+    model_id: str,
+    property_id: int,
+    prediction_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
     """Predict the target value for a single property using a trained model."""
     try:
-        result = predict_single(model_id, db, property_id)
+        result = predict_single(model_id, db, property_id, prediction_date)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
@@ -124,11 +130,18 @@ def predict(model_id: str, property_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{model_id}/predict-postcode", response_model=PostcodePredictionResponse)
 def predict_by_postcode(
-    model_id: str, postcode: str, db: Session = Depends(get_db),
+    model_id: str,
+    postcode: str,
+    prediction_date: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
 ):
     """Predict values for all properties in a given postcode."""
     try:
-        results = predict_postcode(model_id, db, postcode)
+        results = predict_postcode(
+            model_id, db, postcode, limit=min(limit, 200),
+            prediction_date=prediction_date,
+        )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 

@@ -17,6 +17,7 @@ def predict_single(
     model_id: str,
     db: Session,
     property_id: int,
+    prediction_date: Optional[str] = None,
 ) -> Optional[dict]:
     """Predict using a stored model for a single property.
 
@@ -36,7 +37,9 @@ def predict_single(
     model_type = entry["model_type"]
     cat_features = entry["categorical_features"]
 
-    df = assemble_single_property(db, property_id, feature_names, cat_features)
+    df = assemble_single_property(
+        db, property_id, feature_names, cat_features, prediction_date,
+    )
     if df is None or df.empty:
         raise ValueError(f"Could not assemble features for property {property_id}")
 
@@ -59,6 +62,7 @@ def predict_postcode(
     db: Session,
     postcode: str,
     limit: int = 50,
+    prediction_date: Optional[str] = None,
 ) -> Optional[list]:
     """Predict for all properties in a postcode.
 
@@ -99,7 +103,9 @@ def predict_postcode(
     results = []
     for prop in props:
         try:
-            df = assemble_single_property(db, prop.id, feature_names, cat_features)
+            df = assemble_single_property(
+                db, prop.id, feature_names, cat_features, prediction_date,
+            )
             if df is None or df.empty:
                 continue
 

@@ -54,6 +54,11 @@ export default function ModellingPage() {
   const [trainError, setTrainError] = useState("");
   const [result, setResult] = useState<TrainResponse | null>(null);
 
+  // Shared prediction date
+  const [predictionDate, setPredictionDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+
   // Prediction state
   const [predictId, setPredictId] = useState("");
   const [predicting, setPredicting] = useState(false);
@@ -62,6 +67,7 @@ export default function ModellingPage() {
 
   // Postcode prediction state
   const [predictPostcodeVal, setPredictPostcodeVal] = useState("");
+  const [postcodeLimit, setPostcodeLimit] = useState(50);
   const [predictingPostcode, setPredictingPostcode] = useState(false);
   const [postcodePredictions, setPostcodePredictions] = useState<PostcodePredictionItem[] | null>(null);
   const [postcodeError, setPostcodeError] = useState("");
@@ -132,14 +138,14 @@ export default function ModellingPage() {
     setPredictError("");
     setPrediction(null);
     try {
-      const resp = await predictProperty(result.model_id, Number(predictId));
+      const resp = await predictProperty(result.model_id, Number(predictId), predictionDate);
       setPrediction(resp);
     } catch (e: any) {
       setPredictError(e?.response?.data?.detail || "Prediction failed");
     } finally {
       setPredicting(false);
     }
-  }, [result, predictId]);
+  }, [result, predictId, predictionDate]);
 
   const handlePredictPostcode = useCallback(async () => {
     if (!result || !predictPostcodeVal) return;
@@ -147,14 +153,14 @@ export default function ModellingPage() {
     setPostcodeError("");
     setPostcodePredictions(null);
     try {
-      const resp = await predictPostcode(result.model_id, predictPostcodeVal);
+      const resp = await predictPostcode(result.model_id, predictPostcodeVal, predictionDate, postcodeLimit);
       setPostcodePredictions(resp.predictions);
     } catch (e: any) {
       setPostcodeError(e?.response?.data?.detail || "Postcode prediction failed");
     } finally {
       setPredictingPostcode(false);
     }
-  }, [result, predictPostcodeVal]);
+  }, [result, predictPostcodeVal, predictionDate, postcodeLimit]);
 
   if (metaError) {
     return (
@@ -387,6 +393,22 @@ export default function ModellingPage() {
               {/* Worst predictions table */}
               <WorstPredictions predictions={result.predictions} />
 
+              {/* Prediction date */}
+              <div className="rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
+                  Prediction Date
+                </h3>
+                <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                  The model uses this date for sale_year, sale_month, and sale_quarter features.
+                </p>
+                <input
+                  type="date"
+                  value={predictionDate}
+                  onChange={(e) => setPredictionDate(e.target.value)}
+                  className="block w-full rounded border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                />
+              </div>
+
               {/* Single prediction */}
               <div className="rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                 <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
@@ -429,6 +451,8 @@ export default function ModellingPage() {
               <PostcodePredictionSection
                 postcode={predictPostcodeVal}
                 setPostcode={setPredictPostcodeVal}
+                limit={postcodeLimit}
+                setLimit={setPostcodeLimit}
                 onPredict={handlePredictPostcode}
                 predicting={predictingPostcode}
                 predictions={postcodePredictions}
@@ -680,6 +704,8 @@ function WorstPredictions({ predictions }: { predictions: PredictionPoint[] }) {
 function PostcodePredictionSection({
   postcode,
   setPostcode,
+  limit,
+  setLimit,
   onPredict,
   predicting,
   predictions,
@@ -688,6 +714,8 @@ function PostcodePredictionSection({
 }: {
   postcode: string;
   setPostcode: (v: string) => void;
+  limit: number;
+  setLimit: (v: number) => void;
   onPredict: () => void;
   predicting: boolean;
   predictions: PostcodePredictionItem[] | null;
@@ -716,6 +744,18 @@ function PostcodePredictionSection({
             placeholder="e.g. SW18 1AP"
             className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
           />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Max</label>
+          <select
+            value={limit}
+            onChange={(e) => setLimit(Number(e.target.value))}
+            className="mt-1 block rounded border border-gray-300 bg-white px-2 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+          >
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={200}>200</option>
+          </select>
         </div>
         <button
           onClick={onPredict}

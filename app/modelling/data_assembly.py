@@ -349,8 +349,12 @@ def assemble_single_property(
     property_id: int,
     feature_names: list[str],
     categorical_features: list[str],
+    prediction_date: Optional[str] = None,
 ) -> Optional[pd.DataFrame]:
-    """Assemble a single-row DataFrame for prediction."""
+    """Assemble a single-row DataFrame for prediction.
+
+    If prediction_date is provided (YYYY-MM-DD), overrides sale_year/month/quarter.
+    """
     prop = db.query(Property).filter(Property.id == property_id).first()
     if not prop:
         return None
@@ -366,6 +370,16 @@ def assemble_single_property(
     crime_data = _get_crime_by_postcode(db)
     sale_stub = latest_sale or Sale(tenure="", price_numeric=0, date_sold_iso="")
     record = _build_record(prop, sale_stub, crime_data)
+
+    # Override date features if prediction_date provided
+    if prediction_date:
+        try:
+            parts = prediction_date.split("-")
+            record["sale_year"] = int(parts[0])
+            record["sale_month"] = int(parts[1])
+            record["sale_quarter"] = (int(parts[1]) - 1) // 3 + 1
+        except (IndexError, ValueError):
+            pass
 
     df = pd.DataFrame([record])
 
