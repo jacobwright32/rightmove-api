@@ -52,6 +52,11 @@ class Property(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
+    __table_args__ = (
+        Index("ix_property_postcode_created", "postcode", "created_at"),
+        Index("ix_property_type_bedrooms", "property_type", "bedrooms"),
+    )
+
     sales = relationship("Sale", back_populates="property", cascade="all, delete-orphan")
 
 
@@ -73,6 +78,8 @@ class Sale(Base):
     __table_args__ = (
         UniqueConstraint("property_id", "date_sold", "price", name="uq_sale"),
         Index("ix_sale_property_date", "property_id", "date_sold_iso"),
+        Index("ix_sale_property_price", "property_id", "price_numeric"),
+        Index("ix_sale_date_price", "date_sold_iso", "price_numeric"),
     )
 
 
@@ -91,6 +98,7 @@ class PlanningApplication(Base):
 
     __table_args__ = (
         UniqueConstraint("postcode", "reference", name="uq_planning_app"),
+        Index("ix_planning_postcode_fetched", "postcode", "fetched_at"),
     )
 
 
@@ -106,4 +114,6 @@ class CrimeStats(Base):
 
     __table_args__ = (
         UniqueConstraint("postcode", "month", "category", name="uq_crime_stat"),
+        Index("ix_crime_category_postcode", "category", "postcode"),
+        Index("ix_crime_postcode_fetched", "postcode", "fetched_at"),
     )

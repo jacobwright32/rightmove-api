@@ -402,3 +402,18 @@ export interface SinglePredictionResponse {
   address: string;
   predicted_value: number;
 }
+
+export interface PostcodePredictionItem {
+  property_id: number;
+  address: string;
+  predicted_value: number;
+  last_sale_price: number | null;
+  difference: number | null;
+  difference_pct: number | null;
+}
+
+export interface PostcodePredictionResponse {
+  postcode: string;
+  count: number;
+  predictions: PostcodePredictionItem[];
+}

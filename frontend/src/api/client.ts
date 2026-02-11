@@ -13,6 +13,7 @@ import type {
   PlanningResponse,
   PostcodeAnalytics,
   PostcodeGrowthResponse,
+  PostcodePredictionResponse,
   PostcodeStatus,
   PropertyBrief,
   PropertyDetail,
@@ -255,6 +256,17 @@ export async function predictProperty(
   const res = await api.get<SinglePredictionResponse>(
     `/model/${modelId}/predict`,
     { params: { property_id: propertyId } }
+  );
+  return res.data;
+}
+
+export async function predictPostcode(
+  modelId: string,
+  postcode: string
+): Promise<PostcodePredictionResponse> {
+  const res = await api.get<PostcodePredictionResponse>(
+    `/model/${modelId}/predict-postcode`,
+    { params: { postcode } }
   );
   return res.data;
 }

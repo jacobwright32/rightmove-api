@@ -92,6 +92,9 @@ def _build_registry() -> list[dict[str, str]]:
         registry.append({"name": key, "category": "Parsed Features", "label": label, "dtype": dtype})
 
     # Sale context
+    registry.append({"name": "sale_year", "category": "Sale Context", "label": "Sale Year", "dtype": "numeric"})
+    registry.append({"name": "sale_month", "category": "Sale Context", "label": "Sale Month", "dtype": "numeric"})
+    registry.append({"name": "sale_quarter", "category": "Sale Context", "label": "Sale Quarter", "dtype": "numeric"})
     registry.append({"name": "tenure", "category": "Sale Context", "label": "Tenure", "dtype": "categorical"})
 
     return registry
@@ -271,6 +274,19 @@ def _build_record(
     prop: Property, sale: Sale, crime_data: dict[str, dict[str, float]],
 ) -> dict:
     """Build a single row dict from Property + Sale + crime data."""
+    # Parse sale date into year/month/quarter
+    sale_year = None
+    sale_month = None
+    sale_quarter = None
+    if sale.date_sold_iso:
+        try:
+            parts = sale.date_sold_iso.split("-")
+            sale_year = int(parts[0])
+            sale_month = int(parts[1])
+            sale_quarter = (sale_month - 1) // 3 + 1
+        except (IndexError, ValueError):
+            pass
+
     # Base property fields
     record: dict = {
         "property_id": prop.id,
@@ -286,6 +302,9 @@ def _build_record(
         "flood_risk_level": prop.flood_risk_level,
         "latitude": prop.latitude,
         "longitude": prop.longitude,
+        "sale_year": sale_year,
+        "sale_month": sale_month,
+        "sale_quarter": sale_quarter,
         "tenure": sale.tenure,
     }
 
@@ -304,15 +323,21 @@ def _build_record(
 
 
 def _convert_dtypes(df: pd.DataFrame, selected_features: list[str]) -> None:
-    """Convert column dtypes for ML: categoricals + booleans."""
+    """Convert column dtypes for ML: categoricals + booleans + numerics."""
+    _metadata = {"property_id", "address", "date_sold_iso"}
     for col in df.columns:
-        if col in _CATEGORICAL_FEATURES and col in df.columns:
+        if col in _metadata:
+            continue
+        if col in _CATEGORICAL_FEATURES:
             df[col] = df[col].astype("category")
-        elif col in _BOOLEAN_PARSED and col in df.columns:
+        elif col in _BOOLEAN_PARSED:
             # Convert bool/None to float (True=1, False=0, None=NaN)
             df[col] = df[col].map(
                 {True: 1.0, False: 0.0, None: float("nan")}
             ).astype(float)
+        elif df[col].dtype == object:
+            # Coerce any remaining object columns (e.g. crime data with Nones)
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
 
 # ---------------------------------------------------------------------------
@@ -348,7 +373,7 @@ def assemble_single_property(
     available = [f for f in feature_names if f in df.columns]
     df = df[available]
 
-    # Match training dtypes
+    # Match training dtypes — force all non-categorical columns to float
     for col in df.columns:
         if col in categorical_features:
             df[col] = df[col].astype("category")
@@ -356,5 +381,7 @@ def assemble_single_property(
             df[col] = df[col].map(
                 {True: 1.0, False: 0.0, None: float("nan")}
             ).astype(float)
+        else:
+            df[col] = pd.to_numeric(df[col], errors="coerce").astype(float)
 
     return df

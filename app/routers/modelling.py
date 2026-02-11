@@ -8,12 +8,13 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..modelling.data_assembly import FEATURE_REGISTRY, TARGETS, assemble_dataset
-from ..modelling.predictor import predict_single
+from ..modelling.predictor import predict_postcode, predict_single
 from ..modelling.trainer import train_model
 from ..models import Sale
 from ..schemas import (
     AvailableFeaturesResponse,
     FeatureInfo,
+    PostcodePredictionResponse,
     SinglePredictionResponse,
     TargetInfo,
     TrainRequest,
@@ -119,3 +120,26 @@ def predict(model_id: str, property_id: int, db: Session = Depends(get_db)):
         )
 
     return SinglePredictionResponse(**result)
+
+
+@router.get("/{model_id}/predict-postcode", response_model=PostcodePredictionResponse)
+def predict_by_postcode(
+    model_id: str, postcode: str, db: Session = Depends(get_db),
+):
+    """Predict values for all properties in a given postcode."""
+    try:
+        results = predict_postcode(model_id, db, postcode)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    if results is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Model '{model_id}' not found. Models are stored in memory and lost on server restart.",
+        )
+
+    return PostcodePredictionResponse(
+        postcode=postcode.upper().strip(),
+        count=len(results),
+        predictions=results,
+    )

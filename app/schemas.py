@@ -439,3 +439,18 @@ class SinglePredictionResponse(BaseModel):
     property_id: int
     address: str
     predicted_value: float
+
+
+class PostcodePredictionItem(BaseModel):
+    property_id: int
+    address: str
+    predicted_value: float
+    last_sale_price: Optional[float] = None
+    difference: Optional[float] = None
+    difference_pct: Optional[float] = None
+
+
+class PostcodePredictionResponse(BaseModel):
+    postcode: str
+    count: int
+    predictions: list

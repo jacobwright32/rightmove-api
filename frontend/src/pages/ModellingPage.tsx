@@ -9,11 +9,12 @@ import {
   YAxis,
 } from "recharts";
 import Plot from "react-plotly.js";
-import { getModelFeatures, predictProperty, trainModel } from "../api/client";
+import { getModelFeatures, predictPostcode, predictProperty, trainModel } from "../api/client";
 import type {
   AvailableFeaturesResponse,
   FeatureImportance,
   FeatureInfo,
+  PostcodePredictionItem,
   PredictionPoint,
   TrainResponse,
 } from "../api/types";
@@ -58,6 +59,12 @@ export default function ModellingPage() {
   const [predicting, setPredicting] = useState(false);
   const [prediction, setPrediction] = useState<{ predicted_value: number; address: string } | null>(null);
   const [predictError, setPredictError] = useState("");
+
+  // Postcode prediction state
+  const [predictPostcodeVal, setPredictPostcodeVal] = useState("");
+  const [predictingPostcode, setPredictingPostcode] = useState(false);
+  const [postcodePredictions, setPostcodePredictions] = useState<PostcodePredictionItem[] | null>(null);
+  const [postcodeError, setPostcodeError] = useState("");
 
   // Load features on mount
   useEffect(() => {
@@ -133,6 +140,21 @@ export default function ModellingPage() {
       setPredicting(false);
     }
   }, [result, predictId]);
+
+  const handlePredictPostcode = useCallback(async () => {
+    if (!result || !predictPostcodeVal) return;
+    setPredictingPostcode(true);
+    setPostcodeError("");
+    setPostcodePredictions(null);
+    try {
+      const resp = await predictPostcode(result.model_id, predictPostcodeVal);
+      setPostcodePredictions(resp.predictions);
+    } catch (e: any) {
+      setPostcodeError(e?.response?.data?.detail || "Postcode prediction failed");
+    } finally {
+      setPredictingPostcode(false);
+    }
+  }, [result, predictPostcodeVal]);
 
   if (metaError) {
     return (
@@ -402,6 +424,17 @@ export default function ModellingPage() {
                   </div>
                 )}
               </div>
+
+              {/* Postcode prediction */}
+              <PostcodePredictionSection
+                postcode={predictPostcodeVal}
+                setPostcode={setPredictPostcodeVal}
+                onPredict={handlePredictPostcode}
+                predicting={predictingPostcode}
+                predictions={postcodePredictions}
+                error={postcodeError}
+                target={target}
+              />
             </>
           )}
         </div>
@@ -640,6 +673,136 @@ function WorstPredictions({ predictions }: { predictions: PredictionPoint[] }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function PostcodePredictionSection({
+  postcode,
+  setPostcode,
+  onPredict,
+  predicting,
+  predictions,
+  error,
+  target,
+}: {
+  postcode: string;
+  setPostcode: (v: string) => void;
+  onPredict: () => void;
+  predicting: boolean;
+  predictions: PostcodePredictionItem[] | null;
+  error: string;
+  target: string;
+}) {
+  const fmt = (v: number | null) =>
+    v != null ? `£${Math.round(v).toLocaleString()}` : "—";
+  const pctFmt = (v: number | null) =>
+    v != null ? `${v > 0 ? "+" : ""}${v.toFixed(1)}%` : "—";
+  const isPrice = target === "price_numeric" || target === "price_per_sqft";
+
+  return (
+    <div className="rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
+        Predict by Postcode
+      </h3>
+      <div className="flex items-end gap-3">
+        <div className="flex-1">
+          <label className="text-xs text-gray-500 dark:text-gray-400">Postcode</label>
+          <input
+            type="text"
+            value={postcode}
+            onChange={(e) => setPostcode(e.target.value.toUpperCase())}
+            onKeyDown={(e) => e.key === "Enter" && onPredict()}
+            placeholder="e.g. SW18 1AP"
+            className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+          />
+        </div>
+        <button
+          onClick={onPredict}
+          disabled={predicting || !postcode.trim()}
+          className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-50"
+        >
+          {predicting ? "Predicting..." : "Predict Postcode"}
+        </button>
+      </div>
+      {error && (
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
+      {predictions && predictions.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+            {predictions.length} properties found
+          </p>
+          <div className="max-h-[500px] overflow-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 bg-white dark:bg-gray-800">
+                <tr className="border-b dark:border-gray-700">
+                  <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">Address</th>
+                  <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">Predicted</th>
+                  {isPrice && (
+                    <>
+                      <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">Last Sale</th>
+                      <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">Diff</th>
+                      <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">Diff %</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {predictions.map((p) => (
+                  <tr key={p.property_id} className="border-b dark:border-gray-700/50">
+                    <td className="py-1.5 text-gray-700 dark:text-gray-300">
+                      <a
+                        href={`/property/${p.property_id}`}
+                        className="hover:text-blue-600 hover:underline dark:hover:text-blue-400"
+                      >
+                        {p.address}
+                      </a>
+                    </td>
+                    <td className="py-1.5 text-right font-medium text-gray-700 dark:text-gray-300">
+                      {fmt(p.predicted_value)}
+                    </td>
+                    {isPrice && (
+                      <>
+                        <td className="py-1.5 text-right text-gray-700 dark:text-gray-300">
+                          {fmt(p.last_sale_price)}
+                        </td>
+                        <td
+                          className={`py-1.5 text-right font-medium ${
+                            p.difference != null && p.difference > 0
+                              ? "text-green-600 dark:text-green-400"
+                              : p.difference != null && p.difference < 0
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-gray-500"
+                          }`}
+                        >
+                          {fmt(p.difference)}
+                        </td>
+                        <td
+                          className={`py-1.5 text-right font-medium ${
+                            p.difference_pct != null && p.difference_pct > 0
+                              ? "text-green-600 dark:text-green-400"
+                              : p.difference_pct != null && p.difference_pct < 0
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-gray-500"
+                          }`}
+                        >
+                          {pctFmt(p.difference_pct)}
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {predictions && predictions.length === 0 && (
+        <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+          No properties found for this postcode.
+        </p>
+      )}
     </div>
   );
 }

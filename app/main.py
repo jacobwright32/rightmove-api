@@ -101,6 +101,8 @@ if os.path.isdir(_frontend_dist):
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
         """SPA fallback — serve index.html for all non-API routes."""
+        if full_path.startswith("api/"):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
         file_path = os.path.join(_frontend_dist, full_path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)
