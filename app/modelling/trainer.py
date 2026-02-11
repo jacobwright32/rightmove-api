@@ -94,9 +94,9 @@ def train_model(
     metrics = _compute_metrics(y_test.values, y_pred)
 
     # Feature importances (normalized to %)
-    total_imp = sum(importances.values()) if importances else 1
+    total_imp = sum(importances.values()) if importances else 0
     feat_imp = [
-        {"feature": f, "importance": round(v / total_imp * 100, 2)}
+        {"feature": f, "importance": round(v / total_imp * 100, 2) if total_imp > 0 else 0.0}
         for f, v in sorted(importances.items(), key=lambda x: -x[1])
     ]
 
@@ -181,7 +181,7 @@ def _train_lgb(
     # Feature importances
     imp_values = model.feature_importance(importance_type="gain")
     imp_names = model.feature_name()
-    importances = dict(zip(imp_names, imp_values))
+    importances = {n: float(v) for n, v in zip(imp_names, imp_values)}
 
     return model, importances
 
