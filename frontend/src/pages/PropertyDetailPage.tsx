@@ -13,6 +13,7 @@ import { getProperty, getSimilarProperties } from "../api/client";
 import type { PropertyBrief, PropertyDetail } from "../api/types";
 import CrimeSection from "../components/CrimeSection";
 import EPCBadge from "../components/EPCBadge";
+import GrowthSection from "../components/GrowthSection";
 import SaleHistoryTable from "../components/SaleHistoryTable";
 import { useDarkMode } from "../hooks/useDarkMode";
 import { getChartColors } from "../utils/chartTheme";
@@ -301,6 +302,13 @@ export default function PropertyDetailPage() {
         </h3>
         <SaleHistoryTable sales={sales} />
       </div>
+
+      {/* Capital growth */}
+      {property.postcode && (
+        <div className="mb-6">
+          <GrowthSection postcode={property.postcode} />
+        </div>
+      )}
 
       {/* Crime statistics */}
       {property.postcode && (

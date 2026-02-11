@@ -237,6 +237,47 @@ class EPCEnrichmentResponse(BaseModel):
     certificates_found: int
 
 
+# --- Growth & Forecasting schemas ---
+
+
+class AnnualMedian(BaseModel):
+    year: int
+    median_price: float
+    sale_count: int = 0
+
+
+class GrowthPeriodMetric(BaseModel):
+    period_years: int
+    cagr_pct: Optional[float] = None
+    start_price: Optional[float] = None
+    end_price: Optional[float] = None
+
+
+class GrowthForecastPoint(BaseModel):
+    year: int
+    predicted_price: float
+    lower_bound: float
+    upper_bound: float
+
+
+class PostcodeGrowthResponse(BaseModel):
+    postcode: str
+    metrics: list[GrowthPeriodMetric] = []
+    volatility_pct: Optional[float] = None
+    max_drawdown_pct: Optional[float] = None
+    forecast: list[GrowthForecastPoint] = []
+    annual_medians: list[AnnualMedian] = []
+    data_years: int = 0
+
+
+class GrowthLeaderboardEntry(BaseModel):
+    postcode: str
+    cagr_pct: float
+    data_years: int
+    latest_median: Optional[float] = None
+    sale_count: int = 0
+
+
 # --- Crime schemas ---
 
 class CrimeMonthlyStat(BaseModel):

@@ -3,10 +3,12 @@ import type {
   AreaScrapeResponse,
   CrimeSummaryResponse,
   EPCEnrichmentResponse,
+  GrowthLeaderboardEntry,
   HousingInsightsFilters,
   HousingInsightsResponse,
   MarketOverview,
   PostcodeAnalytics,
+  PostcodeGrowthResponse,
   PostcodeStatus,
   PropertyBrief,
   PropertyDetail,
@@ -154,6 +156,26 @@ export async function enrichEPC(
 ): Promise<EPCEnrichmentResponse> {
   const res = await api.post<EPCEnrichmentResponse>(
     `/enrich/epc/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function getGrowthData(
+  postcode: string,
+): Promise<PostcodeGrowthResponse> {
+  const res = await api.get<PostcodeGrowthResponse>(
+    `/analytics/postcode/${encodeURIComponent(postcode)}/growth`
+  );
+  return res.data;
+}
+
+export async function getGrowthLeaderboard(
+  limit = 20,
+  period = 5,
+): Promise<GrowthLeaderboardEntry[]> {
+  const res = await api.get<GrowthLeaderboardEntry[]>(
+    "/analytics/growth-leaderboard",
+    { params: { limit, period } }
   );
   return res.data;
 }

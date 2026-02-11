@@ -418,6 +418,84 @@ class TestCrimeEndpoint:
         assert data["categories"]["burglary"] == 5
 
 
+class TestCapitalGrowth:
+    """Tests for capital growth & forecasting endpoints."""
+
+    def test_growth_empty_db(self, client):
+        """Growth endpoint should 404 with no data."""
+        resp = client.get("/api/v1/analytics/postcode/SW20 8NE/growth")
+        assert resp.status_code == 404
+
+    def test_growth_with_multiyear_data(self, client, db_session):
+        """Growth endpoint should return CAGR when multi-year data exists."""
+        prop = Property(address="10 High St, SW20 8NE", postcode="SW20 8NE")
+        db_session.add(prop)
+        db_session.flush()
+        # Add sales spanning 3 years
+        for year, price in [(2020, 300000), (2021, 330000), (2022, 360000), (2023, 400000)]:
+            db_session.add(Sale(
+                property_id=prop.id, price_numeric=price,
+                date_sold_iso=f"{year}-06-15", date_sold=f"15 Jun {year}",
+                price=f"£{price:,}",
+            ))
+        db_session.commit()
+
+        resp = client.get("/api/v1/analytics/postcode/SW20 8NE/growth")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["postcode"] == "SW20 8NE"
+        assert data["data_years"] == 3
+        assert len(data["annual_medians"]) == 4
+        assert len(data["metrics"]) == 4  # 1,3,5,10 year periods
+        # 3-year CAGR should be calculable
+        three_yr = next((m for m in data["metrics"] if m["period_years"] == 3), None)
+        assert three_yr is not None
+        assert three_yr["cagr_pct"] is not None
+        assert three_yr["cagr_pct"] > 0  # prices went up
+
+    def test_growth_insufficient_data(self, client, db_session):
+        """Growth with only 1 year should return 0 data_years and no volatility."""
+        prop = Property(address="10 High St, SW20 8NE", postcode="SW20 8NE")
+        db_session.add(prop)
+        db_session.flush()
+        db_session.add(Sale(
+            property_id=prop.id, price_numeric=300000,
+            date_sold_iso="2023-06-15", date_sold="15 Jun 2023",
+            price="£300,000",
+        ))
+        db_session.commit()
+
+        resp = client.get("/api/v1/analytics/postcode/SW20 8NE/growth")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["data_years"] == 0
+        assert data["volatility_pct"] is None
+        assert data["max_drawdown_pct"] is None
+
+    def test_growth_leaderboard(self, client, db_session):
+        """Growth leaderboard should return postcodes sorted by CAGR."""
+        for pc_suffix, prices in [("8NE", [200000, 300000]), ("8ND", [200000, 220000])]:
+            prop = Property(address=f"10 High St, SW20 {pc_suffix}", postcode=f"SW20 {pc_suffix}")
+            db_session.add(prop)
+            db_session.flush()
+            for i, price in enumerate(prices):
+                db_session.add(Sale(
+                    property_id=prop.id, price_numeric=price,
+                    date_sold_iso=f"{2020 + i * 3}-06-15",
+                    date_sold=f"15 Jun {2020 + i * 3}",
+                    price=f"£{price:,}",
+                ))
+        db_session.commit()
+
+        resp = client.get("/api/v1/analytics/growth-leaderboard?period=3&limit=10")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+        # SW20 8NE had bigger growth (200k->300k = 50%) vs 8ND (200k->220k = 10%)
+        assert data[0]["postcode"] == "SW20 8NE"
+        assert data[0]["cagr_pct"] > data[1]["cagr_pct"]
+
+
 class TestScrapePropertyValidation:
     def test_invalid_url(self, client):
         resp = client.post("/api/v1/scrape/property", json={"url": "https://example.com"})

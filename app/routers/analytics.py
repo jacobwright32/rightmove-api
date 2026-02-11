@@ -13,7 +13,11 @@ from ..database import get_db
 from ..feature_parser import parse_all_features
 from ..models import Property, Sale
 from ..schemas import (
+    AnnualMedian,
     BedroomDistribution,
+    GrowthForecastPoint,
+    GrowthLeaderboardEntry,
+    GrowthPeriodMetric,
     HousingInsightsResponse,
     InsightsTimeSeriesPoint,
     InvestmentDeal,
@@ -21,6 +25,7 @@ from ..schemas import (
     MarketOverview,
     PostcodeAnalytics,
     PostcodeComparison,
+    PostcodeGrowthResponse,
     PostcodeHeatmapPoint,
     PriceHistogramBucket,
     PriceRangeBucket,
@@ -879,3 +884,247 @@ def get_summary(postcode: str, db: Session = Depends(get_db)):
         bedroom_distribution=bedroom_distribution,
         sales_volume=sales_volume,
     )
+
+
+# --- Capital Growth & Forecasting ---
+
+
+def _compute_annual_medians(
+    db: Session, postcode: str
+) -> list[AnnualMedian]:
+    """Get median sale price per year for a postcode."""
+    rows = _get_sales_for_postcode(db, postcode)
+    yearly: dict[int, list[int]] = defaultdict(list)
+    for sale, _prop in rows:
+        if sale.price_numeric and sale.date_sold_iso:
+            year = int(sale.date_sold_iso[:4])
+            yearly[year].append(sale.price_numeric)
+
+    return [
+        AnnualMedian(
+            year=y,
+            median_price=round(statistics.median(prices)),
+            sale_count=len(prices),
+        )
+        for y, prices in sorted(yearly.items())
+    ]
+
+
+def _compute_cagr(start: float, end: float, years: int) -> Optional[float]:
+    """Compound Annual Growth Rate as a percentage."""
+    if start <= 0 or years <= 0:
+        return None
+    return round((math.pow(end / start, 1 / years) - 1) * 100, 2)
+
+
+def _compute_growth_metrics(
+    medians: list[AnnualMedian], periods: list[int]
+) -> list[GrowthPeriodMetric]:
+    """Compute CAGR for each requested period."""
+    if not medians:
+        return []
+    latest_year = medians[-1].year
+    results = []
+    for period in periods:
+        target_year = latest_year - period
+        # Find closest year >= target
+        start_median = None
+        for m in medians:
+            if m.year >= target_year:
+                start_median = m
+                break
+        end_median = medians[-1]
+        actual_years = end_median.year - start_median.year if start_median else 0
+        cagr = None
+        if start_median and actual_years > 0:
+            cagr = _compute_cagr(
+                start_median.median_price, end_median.median_price, actual_years
+            )
+        results.append(GrowthPeriodMetric(
+            period_years=period,
+            cagr_pct=cagr,
+            start_price=start_median.median_price if start_median else None,
+            end_price=end_median.median_price,
+        ))
+    return results
+
+
+def _compute_volatility(medians: list[AnnualMedian]) -> Optional[float]:
+    """Annual return volatility (std dev of year-over-year % changes)."""
+    if len(medians) < 3:
+        return None
+    returns = []
+    for i in range(1, len(medians)):
+        prev = medians[i - 1].median_price
+        curr = medians[i].median_price
+        if prev > 0:
+            returns.append((curr - prev) / prev * 100)
+    if len(returns) < 2:
+        return None
+    return round(statistics.stdev(returns), 2)
+
+
+def _compute_max_drawdown(medians: list[AnnualMedian]) -> Optional[float]:
+    """Largest peak-to-trough decline in median prices (percentage)."""
+    if len(medians) < 2:
+        return None
+    peak = medians[0].median_price
+    max_dd = 0.0
+    for m in medians:
+        if m.median_price > peak:
+            peak = m.median_price
+        if peak > 0:
+            dd = (peak - m.median_price) / peak * 100
+            if dd > max_dd:
+                max_dd = dd
+    return round(max_dd, 2) if max_dd > 0 else None
+
+
+def _compute_forecast(
+    medians: list[AnnualMedian],
+) -> list[GrowthForecastPoint]:
+    """Linear forecast with confidence bands. Uses scipy if available."""
+    if len(medians) < 3:
+        return []
+    try:
+        from scipy.optimize import curve_fit
+    except ImportError:
+        return _linear_forecast_fallback(medians)
+
+    import numpy as np
+
+    years = np.array([m.year for m in medians], dtype=float)
+    prices = np.array([m.median_price for m in medians], dtype=float)
+
+    # Normalize years for numerical stability
+    base_year = years[0]
+    x = years - base_year
+
+    def linear(t, a, b):
+        return a * t + b
+
+    try:
+        popt, _ = curve_fit(linear, x, prices)
+        residuals = prices - linear(x, *popt)
+        std_residual = float(np.std(residuals))
+    except Exception:
+        return _linear_forecast_fallback(medians)
+
+    latest_year = int(years[-1])
+    forecasts = []
+    for horizon in [1, 3, 5]:
+        future_x = float(latest_year + horizon - base_year)
+        predicted = float(linear(future_x, *popt))
+        forecasts.append(GrowthForecastPoint(
+            year=latest_year + horizon,
+            predicted_price=round(max(predicted, 0)),
+            lower_bound=round(max(predicted - std_residual, 0)),
+            upper_bound=round(predicted + std_residual),
+        ))
+    return forecasts
+
+
+def _linear_forecast_fallback(
+    medians: list[AnnualMedian],
+) -> list[GrowthForecastPoint]:
+    """Simple linear regression fallback without scipy."""
+    n = len(medians)
+    if n < 2:
+        return []
+    years = [m.year for m in medians]
+    prices = [m.median_price for m in medians]
+    mean_x = statistics.mean(years)
+    mean_y = statistics.mean(prices)
+    numerator = sum((x - mean_x) * (y - mean_y) for x, y in zip(years, prices))
+    denominator = sum((x - mean_x) ** 2 for x in years)
+    if denominator == 0:
+        return []
+    slope = numerator / denominator
+    intercept = mean_y - slope * mean_x
+    residuals = [y - (slope * x + intercept) for x, y in zip(years, prices)]
+    std_r = statistics.stdev(residuals) if len(residuals) >= 2 else 0
+
+    latest_year = years[-1]
+    forecasts = []
+    for horizon in [1, 3, 5]:
+        predicted = slope * (latest_year + horizon) + intercept
+        forecasts.append(GrowthForecastPoint(
+            year=latest_year + horizon,
+            predicted_price=round(max(predicted, 0)),
+            lower_bound=round(max(predicted - std_r, 0)),
+            upper_bound=round(predicted + std_r),
+        ))
+    return forecasts
+
+
+@postcode_router.get(
+    "/{postcode}/growth",
+    response_model=PostcodeGrowthResponse,
+)
+def get_postcode_growth(
+    postcode: str,
+    periods: str = Query(default="1,3,5,10", description="Comma-separated year periods"),
+    db: Session = Depends(get_db),
+):
+    """Capital growth metrics and forecast for a postcode."""
+    medians = _compute_annual_medians(db, postcode)
+    if not medians:
+        raise HTTPException(status_code=404, detail="No sale data for this postcode")
+
+    period_list = [int(p.strip()) for p in periods.split(",") if p.strip().isdigit()]
+    metrics = _compute_growth_metrics(medians, period_list)
+    volatility = _compute_volatility(medians)
+    max_drawdown = _compute_max_drawdown(medians)
+    forecast = _compute_forecast(medians)
+
+    return PostcodeGrowthResponse(
+        postcode=postcode.upper().strip(),
+        metrics=metrics,
+        volatility_pct=volatility,
+        max_drawdown_pct=max_drawdown,
+        forecast=forecast,
+        annual_medians=medians,
+        data_years=medians[-1].year - medians[0].year if len(medians) >= 2 else 0,
+    )
+
+
+@router.get(
+    "/growth-leaderboard",
+    response_model=list[GrowthLeaderboardEntry],
+)
+def get_growth_leaderboard(
+    limit: int = Query(default=20, le=100),
+    period: int = Query(default=5, ge=1, le=30),
+    db: Session = Depends(get_db),
+):
+    """Top postcodes by CAGR over the specified period."""
+    # Get all distinct postcodes with sales
+    postcodes = [
+        row[0]
+        for row in db.query(func.distinct(Property.postcode))
+        .filter(Property.postcode.isnot(None))
+        .all()
+    ]
+
+    entries = []
+    for pc in postcodes:
+        medians = _compute_annual_medians(db, pc)
+        if len(medians) < 2:
+            continue
+        data_years = medians[-1].year - medians[0].year
+        if data_years < min(period, 2):
+            continue
+
+        metrics = _compute_growth_metrics(medians, [period])
+        if metrics and metrics[0].cagr_pct is not None:
+            total_sales = sum(m.sale_count for m in medians)
+            entries.append(GrowthLeaderboardEntry(
+                postcode=pc,
+                cagr_pct=metrics[0].cagr_pct,
+                data_years=data_years,
+                latest_median=medians[-1].median_price,
+                sale_count=total_sales,
+            ))
+
+    entries.sort(key=lambda x: x.cagr_pct, reverse=True)
+    return entries[:limit]

@@ -213,6 +213,46 @@ export interface EPCEnrichmentResponse {
   certificates_found: number;
 }
 
+// Growth & Forecasting
+
+export interface AnnualMedian {
+  year: number;
+  median_price: number;
+  sale_count: number;
+}
+
+export interface GrowthPeriodMetric {
+  period_years: number;
+  cagr_pct: number | null;
+  start_price: number | null;
+  end_price: number | null;
+}
+
+export interface GrowthForecastPoint {
+  year: number;
+  predicted_price: number;
+  lower_bound: number;
+  upper_bound: number;
+}
+
+export interface PostcodeGrowthResponse {
+  postcode: string;
+  metrics: GrowthPeriodMetric[];
+  volatility_pct: number | null;
+  max_drawdown_pct: number | null;
+  forecast: GrowthForecastPoint[];
+  annual_medians: AnnualMedian[];
+  data_years: number;
+}
+
+export interface GrowthLeaderboardEntry {
+  postcode: string;
+  cagr_pct: number;
+  data_years: number;
+  latest_median: number | null;
+  sale_count: number;
+}
+
 // Crime Data
 
 export interface CrimeMonthlyStat {

@@ -11,8 +11,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { getMarketOverview } from "../api/client";
-import type { MarketOverview } from "../api/types";
+import { getGrowthLeaderboard, getMarketOverview } from "../api/client";
+import type { GrowthLeaderboardEntry, MarketOverview } from "../api/types";
 import StatCard from "../components/StatCard";
 import { useDarkMode } from "../hooks/useDarkMode";
 import { getChartColors } from "../utils/chartTheme";
@@ -20,6 +20,7 @@ import { formatPrice, formatPriceFull } from "../utils/formatting";
 
 export default function MarketOverviewPage() {
   const [data, setData] = useState<MarketOverview | null>(null);
+  const [leaderboard, setLeaderboard] = useState<GrowthLeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const dark = useDarkMode();
@@ -28,9 +29,12 @@ export default function MarketOverviewPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getMarketOverview()
-      .then((d) => {
-        if (!cancelled) setData(d);
+    Promise.all([
+      getMarketOverview(),
+      getGrowthLeaderboard(20, 5).catch(() => [] as GrowthLeaderboardEntry[]),
+    ])
+      .then(([d, lb]) => {
+        if (!cancelled) { setData(d); setLeaderboard(lb); }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load");
@@ -202,7 +206,7 @@ export default function MarketOverviewPage() {
 
       {/* Top postcodes table */}
       {data.top_postcodes.length > 0 && (
-        <div className="rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="mb-6 rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
             Top Postcodes by Sales Volume
           </h3>
@@ -222,6 +226,39 @@ export default function MarketOverviewPage() {
                   <td className="py-2 pr-3 font-medium">{pc.postcode}</td>
                   <td className="py-2 pr-3 text-right">{formatPriceFull(pc.avg_price)}</td>
                   <td className="py-2 text-right">{pc.count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Growth leaderboard */}
+      {leaderboard.length > 0 && (
+        <div className="rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
+            Growth Leaderboard (5yr CAGR)
+          </h3>
+          <table className="w-full text-sm dark:text-gray-300">
+            <thead>
+              <tr className="border-b text-left text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                <th scope="col" className="py-2 pr-3">#</th>
+                <th scope="col" className="py-2 pr-3">Postcode</th>
+                <th scope="col" className="py-2 pr-3 text-right">CAGR</th>
+                <th scope="col" className="py-2 pr-3 text-right">Latest Median</th>
+                <th scope="col" className="py-2 text-right">Years</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leaderboard.map((entry, i) => (
+                <tr key={entry.postcode} className="border-b border-gray-100 dark:border-gray-700">
+                  <td className="py-2 pr-3 text-gray-400">{i + 1}</td>
+                  <td className="py-2 pr-3 font-medium">{entry.postcode}</td>
+                  <td className={`py-2 pr-3 text-right font-semibold ${entry.cagr_pct >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                    {entry.cagr_pct >= 0 ? "+" : ""}{entry.cagr_pct.toFixed(1)}%
+                  </td>
+                  <td className="py-2 pr-3 text-right">{formatPriceFull(entry.latest_median)}</td>
+                  <td className="py-2 text-right">{entry.data_years}</td>
                 </tr>
               ))}
             </tbody>
