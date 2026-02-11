@@ -69,6 +69,24 @@ class Sale(Base):
     )
 
 
+class PlanningApplication(Base):
+    __tablename__ = "planning_applications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    postcode = Column(String, nullable=False, index=True)
+    reference = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String, nullable=True)  # pending/decided
+    decision_date = Column(String, nullable=True)
+    application_type = Column(String, nullable=True)  # full/outline/householder/etc
+    is_major = Column(Integer, default=0)  # 0/1 boolean
+    fetched_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint("postcode", "reference", name="uq_planning_app"),
+    )
+
+
 class CrimeStats(Base):
     __tablename__ = "crime_stats"
 

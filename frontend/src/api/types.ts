@@ -285,6 +285,25 @@ export interface GrowthLeaderboardEntry {
   sale_count: number;
 }
 
+// Planning Applications
+
+export interface PlanningApplicationOut {
+  reference: string;
+  description: string;
+  status: string;
+  decision_date: string | null;
+  application_type: string;
+  is_major: boolean;
+}
+
+export interface PlanningResponse {
+  postcode: string;
+  applications: PlanningApplicationOut[];
+  total_count: number;
+  major_count: number;
+  cached: boolean;
+}
+
 // Crime Data
 
 export interface CrimeMonthlyStat {

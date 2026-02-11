@@ -10,8 +10,14 @@ from ..database import get_db
 from ..enrichment.crime import get_crime_summary
 from ..enrichment.epc import fetch_epc_for_postcode
 from ..enrichment.flood import get_flood_risk
+from ..enrichment.planning import get_planning_data
 from ..models import Property
-from ..schemas import CrimeSummaryResponse, EPCEnrichmentResponse, FloodRiskResponse
+from ..schemas import (
+    CrimeSummaryResponse,
+    EPCEnrichmentResponse,
+    FloodRiskResponse,
+    PlanningResponse,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/enrich", tags=["enrichment"])
@@ -141,6 +147,32 @@ def get_postcode_flood_risk(postcode: str, db: Session = Depends(get_db)):
         flood_zone=result["flood_zone"],
         active_warnings=result["active_warnings"],
         description=result["description"],
+    )
+
+
+# Planning applications endpoint
+planning_router = APIRouter(tags=["analytics"])
+
+
+@planning_router.get(
+    "/analytics/postcode/{postcode}/planning",
+    response_model=PlanningResponse,
+)
+def get_postcode_planning(postcode: str, db: Session = Depends(get_db)):
+    """Get nearby planning applications for a postcode.
+
+    Uses the free Planning Data API (no auth required).
+    Results are cached for 30 days.
+    """
+    clean = postcode.upper().strip()
+    result = get_planning_data(db, clean)
+
+    return PlanningResponse(
+        postcode=clean,
+        applications=result["applications"],
+        total_count=result["total_count"],
+        major_count=result["major_count"],
+        cached=result["cached"],
     )
 
 

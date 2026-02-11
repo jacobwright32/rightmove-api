@@ -9,6 +9,7 @@ import type {
   HousingInsightsFilters,
   HousingInsightsResponse,
   MarketOverview,
+  PlanningResponse,
   PostcodeAnalytics,
   PostcodeGrowthResponse,
   PostcodeStatus,
@@ -197,6 +198,15 @@ export async function getGrowthLeaderboard(
   const res = await api.get<GrowthLeaderboardEntry[]>(
     "/analytics/growth-leaderboard",
     { params: { limit, period } }
+  );
+  return res.data;
+}
+
+export async function getPlanningApplications(
+  postcode: string
+): Promise<PlanningResponse> {
+  const res = await api.get<PlanningResponse>(
+    `/analytics/postcode/${encodeURIComponent(postcode)}/planning`
   );
   return res.data;
 }

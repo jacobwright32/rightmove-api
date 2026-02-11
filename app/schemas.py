@@ -312,6 +312,26 @@ class GrowthLeaderboardEntry(BaseModel):
     sale_count: int = 0
 
 
+# --- Planning schemas ---
+
+
+class PlanningApplicationOut(BaseModel):
+    reference: str
+    description: str = ""
+    status: str = "pending"
+    decision_date: Optional[str] = None
+    application_type: str = "other"
+    is_major: bool = False
+
+
+class PlanningResponse(BaseModel):
+    postcode: str
+    applications: list[PlanningApplicationOut] = []
+    total_count: int = 0
+    major_count: int = 0
+    cached: bool = False
+
+
 # --- Crime schemas ---
 
 class CrimeMonthlyStat(BaseModel):

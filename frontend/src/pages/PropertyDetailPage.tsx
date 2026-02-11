@@ -16,6 +16,7 @@ import EPCBadge from "../components/EPCBadge";
 import FloodRiskBadge from "../components/FloodRiskBadge";
 import FloodRiskSection from "../components/FloodRiskSection";
 import GrowthSection from "../components/GrowthSection";
+import PlanningSection from "../components/PlanningSection";
 import SaleHistoryTable from "../components/SaleHistoryTable";
 import { useDarkMode } from "../hooks/useDarkMode";
 import { getChartColors } from "../utils/chartTheme";
@@ -317,6 +318,13 @@ export default function PropertyDetailPage() {
       {property.postcode && (
         <div className="mb-6">
           <FloodRiskSection postcode={property.postcode} />
+        </div>
+      )}
+
+      {/* Planning applications */}
+      {property.postcode && (
+        <div className="mb-6">
+          <PlanningSection postcode={property.postcode} />
         </div>
       )}
 

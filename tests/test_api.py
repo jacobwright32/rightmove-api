@@ -1,7 +1,7 @@
 """Integration tests for the FastAPI endpoints."""
 
 
-from app.models import Property, Sale
+from app.models import PlanningApplication, Property, Sale
 
 
 class TestRootEndpoint:
@@ -593,6 +593,74 @@ class TestCapitalGrowth:
         # SW20 8NE had bigger growth (200k->300k = 50%) vs 8ND (200k->220k = 10%)
         assert data[0]["postcode"] == "SW20 8NE"
         assert data[0]["cagr_pct"] > data[1]["cagr_pct"]
+
+
+class TestPlanningApplications:
+    def test_planning_endpoint_exists(self, client):
+        resp = client.get("/api/v1/analytics/postcode/SW20 8NE/planning")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["postcode"] == "SW20 8NE"
+        assert "applications" in data
+        assert "total_count" in data
+        assert "major_count" in data
+
+    def test_planning_cached_data(self, client, db_session):
+        """Cached planning applications are returned without API call."""
+        from datetime import datetime, timezone
+
+        app = PlanningApplication(
+            postcode="SW20 8NE",
+            reference="23/00001/FUL",
+            description="Erection of single storey rear extension",
+            status="decided",
+            decision_date="2023-05-09",
+            application_type="full",
+            is_major=0,
+            fetched_at=datetime.now(timezone.utc),
+        )
+        db_session.add(app)
+        db_session.commit()
+
+        resp = client.get("/api/v1/analytics/postcode/SW20 8NE/planning")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["cached"] is True
+        assert data["total_count"] == 1
+        assert data["applications"][0]["reference"] == "23/00001/FUL"
+
+    def test_major_development_flagging(self, client, db_session):
+        """Major development keyword detection works."""
+        from datetime import datetime, timezone
+
+        apps = [
+            PlanningApplication(
+                postcode="SW20 8NE",
+                reference="23/00001/FUL",
+                description="Erection of 15 dwellings with parking",
+                status="pending",
+                application_type="full",
+                is_major=1,
+                fetched_at=datetime.now(timezone.utc),
+            ),
+            PlanningApplication(
+                postcode="SW20 8NE",
+                reference="23/00002/HH",
+                description="Single storey rear extension",
+                status="decided",
+                application_type="householder",
+                is_major=0,
+                fetched_at=datetime.now(timezone.utc),
+            ),
+        ]
+        db_session.add_all(apps)
+        db_session.commit()
+
+        resp = client.get("/api/v1/analytics/postcode/SW20 8NE/planning")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_count"] == 2
+        assert data["major_count"] == 1
 
 
 class TestScrapePropertyValidation:
