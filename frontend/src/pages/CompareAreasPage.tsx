@@ -39,18 +39,19 @@ export default function CompareAreasPage() {
       const settled = await Promise.allSettled(fetches);
       const map = new Map<string, PostcodeAnalytics>();
       const failed: string[] = [];
-      for (const result of settled) {
+      for (let i = 0; i < settled.length; i++) {
+        const result = settled[i];
         if (result.status === "fulfilled") {
           map.set(result.value[0], result.value[1]);
         } else {
-          failed.push("unknown");
+          failed.push(postcodes[i]);
         }
       }
       if (map.size === 0) {
         setError("No data found for any of the postcodes. Try scraping them first.");
       } else {
         if (failed.length > 0) {
-          setError(`Some postcodes had no data. Showing ${map.size} of ${postcodes.length}.`);
+          setError(`No data for: ${failed.join(", ")}. Showing ${map.size} of ${postcodes.length}.`);
         }
         setResults(map);
       }

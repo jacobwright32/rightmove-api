@@ -1040,7 +1040,7 @@ def _compute_forecast(
             year=latest_year + horizon,
             predicted_price=round(max(predicted, 0)),
             lower_bound=round(max(predicted - std_residual, 0)),
-            upper_bound=round(predicted + std_residual),
+            upper_bound=round(max(predicted + std_residual, 0)),
         ))
     return forecasts
 
@@ -1073,7 +1073,7 @@ def _linear_forecast_fallback(
             year=latest_year + horizon,
             predicted_price=round(max(predicted, 0)),
             lower_bound=round(max(predicted - std_r, 0)),
-            upper_bound=round(predicted + std_r),
+            upper_bound=round(max(predicted + std_r, 0)),
         ))
     return forecasts
 

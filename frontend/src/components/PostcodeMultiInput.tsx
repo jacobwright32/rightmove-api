@@ -66,7 +66,9 @@ export default function PostcodeMultiInput({
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") {
+    if (e.key === "Escape") {
+      setShowSuggestions(false);
+    } else if (e.key === "Enter") {
       e.preventDefault();
       if (input.trim()) addPostcode(input.trim());
     }

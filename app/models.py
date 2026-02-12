@@ -48,7 +48,7 @@ class Property(Base):
     # Transport distances (populated via /enrich/transport endpoint)
     dist_nearest_rail_km = Column(Float, nullable=True)
     dist_nearest_tube_km = Column(Float, nullable=True)
-    dist_nearest_tram_km = Column(Float, nullable=True)
+    dist_nearest_tram_km = Column(Float, nullable=True)  # NOTE: never populated — tram data not in NaPTAN enrichment
     dist_nearest_bus_km = Column(Float, nullable=True)
     dist_nearest_airport_km = Column(Float, nullable=True)
     dist_nearest_port_km = Column(Float, nullable=True)

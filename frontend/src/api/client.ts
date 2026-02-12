@@ -106,7 +106,7 @@ export async function getProperties(
   postcode: string
 ): Promise<PropertyDetail[]> {
   const res = await api.get<PropertyDetail[]>("/properties", {
-    params: { postcode, limit: 0 },
+    params: { postcode, limit: 500 },
   });
   return res.data;
 }

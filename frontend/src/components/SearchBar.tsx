@@ -93,6 +93,9 @@ export default function SearchBar({ onSearch, disabled }: Props) {
             onFocus={() => {
               if (suggestions.length > 0) setShowSuggestions(true);
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setShowSuggestions(false);
+            }}
             placeholder="Enter postcode (e.g. E1W 1AT)"
             aria-label="Enter UK postcode"
             disabled={disabled}

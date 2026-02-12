@@ -276,6 +276,9 @@ def compute_transport_distances(lat: float, lon: float) -> Optional[dict]:
         km = _haversine_km(lat, lon, airports[idx]["lat"], airports[idx]["lon"])
         result["dist_nearest_airport_km"] = round(km, 2)
         result["nearest_airport"] = airports[idx]["name"]
+    else:
+        result["dist_nearest_airport_km"] = None
+        result["nearest_airport"] = None
 
     # Nearest port
     if _port_tree:
@@ -284,6 +287,9 @@ def compute_transport_distances(lat: float, lon: float) -> Optional[dict]:
         km = _haversine_km(lat, lon, ports[idx]["lat"], ports[idx]["lon"])
         result["dist_nearest_port_km"] = round(km, 2)
         result["nearest_port"] = ports[idx]["name"]
+    else:
+        result["dist_nearest_port_km"] = None
+        result["nearest_port"] = None
 
     return result
 

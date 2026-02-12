@@ -101,7 +101,7 @@ def predict_postcode(
         sale = (
             db.query(Sale)
             .filter(Sale.property_id == prop.id, Sale.price_numeric.isnot(None))
-            .order_by(Sale.id.desc())
+            .order_by(Sale.date_sold_iso.desc())
             .first()
         )
         if sale:

@@ -93,11 +93,14 @@ export function usePostcodeSearch() {
       if (controller.signal.aborted) return;
 
       setState("loading");
+      if (controller.signal.aborted) return;
+
       const [analytics, properties] = await Promise.allSettled([
         getAnalytics(clean),
         getProperties(clean),
       ]);
 
+      // Check after await — if aborted during fetch, discard stale results
       if (controller.signal.aborted) return;
 
       setResult({

@@ -86,6 +86,10 @@ export default function EnrichmentPage() {
 
   const handleStart = async () => {
     setError(null);
+    if (selectedTypes.size === 0) {
+      setError("Select at least one enrichment type");
+      return;
+    }
     try {
       const types = Array.from(selectedTypes);
       const s = await startBulkEnrichment(types, delay);

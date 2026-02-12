@@ -1,0 +1,15 @@
+[Unit]
+Description=Rightmove API
+After=network.target
+
+[Service]
+Type=simple
+User=rightmove
+WorkingDirectory=/opt/rightmove-api
+EnvironmentFile=/opt/rightmove-api/.env
+ExecStart=/opt/rightmove-api/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

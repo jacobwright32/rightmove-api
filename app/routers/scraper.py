@@ -12,7 +12,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..config import RATE_LIMIT_SCRAPE, SCRAPER_FRESHNESS_DAYS
+from ..config import DATA_DIR, RATE_LIMIT_SCRAPE, SCRAPER_FRESHNESS_DAYS
 from ..database import get_db
 from ..export import save_property_parquet
 from ..models import Property, Sale
@@ -61,9 +61,9 @@ def _scrape_postcode_properties(
 
 def _normalise_price(price: str) -> str:
     """Normalise a price string to consistent '£N,NNN' format."""
-    # Strip any existing £-like characters and whitespace
+    # Strip any existing £-like characters, commas, and whitespace
     cleaned = price.replace("\u00a3", "").replace("\u00c2", "").replace(",", "").strip()
-    # Extract numeric value
+    # Extract first contiguous digit sequence (commas already stripped, so "250000" matches whole)
     match = re.search(r"(\d+)", cleaned)
     if match:
         amount = int(match.group(1))
@@ -108,17 +108,17 @@ def _upsert_property(db: Session, data: PropertyData) -> Property:
 
     if existing:
         prop = existing
-        prop.postcode = data.postcode or prop.postcode
-        prop.property_type = norm_ptype or prop.property_type
-        prop.bedrooms = data.bedrooms or prop.bedrooms
-        prop.bathrooms = data.bathrooms or prop.bathrooms
+        prop.postcode = data.postcode if data.postcode is not None else prop.postcode
+        prop.property_type = norm_ptype if norm_ptype else prop.property_type
+        prop.bedrooms = data.bedrooms if data.bedrooms is not None else prop.bedrooms
+        prop.bathrooms = data.bathrooms if data.bathrooms is not None else prop.bathrooms
         prop.extra_features = (
-            json.dumps(data.extra_features) if data.extra_features else prop.extra_features
+            json.dumps(data.extra_features) if data.extra_features is not None else prop.extra_features
         )
         prop.floorplan_urls = (
-            json.dumps(data.floorplan_urls) if data.floorplan_urls else prop.floorplan_urls
+            json.dumps(data.floorplan_urls) if data.floorplan_urls is not None else prop.floorplan_urls
         )
-        prop.url = data.url or prop.url
+        prop.url = data.url if data.url is not None else prop.url
     else:
         prop = Property(
             address=data.address,
@@ -126,8 +126,8 @@ def _upsert_property(db: Session, data: PropertyData) -> Property:
             property_type=norm_ptype,
             bedrooms=data.bedrooms,
             bathrooms=data.bathrooms,
-            extra_features=json.dumps(data.extra_features) if data.extra_features else None,
-            floorplan_urls=json.dumps(data.floorplan_urls) if data.floorplan_urls else None,
+            extra_features=json.dumps(data.extra_features) if data.extra_features is not None else None,
+            floorplan_urls=json.dumps(data.floorplan_urls) if data.floorplan_urls is not None else None,
             url=data.url,
         )
         db.add(prop)
@@ -281,7 +281,7 @@ def scrape_area(
     # Step 1: discover postcodes from local parquet files
     # Try candidate outcodes from longest to shortest (e.g. "SE17" then "SE1")
     # because "SE17G" could be outcode SE1 + incode 7G*, not SE17 + G*
-    parquet_dir = Path(__file__).resolve().parent.parent.parent / "data" / "postcodes"
+    parquet_dir = DATA_DIR / "postcodes"
     outcode_match = re.match(r"([A-Z]{1,2}\d[A-Z\d]?)", partial_clean)
     if not outcode_match:
         raise HTTPException(status_code=400, detail=f"Invalid postcode format: '{partial}'")

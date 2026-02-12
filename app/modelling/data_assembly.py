@@ -530,7 +530,7 @@ def assemble_single_property(
     latest_sale = (
         db.query(Sale)
         .filter(Sale.property_id == property_id)
-        .order_by(Sale.id.desc())
+        .order_by(Sale.date_sold_iso.desc())
         .first()
     )
 

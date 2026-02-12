@@ -556,14 +556,14 @@ def get_coverage() -> dict:
             },
             {
                 "name": "Crime Data",
-                "filled": crime_rows,
-                "total": crime_rows or 1,  # avoid /0
+                "filled": crime_pcs,
+                "total": total_postcodes or 1,
                 "note": f"{crime_pcs} postcodes, {crime_rows} rows",
             },
             {
                 "name": "Planning Applications",
-                "filled": planning_rows,
-                "total": planning_rows or 1,
+                "filled": planning_pcs,
+                "total": total_postcodes or 1,
                 "note": f"{planning_pcs} postcodes, {planning_rows} rows",
             },
             {
