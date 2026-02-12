@@ -8,6 +8,7 @@ import type {
   EPCEnrichmentResponse,
   FloodRiskResponse,
   GrowthLeaderboardEntry,
+  IMDEnrichmentResponse,
   PropertyGeoPoint,
   HousingInsightsFilters,
   HousingInsightsResponse,
@@ -225,6 +226,15 @@ export async function getPropertyListing(
 ): Promise<PropertyListingResponse> {
   const res = await api.get<PropertyListingResponse>(
     `/properties/${propertyId}/listing`
+  );
+  return res.data;
+}
+
+export async function enrichIMD(
+  postcode: string
+): Promise<IMDEnrichmentResponse> {
+  const res = await api.post<IMDEnrichmentResponse>(
+    `/enrich/imd/${encodeURIComponent(postcode)}`
   );
   return res.data;
 }

@@ -14,6 +14,7 @@ const ENRICHMENT_TYPES = [
   { id: "crime", label: "Crime" },
   { id: "flood", label: "Flood Risk" },
   { id: "planning", label: "Planning" },
+  { id: "imd", label: "IMD Deprivation" },
 ];
 
 export default function EnrichmentPage() {

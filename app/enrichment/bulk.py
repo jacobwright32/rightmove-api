@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # ── Enrichment types ──────────────────────────────────────────────
 
-ALL_TYPES = ["geocode", "transport", "epc", "crime", "flood", "planning"]
+ALL_TYPES = ["geocode", "transport", "epc", "crime", "flood", "planning", "imd"]
 
 
 # ── Singleton state ───────────────────────────────────────────────
@@ -238,6 +238,25 @@ def _enrich_planning(db: Session, postcode: str, delay: float) -> str:
         return f"error:{e}"
 
 
+def _enrich_imd(db: Session, postcode: str, delay: float) -> str:
+    from ..enrichment.imd import enrich_postcode_imd
+
+    has = (
+        db.query(Property)
+        .filter(
+            Property.postcode == postcode,
+            Property.imd_decile.isnot(None),
+        )
+        .count()
+    )
+    if has > 0:
+        return "already_enriched"
+
+    result = enrich_postcode_imd(db, postcode)
+    # No delay — IMD is local computation (postcode→LSOA→CSV lookup)
+    return f"updated_{result['properties_updated']}"
+
+
 _FNS = {
     "geocode": _enrich_geocode,
     "transport": _enrich_transport,
@@ -245,6 +264,7 @@ _FNS = {
     "crime": _enrich_crime,
     "flood": _enrich_flood,
     "planning": _enrich_planning,
+    "imd": _enrich_imd,
 }
 
 
@@ -468,6 +488,12 @@ def get_coverage() -> dict:
                 "filled": _count(Property.listing_status),
                 "total": total,
                 "note": f"{_pc_count(Property.listing_status)} postcodes",
+            },
+            {
+                "name": "IMD Deprivation",
+                "filled": _count(Property.imd_decile),
+                "total": total,
+                "note": f"{_pc_count(Property.imd_decile)} postcodes",
             },
         ]
 

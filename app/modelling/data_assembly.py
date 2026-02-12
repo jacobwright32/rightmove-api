@@ -84,6 +84,16 @@ def _build_registry() -> list[dict[str, str]]:
     registry.append({"name": "nearest_airport", "category": "Transport", "label": "Nearest Airport", "dtype": "categorical"})
     registry.append({"name": "nearest_port", "category": "Transport", "label": "Nearest Port", "dtype": "categorical"})
 
+    # Deprivation (IMD)
+    registry.append({"name": "imd_decile", "category": "Deprivation", "label": "IMD Overall Decile", "dtype": "numeric"})
+    registry.append({"name": "imd_income_decile", "category": "Deprivation", "label": "Income Decile", "dtype": "numeric"})
+    registry.append({"name": "imd_employment_decile", "category": "Deprivation", "label": "Employment Decile", "dtype": "numeric"})
+    registry.append({"name": "imd_education_decile", "category": "Deprivation", "label": "Education Decile", "dtype": "numeric"})
+    registry.append({"name": "imd_health_decile", "category": "Deprivation", "label": "Health Decile", "dtype": "numeric"})
+    registry.append({"name": "imd_crime_decile", "category": "Deprivation", "label": "Crime Decile", "dtype": "numeric"})
+    registry.append({"name": "imd_housing_decile", "category": "Deprivation", "label": "Housing Decile", "dtype": "numeric"})
+    registry.append({"name": "imd_environment_decile", "category": "Deprivation", "label": "Environment Decile", "dtype": "numeric"})
+
     # Crime
     registry.append({"name": "total_crime", "category": "Crime", "label": "Total Crime Count", "dtype": "numeric"})
     for cat, col in CRIME_COL_MAP.items():
@@ -385,6 +395,15 @@ def _build_record(
         "nearest_tube_station": prop.nearest_tube_station,
         "nearest_airport": prop.nearest_airport,
         "nearest_port": prop.nearest_port,
+        # IMD deprivation
+        "imd_decile": prop.imd_decile,
+        "imd_income_decile": prop.imd_income_decile,
+        "imd_employment_decile": prop.imd_employment_decile,
+        "imd_education_decile": prop.imd_education_decile,
+        "imd_health_decile": prop.imd_health_decile,
+        "imd_crime_decile": prop.imd_crime_decile,
+        "imd_housing_decile": prop.imd_housing_decile,
+        "imd_environment_decile": prop.imd_environment_decile,
         "sale_year": sale_year,
         "sale_month": sale_month,
         "sale_quarter": sale_quarter,

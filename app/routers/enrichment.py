@@ -12,6 +12,7 @@ from ..enrichment.bulk import get_coverage, get_status, start, stop
 from ..enrichment.crime import get_crime_summary
 from ..enrichment.epc import fetch_epc_for_postcode
 from ..enrichment.flood import get_flood_risk
+from ..enrichment.imd import enrich_postcode_imd
 from ..enrichment.listing import check_property_listing, enrich_postcode_listings
 from ..enrichment.planning import get_planning_data
 from ..enrichment.transport import enrich_postcode_transport
@@ -20,6 +21,7 @@ from ..schemas import (
     CrimeSummaryResponse,
     EPCEnrichmentResponse,
     FloodRiskResponse,
+    IMDEnrichmentResponse,
     ListingEnrichmentResponse,
     PlanningResponse,
     PropertyListingResponse,
@@ -119,6 +121,29 @@ def _fuzzy_match(prop_address: str, epc_lookup: dict) -> Optional[dict]:
                 return cert
 
     return None
+
+
+@router.post("/imd/{postcode}", response_model=IMDEnrichmentResponse)
+def enrich_imd(postcode: str, db: Session = Depends(get_db)):
+    """Enrich properties with IMD deprivation deciles via postcode→LSOA lookup.
+
+    Downloads ONS NSPL (~120MB) and IMD 2019 (~5MB) on first call.
+    All properties in the same postcode share the same deprivation scores.
+    """
+    clean = postcode.upper().strip()
+    props = db.query(Property).filter(Property.postcode == clean).all()
+    if not props:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No properties found for postcode {clean}. Scrape first.",
+        )
+
+    result = enrich_postcode_imd(db, clean)
+    return IMDEnrichmentResponse(
+        message=result["message"],
+        properties_updated=result["properties_updated"],
+        properties_skipped=result["properties_skipped"],
+    )
 
 
 @router.post("/transport/{postcode}", response_model=TransportEnrichmentResponse)
