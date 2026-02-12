@@ -123,15 +123,19 @@ def _init_trees() -> bool:
                 col_map["urn"] = col
             elif cl in ("establishmentname", "schoolname", "name"):
                 col_map["name"] = col
-            elif cl in ("phaseofeducation", "phase"):
-                col_map["phase"] = col
-            elif cl in ("ofstedrating", "ofstedratingname", "ofstedlastinsp"):
-                if "rating" in cl and "name" not in cl:
-                    col_map["ofsted_num"] = col
-                elif "name" in cl:
+            elif cl.startswith("phaseofeducation") or cl == "phase":
+                # Prefer "(name)" variant over "(code)"
+                if "name" in cl or "phase" not in col_map:
+                    col_map["phase"] = col
+            elif "ofsted" in cl and "rating" in cl:
+                if "name" in cl:
                     col_map["ofsted"] = col
-            elif cl in ("establishmentstatus", "status"):
-                col_map["status"] = col
+                elif "ofsted" not in col_map:
+                    col_map["ofsted_num"] = col
+            elif cl.startswith("establishmentstatus") or cl == "status":
+                # Prefer "(name)" variant
+                if "name" in cl or "status" not in col_map:
+                    col_map["status"] = col
             elif cl in ("easting",):
                 col_map["easting"] = col
             elif cl in ("northing",):

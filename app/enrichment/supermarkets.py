@@ -26,16 +26,11 @@ from ..models import Property
 
 logger = logging.getLogger(__name__)
 
-# Geolytix Retail Points — open data supermarket locations
+# Geolytix Retail Points — open data supermarket locations (Google Drive ZIP)
 _GEOLYTIX_URL = (
-    "https://geolytix.net/geodata/geolytix_retailpoints_v34_202312.csv"
+    "https://drive.usercontent.google.com/download"
+    "?id=1B8M7m86rQg2sx2TsHhFa2d-x-dZ1DbSy&export=download&confirm=t"
 )
-
-# Fallback URLs if primary fails
-_GEOLYTIX_FALLBACK_URLS = [
-    "https://geolytix.net/geodata/geolytix_retailpoints_v33_202306.csv",
-    "https://geolytix.net/geodata/geolytix_retailpoints_v32_202212.csv",
-]
 
 # Premium and budget brand classification
 _PREMIUM_BRANDS = {"waitrose", "m&s food", "m&s simply food", "marks & spencer"}
@@ -104,23 +99,34 @@ def _init_trees() -> bool:
                 logger.info("Supermarkets loaded from cache: %d stores", len(df))
                 return True
 
-        # Download CSV
+        # Download ZIP from Google Drive
+        import zipfile
+        from io import BytesIO
+
         import httpx
 
         df = None
-        for url in [_GEOLYTIX_URL] + _GEOLYTIX_FALLBACK_URLS:
-            try:
-                resp = httpx.get(url, timeout=120, follow_redirects=True)
-                if resp.status_code == 200:
-                    from io import StringIO
-                    df = pd.read_csv(StringIO(resp.text), low_memory=False)
-                    logger.info("Geolytix data downloaded from %s", url)
-                    break
-            except Exception:
-                continue
+        try:
+            resp = httpx.get(_GEOLYTIX_URL, timeout=300, follow_redirects=True)
+            resp.raise_for_status()
 
-        if df is None:
-            logger.error("Failed to download Geolytix supermarket data")
+            # ZIP contains multiple CSVs — find the latest retailpoints CSV
+            zf = zipfile.ZipFile(BytesIO(resp.content))
+            csv_name = None
+            for name in sorted(zf.namelist(), reverse=True):
+                if name.endswith(".csv") and "retailpoints" in name.lower():
+                    csv_name = name
+                    break
+
+            if csv_name is None:
+                logger.error("Geolytix ZIP has no retailpoints CSV: %s", zf.namelist()[:10])
+                return False
+
+            with zf.open(csv_name) as f:
+                df = pd.read_csv(f, low_memory=False)
+            logger.info("Geolytix data loaded from ZIP: %s", csv_name)
+        except Exception:
+            logger.exception("Failed to download Geolytix supermarket data")
             return False
 
         # Find relevant columns

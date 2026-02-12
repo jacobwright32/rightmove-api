@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # IMD 2019 CSV URL (gov.uk — File 7: all domains)
 _IMD_URL = (
     "https://assets.publishing.service.gov.uk/media/"
-    "5d8b3abf40f0b6093b72b11e/File_7_-_All_IoD2019_Scores__Ranks"
+    "5dc407b440f0b6379a7acc8d/File_7_-_All_IoD2019_Scores__Ranks"
     "__Deciles_and_Population_Denominators_3.csv"
 )
 

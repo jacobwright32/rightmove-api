@@ -15,10 +15,10 @@ from .. import config
 
 logger = logging.getLogger(__name__)
 
-# ONS NSPL download URL (Feb 2024 release — covers all active UK postcodes)
+# ONS NSPL download URL (Nov 2025 release — full NSPL with lat/long)
 _NSPL_URL = (
     "https://www.arcgis.com/sharing/rest/content/items/"
-    "80592949bebd4390b2cbe29159a75ef4/data"
+    "8a1d5b58df824b2e86fe07ddfdd87165/data"
 )
 
 _pc_to_lsoa: Optional[dict[str, str]] = None
@@ -65,18 +65,20 @@ def _ensure_data() -> bool:
         resp = httpx.get(_NSPL_URL, timeout=300, follow_redirects=True)
         resp.raise_for_status()
 
-        # The download is a ZIP; find the main CSV inside
+        # The download is a ZIP; find the main combined CSV
+        # (ZIP contains Data/NSPL_*_UK.csv plus Data/multi_csv/NSPL_*_UK_AB.csv etc.)
         zf = zipfile.ZipFile(BytesIO(resp.content))
+        csv_candidates = [n for n in zf.namelist() if n.endswith(".csv")]
+
+        # Prefer the combined UK file (not in multi_csv/, not area-specific)
         csv_name = None
-        for name in zf.namelist():
-            if name.endswith(".csv") and "NSPL" in name.upper():
+        for name in csv_candidates:
+            if "NSPL" in name.upper() and "multi_csv" not in name:
                 csv_name = name
                 break
         # Fallback: largest CSV in the ZIP
-        if csv_name is None:
-            csv_candidates = [n for n in zf.namelist() if n.endswith(".csv")]
-            if csv_candidates:
-                csv_name = max(csv_candidates, key=lambda n: zf.getinfo(n).file_size)
+        if csv_name is None and csv_candidates:
+            csv_name = max(csv_candidates, key=lambda n: zf.getinfo(n).file_size)
 
         if csv_name is None:
             logger.error("ONS NSPL ZIP has no CSV files")

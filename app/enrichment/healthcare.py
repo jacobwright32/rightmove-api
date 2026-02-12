@@ -13,7 +13,7 @@ import logging
 import math
 import os
 from datetime import datetime, timezone
-from io import BytesIO, StringIO
+from io import StringIO
 from typing import Optional
 
 import numpy as np
@@ -26,14 +26,14 @@ from .ons_postcode import batch_postcode_to_coords
 
 logger = logging.getLogger(__name__)
 
-# NHS GP practice list (epraccur.csv from NHS Digital)
+# NHS GP practice list (epraccur — ODS Data Search and Export API)
 _GP_URL = (
-    "https://files.digital.nhs.uk/assets/ods/current/epraccur.zip"
+    "https://www.odsdatasearchandexport.nhs.uk/api/getReport?report=epraccur"
 )
 
-# NHS hospitals — England hospital data
+# NHS hospitals — England trust sites (ets — ODS DSE API)
 _HOSPITAL_URL = (
-    "https://files.digital.nhs.uk/assets/ods/current/ets.zip"
+    "https://www.odsdatasearchandexport.nhs.uk/api/getReport?report=ets"
 )
 
 # Earth radius in km
@@ -83,13 +83,11 @@ def _init_trees() -> bool:
                 logger.info("Healthcare loaded from cache: %d facilities", len(df))
                 return True
 
-        import zipfile
-
         import httpx
 
         # Load GP practices
-        gp_records = _download_gp_practices(httpx, zipfile, pd)
-        hospital_records = _download_hospitals(httpx, zipfile, pd)
+        gp_records = _download_gp_practices(httpx, zipfile=None, pd=pd)
+        hospital_records = _download_hospitals(httpx, zipfile=None, pd=pd)
 
         all_records = gp_records + hospital_records
         if not all_records:
@@ -129,22 +127,10 @@ def _download_gp_practices(httpx, zipfile, pd) -> list:
     try:
         resp = httpx.get(_GP_URL, timeout=120, follow_redirects=True)
         resp.raise_for_status()
-        zf = zipfile.ZipFile(BytesIO(resp.content))
 
-        csv_name = None
-        for name in zf.namelist():
-            if name.endswith(".csv"):
-                csv_name = name
-                break
-
-        if csv_name is None:
-            logger.warning("GP practice ZIP has no CSV files")
-            return records
-
-        with zf.open(csv_name) as f:
-            # epraccur.csv is headerless fixed-width-like CSV
-            content = f.read().decode("latin-1")
-            df = pd.read_csv(StringIO(content), header=None, low_memory=False)
+        # New ODS DSE API returns direct CSV (not ZIP)
+        content = resp.content.decode("latin-1")
+        df = pd.read_csv(StringIO(content), header=None, low_memory=False)
 
         # epraccur columns: 0=OrgCode, 1=Name, ..., 9=Postcode
         # (Column positions may vary; name is col 1, postcode is typically col 9)
@@ -152,8 +138,8 @@ def _download_gp_practices(httpx, zipfile, pd) -> list:
             for _, row in df.iterrows():
                 name = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ""
                 postcode = str(row.iloc[9]).strip() if pd.notna(row.iloc[9]) else ""
-                status = str(row.iloc[12]).strip() if len(df.columns) > 12 and pd.notna(row.iloc[12]) else "A"
-                if name and postcode and status == "A":  # A = Active
+                status = str(row.iloc[12]).strip() if len(df.columns) > 12 and pd.notna(row.iloc[12]) else "ACTIVE"
+                if name and postcode and status.upper() in ("A", "ACTIVE"):
                     records.append({"name": name, "postcode": postcode, "type": "gp"})
 
         logger.info("GP practices loaded: %d active", len(records))
@@ -169,29 +155,18 @@ def _download_hospitals(httpx, zipfile, pd) -> list:
     try:
         resp = httpx.get(_HOSPITAL_URL, timeout=120, follow_redirects=True)
         resp.raise_for_status()
-        zf = zipfile.ZipFile(BytesIO(resp.content))
 
-        csv_name = None
-        for name in zf.namelist():
-            if name.endswith(".csv"):
-                csv_name = name
-                break
-
-        if csv_name is None:
-            logger.warning("Hospital ZIP has no CSV files")
-            return records
-
-        with zf.open(csv_name) as f:
-            content = f.read().decode("latin-1")
-            df = pd.read_csv(StringIO(content), header=None, low_memory=False)
+        # New ODS DSE API returns direct CSV (not ZIP)
+        content = resp.content.decode("latin-1")
+        df = pd.read_csv(StringIO(content), header=None, low_memory=False)
 
         # ets.csv columns: 0=OrgCode, 1=Name, ..., 9=Postcode
         if len(df.columns) >= 10:
             for _, row in df.iterrows():
                 name = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ""
                 postcode = str(row.iloc[9]).strip() if pd.notna(row.iloc[9]) else ""
-                status = str(row.iloc[12]).strip() if len(df.columns) > 12 and pd.notna(row.iloc[12]) else "A"
-                if name and postcode and status == "A":
+                status = str(row.iloc[12]).strip() if len(df.columns) > 12 and pd.notna(row.iloc[12]) else "ACTIVE"
+                if name and postcode and status.upper() in ("A", "ACTIVE", "NAN"):
                     records.append({"name": name, "postcode": postcode, "type": "hospital"})
 
         logger.info("Hospitals loaded: %d active", len(records))

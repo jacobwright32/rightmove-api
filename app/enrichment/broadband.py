@@ -19,9 +19,10 @@ logger = logging.getLogger(__name__)
 
 # Ofcom Connected Nations fixed broadband data (latest available)
 _BROADBAND_URL = (
-    "https://www.ofcom.org.uk/siteassets/research-and-data/telecoms-research/"
-    "connected-nations/connected-nations-2023/fixed-postcode-2023/"
-    "202305_fixed_pc_performance_r03.zip"
+    "https://www.ofcom.org.uk/siteassets/resources/documents/"
+    "research-and-data/multi-sector/infrastructure-research/"
+    "connected-nations-2023/data-downloads/"
+    "202305_fixed_postcode_performance_r01.zip"
 )
 
 _pc_to_broadband: Optional[dict[str, dict[str, float]]] = None
@@ -66,56 +67,72 @@ def _ensure_data() -> bool:
         resp.raise_for_status()
 
         zf = zipfile.ZipFile(BytesIO(resp.content))
-        csv_name = None
-        for name in zf.namelist():
-            if name.endswith(".csv"):
-                csv_name = name
-                break
+        csv_names = [n for n in zf.namelist() if n.endswith(".csv")]
 
-        if csv_name is None:
+        if not csv_names:
             logger.error("Ofcom broadband ZIP has no CSV files")
             return False
 
-        logger.info("Parsing %s...", csv_name)
-        with zf.open(csv_name) as f:
-            df = pd.read_csv(f, low_memory=False)
+        # Concatenate all area CSVs (AB, BT, CF, etc.)
+        logger.info("Parsing %d CSVs from Ofcom ZIP...", len(csv_names))
+        frames = []
+        for csv_name in csv_names:
+            with zf.open(csv_name) as f:
+                frames.append(pd.read_csv(f, low_memory=False))
+        df = pd.concat(frames, ignore_index=True)
+        logger.info("Loaded %d rows from %d CSV files", len(df), len(csv_names))
 
-        # Find columns — Ofcom uses varying names across years
-        col_map = {}
-        for col in df.columns:
-            cl = col.lower().strip()
+        # Find columns — Ofcom 2023 performance data uses descriptive names
+        col_lower = {c: c.lower().strip() for c in df.columns}
+
+        pc_col = None
+        median_col = None
+        conn_cols = {}  # speed_threshold -> column_name
+        for col, cl in col_lower.items():
             if cl in ("postcode", "pcds", "pcd"):
-                col_map["postcode"] = col
-            elif "median" in cl and ("speed" in cl or "download" in cl):
-                col_map["broadband_median_speed"] = col
-            elif "superfast" in cl and ("avail" in cl or "%" in cl or "pct" in cl or "premises" in cl):
-                col_map["broadband_superfast_pct"] = col
-            elif "ultrafast" in cl and ("avail" in cl or "%" in cl or "pct" in cl or "premises" in cl):
-                col_map["broadband_ultrafast_pct"] = col
-            elif ("fttp" in cl or "full fibre" in cl or "fullfibre" in cl) and ("avail" in cl or "%" in cl or "pct" in cl or "premises" in cl):
-                col_map["broadband_full_fibre_pct"] = col
+                pc_col = col
+            elif "median" in cl and "download" in cl and "speed" in cl:
+                median_col = col
+            elif cl.startswith("number of connections"):
+                if ">= 300" in cl:
+                    conn_cols["ufbb"] = col
+                elif ">= 30" in cl:
+                    conn_cols["sfbb"] = col
+                elif "< 2" in cl or "2<5" in cl or "5<10" in cl or "10<30" in cl or "30<300" in cl:
+                    conn_cols.setdefault("_all", [])
+                    conn_cols["_all"].append(col)
 
-        if "postcode" not in col_map:
-            # Try first column as postcode
-            col_map["postcode"] = df.columns[0]
+        if pc_col is None:
+            pc_col = df.columns[0]
 
-        # Select and rename
-        rename = {}
-        select_cols = []
-        for key, col in col_map.items():
-            rename[col] = key
-            select_cols.append(col)
+        # Build output DataFrame with calculated metrics
+        out = pd.DataFrame()
+        out["postcode"] = df[pc_col].astype(str).str.upper().str.replace(" ", "", regex=False)
 
-        df = df[select_cols].rename(columns=rename)
-        df["postcode"] = (
-            df["postcode"].astype(str).str.upper().str.replace(" ", "", regex=False)
-        )
+        if median_col:
+            out["broadband_median_speed"] = pd.to_numeric(df[median_col], errors="coerce")
 
-        # Convert metrics to float
-        for col in ["broadband_median_speed", "broadband_superfast_pct",
-                     "broadband_ultrafast_pct", "broadband_full_fibre_pct"]:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
+        # Calculate percentages from connection counts
+        all_count_cols = conn_cols.get("_all", [])
+        if all_count_cols:
+            for c in all_count_cols:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+            total = df[all_count_cols].sum(axis=1)
+            # Also add >=300 to total if present
+            if "ufbb" in conn_cols:
+                df[conn_cols["ufbb"]] = pd.to_numeric(df[conn_cols["ufbb"]], errors="coerce")
+                total = total + df[conn_cols["ufbb"]].fillna(0)
+
+            if "sfbb" in conn_cols:
+                df[conn_cols["sfbb"]] = pd.to_numeric(df[conn_cols["sfbb"]], errors="coerce")
+                sfbb_count = df[conn_cols["sfbb"]].fillna(0)
+                out["broadband_superfast_pct"] = (sfbb_count / total.replace(0, float("nan")) * 100).round(1)
+
+            if "ufbb" in conn_cols:
+                ufbb_count = df[conn_cols["ufbb"]].fillna(0)
+                out["broadband_ultrafast_pct"] = (ufbb_count / total.replace(0, float("nan")) * 100).round(1)
+
+        df = out
 
         # Drop rows without postcode
         df = df.dropna(subset=["postcode"])
