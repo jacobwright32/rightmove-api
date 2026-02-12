@@ -94,6 +94,12 @@ def _build_registry() -> list[dict[str, str]]:
     registry.append({"name": "imd_housing_decile", "category": "Deprivation", "label": "Housing Decile", "dtype": "numeric"})
     registry.append({"name": "imd_environment_decile", "category": "Deprivation", "label": "Environment Decile", "dtype": "numeric"})
 
+    # Broadband
+    registry.append({"name": "broadband_median_speed", "category": "Broadband", "label": "Median Download (Mbit/s)", "dtype": "numeric"})
+    registry.append({"name": "broadband_superfast_pct", "category": "Broadband", "label": "Superfast Availability (%)", "dtype": "numeric"})
+    registry.append({"name": "broadband_ultrafast_pct", "category": "Broadband", "label": "Ultrafast Availability (%)", "dtype": "numeric"})
+    registry.append({"name": "broadband_full_fibre_pct", "category": "Broadband", "label": "Full Fibre Availability (%)", "dtype": "numeric"})
+
     # Crime
     registry.append({"name": "total_crime", "category": "Crime", "label": "Total Crime Count", "dtype": "numeric"})
     for cat, col in CRIME_COL_MAP.items():
@@ -404,6 +410,11 @@ def _build_record(
         "imd_crime_decile": prop.imd_crime_decile,
         "imd_housing_decile": prop.imd_housing_decile,
         "imd_environment_decile": prop.imd_environment_decile,
+        # Broadband
+        "broadband_median_speed": prop.broadband_median_speed,
+        "broadband_superfast_pct": prop.broadband_superfast_pct,
+        "broadband_ultrafast_pct": prop.broadband_ultrafast_pct,
+        "broadband_full_fibre_pct": prop.broadband_full_fibre_pct,
         "sale_year": sale_year,
         "sale_month": sale_month,
         "sale_quarter": sale_quarter,

@@ -2,6 +2,7 @@ import axios from "axios";
 import type {
   AreaScrapeResponse,
   AvailableFeaturesResponse,
+  BroadbandEnrichmentResponse,
   BulkEnrichmentStatus,
   CoverageResponse,
   CrimeSummaryResponse,
@@ -226,6 +227,15 @@ export async function getPropertyListing(
 ): Promise<PropertyListingResponse> {
   const res = await api.get<PropertyListingResponse>(
     `/properties/${propertyId}/listing`
+  );
+  return res.data;
+}
+
+export async function enrichBroadband(
+  postcode: string
+): Promise<BroadbandEnrichmentResponse> {
+  const res = await api.post<BroadbandEnrichmentResponse>(
+    `/enrich/broadband/${encodeURIComponent(postcode)}`
   );
   return res.data;
 }

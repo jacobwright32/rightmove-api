@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # ── Enrichment types ──────────────────────────────────────────────
 
-ALL_TYPES = ["geocode", "transport", "epc", "crime", "flood", "planning", "imd"]
+ALL_TYPES = ["geocode", "transport", "epc", "crime", "flood", "planning", "imd", "broadband"]
 
 
 # ── Singleton state ───────────────────────────────────────────────
@@ -257,6 +257,25 @@ def _enrich_imd(db: Session, postcode: str, delay: float) -> str:
     return f"updated_{result['properties_updated']}"
 
 
+def _enrich_broadband(db: Session, postcode: str, delay: float) -> str:
+    from ..enrichment.broadband import enrich_postcode_broadband
+
+    has = (
+        db.query(Property)
+        .filter(
+            Property.postcode == postcode,
+            Property.broadband_median_speed.isnot(None),
+        )
+        .count()
+    )
+    if has > 0:
+        return "already_enriched"
+
+    result = enrich_postcode_broadband(db, postcode)
+    # No delay — broadband is local computation (postcode→CSV lookup)
+    return f"updated_{result['properties_updated']}"
+
+
 _FNS = {
     "geocode": _enrich_geocode,
     "transport": _enrich_transport,
@@ -265,6 +284,7 @@ _FNS = {
     "flood": _enrich_flood,
     "planning": _enrich_planning,
     "imd": _enrich_imd,
+    "broadband": _enrich_broadband,
 }
 
 
@@ -494,6 +514,12 @@ def get_coverage() -> dict:
                 "filled": _count(Property.imd_decile),
                 "total": total,
                 "note": f"{_pc_count(Property.imd_decile)} postcodes",
+            },
+            {
+                "name": "Broadband Speed",
+                "filled": _count(Property.broadband_median_speed),
+                "total": total,
+                "note": f"{_pc_count(Property.broadband_median_speed)} postcodes",
             },
         ]
 

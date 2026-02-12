@@ -18,6 +18,7 @@ import FloodRiskSection from "../components/FloodRiskSection";
 import GrowthSection from "../components/GrowthSection";
 import ListingStatusSection from "../components/ListingStatusSection";
 import PlanningSection from "../components/PlanningSection";
+import BroadbandSection from "../components/BroadbandSection";
 import IMDSection from "../components/IMDSection";
 import TransportSection from "../components/TransportSection";
 import SaleHistoryTable from "../components/SaleHistoryTable";
@@ -377,6 +378,13 @@ export default function PropertyDetailPage() {
       {property.postcode && (
         <div className="mb-6">
           <IMDSection property={property} onRefresh={setProperty} />
+        </div>
+      )}
+
+      {/* Broadband */}
+      {property.postcode && (
+        <div className="mb-6">
+          <BroadbandSection property={property} onRefresh={setProperty} />
         </div>
       )}
 

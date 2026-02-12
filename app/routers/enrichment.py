@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..enrichment.broadband import enrich_postcode_broadband
 from ..enrichment.bulk import get_coverage, get_status, start, stop
 from ..enrichment.crime import get_crime_summary
 from ..enrichment.epc import fetch_epc_for_postcode
@@ -18,6 +19,7 @@ from ..enrichment.planning import get_planning_data
 from ..enrichment.transport import enrich_postcode_transport
 from ..models import Property
 from ..schemas import (
+    BroadbandEnrichmentResponse,
     CrimeSummaryResponse,
     EPCEnrichmentResponse,
     FloodRiskResponse,
@@ -140,6 +142,29 @@ def enrich_imd(postcode: str, db: Session = Depends(get_db)):
 
     result = enrich_postcode_imd(db, clean)
     return IMDEnrichmentResponse(
+        message=result["message"],
+        properties_updated=result["properties_updated"],
+        properties_skipped=result["properties_skipped"],
+    )
+
+
+@router.post("/broadband/{postcode}", response_model=BroadbandEnrichmentResponse)
+def enrich_broadband(postcode: str, db: Session = Depends(get_db)):
+    """Enrich properties with Ofcom broadband speed data.
+
+    Downloads Ofcom Connected Nations data (~200MB) on first call.
+    All properties in the same postcode share the same broadband metrics.
+    """
+    clean = postcode.upper().strip()
+    props = db.query(Property).filter(Property.postcode == clean).all()
+    if not props:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No properties found for postcode {clean}. Scrape first.",
+        )
+
+    result = enrich_postcode_broadband(db, clean)
+    return BroadbandEnrichmentResponse(
         message=result["message"],
         properties_updated=result["properties_updated"],
         properties_skipped=result["properties_skipped"],
