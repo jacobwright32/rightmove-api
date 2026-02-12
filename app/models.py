@@ -57,6 +57,44 @@ class Property(Base):
     nearest_airport = Column(String, nullable=True)
     nearest_port = Column(String, nullable=True)
     bus_stops_within_500m = Column(Integer, nullable=True)
+    # IMD (Indices of Multiple Deprivation) — populated via /enrich/imd endpoint
+    imd_decile = Column(Integer, nullable=True)  # 1-10, 1 = most deprived
+    imd_income_decile = Column(Integer, nullable=True)
+    imd_employment_decile = Column(Integer, nullable=True)
+    imd_education_decile = Column(Integer, nullable=True)
+    imd_health_decile = Column(Integer, nullable=True)
+    imd_crime_decile = Column(Integer, nullable=True)
+    imd_housing_decile = Column(Integer, nullable=True)
+    imd_environment_decile = Column(Integer, nullable=True)
+    # Broadband (Ofcom) — populated via /enrich/broadband endpoint
+    broadband_median_speed = Column(Float, nullable=True)  # Mbit/s
+    broadband_superfast_pct = Column(Float, nullable=True)  # % with 30Mbit/s+
+    broadband_ultrafast_pct = Column(Float, nullable=True)  # % with 300Mbit/s+
+    broadband_full_fibre_pct = Column(Float, nullable=True)  # % full fibre
+    # Schools (GIAS/Ofsted) — populated via /enrich/schools endpoint
+    dist_nearest_primary_km = Column(Float, nullable=True)
+    dist_nearest_secondary_km = Column(Float, nullable=True)
+    nearest_primary_school = Column(String, nullable=True)
+    nearest_secondary_school = Column(String, nullable=True)
+    nearest_primary_ofsted = Column(String, nullable=True)  # Outstanding/Good/RI/Inadequate
+    nearest_secondary_ofsted = Column(String, nullable=True)
+    dist_nearest_outstanding_primary_km = Column(Float, nullable=True)
+    dist_nearest_outstanding_secondary_km = Column(Float, nullable=True)
+    primary_schools_within_2km = Column(Integer, nullable=True)
+    secondary_schools_within_3km = Column(Integer, nullable=True)
+    # Healthcare (NHS) — populated via /enrich/healthcare endpoint
+    dist_nearest_gp_km = Column(Float, nullable=True)
+    nearest_gp_name = Column(String, nullable=True)
+    dist_nearest_hospital_km = Column(Float, nullable=True)
+    nearest_hospital_name = Column(String, nullable=True)
+    gp_practices_within_2km = Column(Integer, nullable=True)
+    # Supermarkets (Geolytix) — populated via /enrich/supermarkets endpoint
+    dist_nearest_supermarket_km = Column(Float, nullable=True)
+    nearest_supermarket_name = Column(String, nullable=True)
+    nearest_supermarket_brand = Column(String, nullable=True)
+    dist_nearest_premium_supermarket_km = Column(Float, nullable=True)  # Waitrose/M&S
+    dist_nearest_budget_supermarket_km = Column(Float, nullable=True)  # Aldi/Lidl
+    supermarkets_within_2km = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,

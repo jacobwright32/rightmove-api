@@ -51,6 +51,44 @@ class PropertyBrief(BaseModel):
     nearest_airport: Optional[str] = None
     nearest_port: Optional[str] = None
     bus_stops_within_500m: Optional[int] = None
+    # IMD deprivation
+    imd_decile: Optional[int] = None
+    imd_income_decile: Optional[int] = None
+    imd_employment_decile: Optional[int] = None
+    imd_education_decile: Optional[int] = None
+    imd_health_decile: Optional[int] = None
+    imd_crime_decile: Optional[int] = None
+    imd_housing_decile: Optional[int] = None
+    imd_environment_decile: Optional[int] = None
+    # Broadband
+    broadband_median_speed: Optional[float] = None
+    broadband_superfast_pct: Optional[float] = None
+    broadband_ultrafast_pct: Optional[float] = None
+    broadband_full_fibre_pct: Optional[float] = None
+    # Schools
+    dist_nearest_primary_km: Optional[float] = None
+    dist_nearest_secondary_km: Optional[float] = None
+    nearest_primary_school: Optional[str] = None
+    nearest_secondary_school: Optional[str] = None
+    nearest_primary_ofsted: Optional[str] = None
+    nearest_secondary_ofsted: Optional[str] = None
+    dist_nearest_outstanding_primary_km: Optional[float] = None
+    dist_nearest_outstanding_secondary_km: Optional[float] = None
+    primary_schools_within_2km: Optional[int] = None
+    secondary_schools_within_3km: Optional[int] = None
+    # Healthcare
+    dist_nearest_gp_km: Optional[float] = None
+    nearest_gp_name: Optional[str] = None
+    dist_nearest_hospital_km: Optional[float] = None
+    nearest_hospital_name: Optional[str] = None
+    gp_practices_within_2km: Optional[int] = None
+    # Supermarkets
+    dist_nearest_supermarket_km: Optional[float] = None
+    nearest_supermarket_name: Optional[str] = None
+    nearest_supermarket_brand: Optional[str] = None
+    dist_nearest_premium_supermarket_km: Optional[float] = None
+    dist_nearest_budget_supermarket_km: Optional[float] = None
+    supermarkets_within_2km: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -486,3 +524,36 @@ class PostcodePredictionResponse(BaseModel):
     postcode: str
     count: int
     predictions: list
+
+
+# --- New enrichment response schemas ---
+
+
+class IMDEnrichmentResponse(BaseModel):
+    message: str
+    properties_updated: int
+    properties_skipped: int
+
+
+class BroadbandEnrichmentResponse(BaseModel):
+    message: str
+    properties_updated: int
+    properties_skipped: int
+
+
+class SchoolsEnrichmentResponse(BaseModel):
+    message: str
+    properties_updated: int
+    properties_skipped: int
+
+
+class HealthcareEnrichmentResponse(BaseModel):
+    message: str
+    properties_updated: int
+    properties_skipped: int
+
+
+class SupermarketsEnrichmentResponse(BaseModel):
+    message: str
+    properties_updated: int
+    properties_skipped: int

@@ -45,6 +45,44 @@ def _migrate_db():
             "ALTER TABLE properties ADD COLUMN nearest_airport TEXT",
             "ALTER TABLE properties ADD COLUMN nearest_port TEXT",
             "ALTER TABLE properties ADD COLUMN bus_stops_within_500m INTEGER",
+            # IMD deprivation
+            "ALTER TABLE properties ADD COLUMN imd_decile INTEGER",
+            "ALTER TABLE properties ADD COLUMN imd_income_decile INTEGER",
+            "ALTER TABLE properties ADD COLUMN imd_employment_decile INTEGER",
+            "ALTER TABLE properties ADD COLUMN imd_education_decile INTEGER",
+            "ALTER TABLE properties ADD COLUMN imd_health_decile INTEGER",
+            "ALTER TABLE properties ADD COLUMN imd_crime_decile INTEGER",
+            "ALTER TABLE properties ADD COLUMN imd_housing_decile INTEGER",
+            "ALTER TABLE properties ADD COLUMN imd_environment_decile INTEGER",
+            # Broadband
+            "ALTER TABLE properties ADD COLUMN broadband_median_speed REAL",
+            "ALTER TABLE properties ADD COLUMN broadband_superfast_pct REAL",
+            "ALTER TABLE properties ADD COLUMN broadband_ultrafast_pct REAL",
+            "ALTER TABLE properties ADD COLUMN broadband_full_fibre_pct REAL",
+            # Schools
+            "ALTER TABLE properties ADD COLUMN dist_nearest_primary_km REAL",
+            "ALTER TABLE properties ADD COLUMN dist_nearest_secondary_km REAL",
+            "ALTER TABLE properties ADD COLUMN nearest_primary_school TEXT",
+            "ALTER TABLE properties ADD COLUMN nearest_secondary_school TEXT",
+            "ALTER TABLE properties ADD COLUMN nearest_primary_ofsted TEXT",
+            "ALTER TABLE properties ADD COLUMN nearest_secondary_ofsted TEXT",
+            "ALTER TABLE properties ADD COLUMN dist_nearest_outstanding_primary_km REAL",
+            "ALTER TABLE properties ADD COLUMN dist_nearest_outstanding_secondary_km REAL",
+            "ALTER TABLE properties ADD COLUMN primary_schools_within_2km INTEGER",
+            "ALTER TABLE properties ADD COLUMN secondary_schools_within_3km INTEGER",
+            # Healthcare
+            "ALTER TABLE properties ADD COLUMN dist_nearest_gp_km REAL",
+            "ALTER TABLE properties ADD COLUMN nearest_gp_name TEXT",
+            "ALTER TABLE properties ADD COLUMN dist_nearest_hospital_km REAL",
+            "ALTER TABLE properties ADD COLUMN nearest_hospital_name TEXT",
+            "ALTER TABLE properties ADD COLUMN gp_practices_within_2km INTEGER",
+            # Supermarkets
+            "ALTER TABLE properties ADD COLUMN dist_nearest_supermarket_km REAL",
+            "ALTER TABLE properties ADD COLUMN nearest_supermarket_name TEXT",
+            "ALTER TABLE properties ADD COLUMN nearest_supermarket_brand TEXT",
+            "ALTER TABLE properties ADD COLUMN dist_nearest_premium_supermarket_km REAL",
+            "ALTER TABLE properties ADD COLUMN dist_nearest_budget_supermarket_km REAL",
+            "ALTER TABLE properties ADD COLUMN supermarkets_within_2km INTEGER",
         ]
         for sql in migrations:
             try:

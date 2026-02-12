@@ -42,6 +42,44 @@ export interface PropertyBrief {
   nearest_airport: string | null;
   nearest_port: string | null;
   bus_stops_within_500m: number | null;
+  // IMD deprivation
+  imd_decile: number | null;
+  imd_income_decile: number | null;
+  imd_employment_decile: number | null;
+  imd_education_decile: number | null;
+  imd_health_decile: number | null;
+  imd_crime_decile: number | null;
+  imd_housing_decile: number | null;
+  imd_environment_decile: number | null;
+  // Broadband
+  broadband_median_speed: number | null;
+  broadband_superfast_pct: number | null;
+  broadband_ultrafast_pct: number | null;
+  broadband_full_fibre_pct: number | null;
+  // Schools
+  dist_nearest_primary_km: number | null;
+  dist_nearest_secondary_km: number | null;
+  nearest_primary_school: string | null;
+  nearest_secondary_school: string | null;
+  nearest_primary_ofsted: string | null;
+  nearest_secondary_ofsted: string | null;
+  dist_nearest_outstanding_primary_km: number | null;
+  dist_nearest_outstanding_secondary_km: number | null;
+  primary_schools_within_2km: number | null;
+  secondary_schools_within_3km: number | null;
+  // Healthcare
+  dist_nearest_gp_km: number | null;
+  nearest_gp_name: string | null;
+  dist_nearest_hospital_km: number | null;
+  nearest_hospital_name: string | null;
+  gp_practices_within_2km: number | null;
+  // Supermarkets
+  dist_nearest_supermarket_km: number | null;
+  nearest_supermarket_name: string | null;
+  nearest_supermarket_brand: string | null;
+  dist_nearest_premium_supermarket_km: number | null;
+  dist_nearest_budget_supermarket_km: number | null;
+  supermarkets_within_2km: number | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -479,4 +517,36 @@ export interface BulkEnrichmentStatus {
   types: string[];
   delay: number;
   error?: string;
+}
+
+// New enrichment responses
+
+export interface IMDEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
+}
+
+export interface BroadbandEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
+}
+
+export interface SchoolsEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
+}
+
+export interface HealthcareEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
+}
+
+export interface SupermarketsEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
 }

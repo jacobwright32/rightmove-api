@@ -59,3 +59,27 @@ RATE_LIMIT_DEFAULT: str = os.getenv("RATE_LIMIT_DEFAULT", "60/minute")
 NAPTAN_CACHE_DIR: Path = Path(__file__).resolve().parent.parent / "data"
 NAPTAN_CACHE_PATH: Path = NAPTAN_CACHE_DIR / "naptan_stops.parquet"
 NAPTAN_MAX_AGE_DAYS: int = int(os.getenv("NAPTAN_MAX_AGE_DAYS", "90"))
+
+# ONS Postcode Directory (shared: postcode→LSOA, postcode→coords)
+ONS_NSPL_CACHE_PATH: Path = NAPTAN_CACHE_DIR / "ons_nspl.parquet"
+ONS_NSPL_MAX_AGE_DAYS: int = int(os.getenv("ONS_NSPL_MAX_AGE_DAYS", "365"))
+
+# IMD (Indices of Multiple Deprivation)
+IMD_CACHE_PATH: Path = NAPTAN_CACHE_DIR / "imd_2019.parquet"
+IMD_MAX_AGE_DAYS: int = int(os.getenv("IMD_MAX_AGE_DAYS", "365"))
+
+# Ofcom Broadband
+BROADBAND_CACHE_PATH: Path = NAPTAN_CACHE_DIR / "ofcom_broadband.parquet"
+BROADBAND_MAX_AGE_DAYS: int = int(os.getenv("BROADBAND_MAX_AGE_DAYS", "180"))
+
+# Schools (GIAS / Ofsted)
+SCHOOLS_CACHE_PATH: Path = NAPTAN_CACHE_DIR / "gias_schools.parquet"
+SCHOOLS_MAX_AGE_DAYS: int = int(os.getenv("SCHOOLS_MAX_AGE_DAYS", "365"))
+
+# Healthcare (NHS GP practices + hospitals)
+HEALTHCARE_CACHE_PATH: Path = NAPTAN_CACHE_DIR / "nhs_healthcare.parquet"
+HEALTHCARE_MAX_AGE_DAYS: int = int(os.getenv("HEALTHCARE_MAX_AGE_DAYS", "180"))
+
+# Supermarkets (Geolytix)
+SUPERMARKETS_CACHE_PATH: Path = NAPTAN_CACHE_DIR / "geolytix_supermarkets.parquet"
+SUPERMARKETS_MAX_AGE_DAYS: int = int(os.getenv("SUPERMARKETS_MAX_AGE_DAYS", "180"))
