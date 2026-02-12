@@ -12,6 +12,7 @@ import type {
   HealthcareEnrichmentResponse,
   IMDEnrichmentResponse,
   SchoolsEnrichmentResponse,
+  SupermarketsEnrichmentResponse,
   PropertyGeoPoint,
   HousingInsightsFilters,
   HousingInsightsResponse,
@@ -265,6 +266,15 @@ export async function enrichSchools(
 ): Promise<SchoolsEnrichmentResponse> {
   const res = await api.post<SchoolsEnrichmentResponse>(
     `/enrich/schools/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichSupermarkets(
+  postcode: string
+): Promise<SupermarketsEnrichmentResponse> {
+  const res = await api.post<SupermarketsEnrichmentResponse>(
+    `/enrich/supermarkets/${encodeURIComponent(postcode)}`
   );
   return res.data;
 }

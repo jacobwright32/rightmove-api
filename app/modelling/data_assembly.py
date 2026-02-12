@@ -30,6 +30,7 @@ _CATEGORICAL_FEATURES = {
     "nearest_primary_school", "nearest_secondary_school",
     "nearest_primary_ofsted", "nearest_secondary_ofsted",
     "nearest_gp_name", "nearest_hospital_name",
+    "nearest_supermarket_name", "nearest_supermarket_brand",
 }
 
 # Numeric features from parsed extras
@@ -121,6 +122,14 @@ def _build_registry() -> list[dict[str, str]]:
     registry.append({"name": "dist_nearest_hospital_km", "category": "Healthcare", "label": "Dist. to Nearest Hospital (km)", "dtype": "numeric"})
     registry.append({"name": "nearest_hospital_name", "category": "Healthcare", "label": "Nearest Hospital", "dtype": "categorical"})
     registry.append({"name": "gp_practices_within_2km", "category": "Healthcare", "label": "GP Practices within 2km", "dtype": "numeric"})
+
+    # Amenities (Supermarkets)
+    registry.append({"name": "dist_nearest_supermarket_km", "category": "Amenities", "label": "Dist. to Nearest Supermarket (km)", "dtype": "numeric"})
+    registry.append({"name": "nearest_supermarket_name", "category": "Amenities", "label": "Nearest Supermarket", "dtype": "categorical"})
+    registry.append({"name": "nearest_supermarket_brand", "category": "Amenities", "label": "Nearest Supermarket Brand", "dtype": "categorical"})
+    registry.append({"name": "dist_nearest_premium_supermarket_km", "category": "Amenities", "label": "Dist. to Premium Supermarket (km)", "dtype": "numeric"})
+    registry.append({"name": "dist_nearest_budget_supermarket_km", "category": "Amenities", "label": "Dist. to Budget Supermarket (km)", "dtype": "numeric"})
+    registry.append({"name": "supermarkets_within_2km", "category": "Amenities", "label": "Supermarkets within 2km", "dtype": "numeric"})
 
     # Crime
     registry.append({"name": "total_crime", "category": "Crime", "label": "Total Crime Count", "dtype": "numeric"})
@@ -454,6 +463,13 @@ def _build_record(
         "dist_nearest_hospital_km": prop.dist_nearest_hospital_km,
         "nearest_hospital_name": prop.nearest_hospital_name,
         "gp_practices_within_2km": prop.gp_practices_within_2km,
+        # Supermarkets
+        "dist_nearest_supermarket_km": prop.dist_nearest_supermarket_km,
+        "nearest_supermarket_name": prop.nearest_supermarket_name,
+        "nearest_supermarket_brand": prop.nearest_supermarket_brand,
+        "dist_nearest_premium_supermarket_km": prop.dist_nearest_premium_supermarket_km,
+        "dist_nearest_budget_supermarket_km": prop.dist_nearest_budget_supermarket_km,
+        "supermarkets_within_2km": prop.supermarkets_within_2km,
         "sale_year": sale_year,
         "sale_month": sale_month,
         "sale_quarter": sale_quarter,

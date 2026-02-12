@@ -18,6 +18,7 @@ const ENRICHMENT_TYPES = [
   { id: "broadband", label: "Broadband" },
   { id: "schools", label: "Schools" },
   { id: "healthcare", label: "Healthcare" },
+  { id: "supermarkets", label: "Supermarkets" },
 ];
 
 export default function EnrichmentPage() {

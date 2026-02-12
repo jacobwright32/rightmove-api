@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 ALL_TYPES = [
     "geocode", "transport", "epc", "crime", "flood", "planning",
-    "imd", "broadband", "schools", "healthcare",
+    "imd", "broadband", "schools", "healthcare", "supermarkets",
 ]
 
 
@@ -317,6 +317,25 @@ def _enrich_healthcare(db: Session, postcode: str, delay: float) -> str:
     return f"updated_{result['properties_updated']}"
 
 
+def _enrich_supermarkets(db: Session, postcode: str, delay: float) -> str:
+    from ..enrichment.supermarkets import enrich_postcode_supermarkets
+
+    has = (
+        db.query(Property)
+        .filter(
+            Property.postcode == postcode,
+            Property.dist_nearest_supermarket_km.isnot(None),
+        )
+        .count()
+    )
+    if has > 0:
+        return "already_enriched"
+
+    result = enrich_postcode_supermarkets(db, postcode)
+    # No delay — supermarkets is local computation (cKDTree lookup)
+    return f"updated_{result['properties_updated']}"
+
+
 _FNS = {
     "geocode": _enrich_geocode,
     "transport": _enrich_transport,
@@ -328,6 +347,7 @@ _FNS = {
     "broadband": _enrich_broadband,
     "schools": _enrich_schools,
     "healthcare": _enrich_healthcare,
+    "supermarkets": _enrich_supermarkets,
 }
 
 
@@ -575,6 +595,12 @@ def get_coverage() -> dict:
                 "filled": _count(Property.dist_nearest_gp_km),
                 "total": total,
                 "note": f"{_pc_count(Property.dist_nearest_gp_km)} postcodes",
+            },
+            {
+                "name": "Supermarkets",
+                "filled": _count(Property.dist_nearest_supermarket_km),
+                "total": total,
+                "note": f"{_pc_count(Property.dist_nearest_supermarket_km)} postcodes",
             },
         ]
 
