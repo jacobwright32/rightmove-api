@@ -9,6 +9,7 @@ import type {
   EPCEnrichmentResponse,
   FloodRiskResponse,
   GrowthLeaderboardEntry,
+  HealthcareEnrichmentResponse,
   IMDEnrichmentResponse,
   SchoolsEnrichmentResponse,
   PropertyGeoPoint,
@@ -246,6 +247,15 @@ export async function enrichIMD(
 ): Promise<IMDEnrichmentResponse> {
   const res = await api.post<IMDEnrichmentResponse>(
     `/enrich/imd/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichHealthcare(
+  postcode: string
+): Promise<HealthcareEnrichmentResponse> {
+  const res = await api.post<HealthcareEnrichmentResponse>(
+    `/enrich/healthcare/${encodeURIComponent(postcode)}`
   );
   return res.data;
 }

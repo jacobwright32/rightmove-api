@@ -29,6 +29,7 @@ _CATEGORICAL_FEATURES = {
     "nearest_rail_station", "nearest_tube_station", "nearest_airport", "nearest_port",
     "nearest_primary_school", "nearest_secondary_school",
     "nearest_primary_ofsted", "nearest_secondary_ofsted",
+    "nearest_gp_name", "nearest_hospital_name",
 }
 
 # Numeric features from parsed extras
@@ -113,6 +114,13 @@ def _build_registry() -> list[dict[str, str]]:
     registry.append({"name": "dist_nearest_outstanding_secondary_km", "category": "Schools", "label": "Dist. to Outstanding Secondary (km)", "dtype": "numeric"})
     registry.append({"name": "primary_schools_within_2km", "category": "Schools", "label": "Primary Schools within 2km", "dtype": "numeric"})
     registry.append({"name": "secondary_schools_within_3km", "category": "Schools", "label": "Secondary Schools within 3km", "dtype": "numeric"})
+
+    # Healthcare
+    registry.append({"name": "dist_nearest_gp_km", "category": "Healthcare", "label": "Dist. to Nearest GP (km)", "dtype": "numeric"})
+    registry.append({"name": "nearest_gp_name", "category": "Healthcare", "label": "Nearest GP Practice", "dtype": "categorical"})
+    registry.append({"name": "dist_nearest_hospital_km", "category": "Healthcare", "label": "Dist. to Nearest Hospital (km)", "dtype": "numeric"})
+    registry.append({"name": "nearest_hospital_name", "category": "Healthcare", "label": "Nearest Hospital", "dtype": "categorical"})
+    registry.append({"name": "gp_practices_within_2km", "category": "Healthcare", "label": "GP Practices within 2km", "dtype": "numeric"})
 
     # Crime
     registry.append({"name": "total_crime", "category": "Crime", "label": "Total Crime Count", "dtype": "numeric"})
@@ -440,6 +448,12 @@ def _build_record(
         "dist_nearest_outstanding_secondary_km": prop.dist_nearest_outstanding_secondary_km,
         "primary_schools_within_2km": prop.primary_schools_within_2km,
         "secondary_schools_within_3km": prop.secondary_schools_within_3km,
+        # Healthcare
+        "dist_nearest_gp_km": prop.dist_nearest_gp_km,
+        "nearest_gp_name": prop.nearest_gp_name,
+        "dist_nearest_hospital_km": prop.dist_nearest_hospital_km,
+        "nearest_hospital_name": prop.nearest_hospital_name,
+        "gp_practices_within_2km": prop.gp_practices_within_2km,
         "sale_year": sale_year,
         "sale_month": sale_month,
         "sale_quarter": sale_quarter,
