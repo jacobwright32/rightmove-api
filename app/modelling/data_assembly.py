@@ -27,6 +27,8 @@ _CATEGORICAL_FEATURES = {
     "lease_type", "furnished", "floor_level", "council_tax_band",
     "flood_risk_level", "tenure",
     "nearest_rail_station", "nearest_tube_station", "nearest_airport", "nearest_port",
+    "nearest_primary_school", "nearest_secondary_school",
+    "nearest_primary_ofsted", "nearest_secondary_ofsted",
 }
 
 # Numeric features from parsed extras
@@ -99,6 +101,18 @@ def _build_registry() -> list[dict[str, str]]:
     registry.append({"name": "broadband_superfast_pct", "category": "Broadband", "label": "Superfast Availability (%)", "dtype": "numeric"})
     registry.append({"name": "broadband_ultrafast_pct", "category": "Broadband", "label": "Ultrafast Availability (%)", "dtype": "numeric"})
     registry.append({"name": "broadband_full_fibre_pct", "category": "Broadband", "label": "Full Fibre Availability (%)", "dtype": "numeric"})
+
+    # Schools
+    registry.append({"name": "dist_nearest_primary_km", "category": "Schools", "label": "Dist. to Nearest Primary (km)", "dtype": "numeric"})
+    registry.append({"name": "dist_nearest_secondary_km", "category": "Schools", "label": "Dist. to Nearest Secondary (km)", "dtype": "numeric"})
+    registry.append({"name": "nearest_primary_school", "category": "Schools", "label": "Nearest Primary School", "dtype": "categorical"})
+    registry.append({"name": "nearest_secondary_school", "category": "Schools", "label": "Nearest Secondary School", "dtype": "categorical"})
+    registry.append({"name": "nearest_primary_ofsted", "category": "Schools", "label": "Nearest Primary Ofsted", "dtype": "categorical"})
+    registry.append({"name": "nearest_secondary_ofsted", "category": "Schools", "label": "Nearest Secondary Ofsted", "dtype": "categorical"})
+    registry.append({"name": "dist_nearest_outstanding_primary_km", "category": "Schools", "label": "Dist. to Outstanding Primary (km)", "dtype": "numeric"})
+    registry.append({"name": "dist_nearest_outstanding_secondary_km", "category": "Schools", "label": "Dist. to Outstanding Secondary (km)", "dtype": "numeric"})
+    registry.append({"name": "primary_schools_within_2km", "category": "Schools", "label": "Primary Schools within 2km", "dtype": "numeric"})
+    registry.append({"name": "secondary_schools_within_3km", "category": "Schools", "label": "Secondary Schools within 3km", "dtype": "numeric"})
 
     # Crime
     registry.append({"name": "total_crime", "category": "Crime", "label": "Total Crime Count", "dtype": "numeric"})
@@ -415,6 +429,17 @@ def _build_record(
         "broadband_superfast_pct": prop.broadband_superfast_pct,
         "broadband_ultrafast_pct": prop.broadband_ultrafast_pct,
         "broadband_full_fibre_pct": prop.broadband_full_fibre_pct,
+        # Schools
+        "dist_nearest_primary_km": prop.dist_nearest_primary_km,
+        "dist_nearest_secondary_km": prop.dist_nearest_secondary_km,
+        "nearest_primary_school": prop.nearest_primary_school,
+        "nearest_secondary_school": prop.nearest_secondary_school,
+        "nearest_primary_ofsted": prop.nearest_primary_ofsted,
+        "nearest_secondary_ofsted": prop.nearest_secondary_ofsted,
+        "dist_nearest_outstanding_primary_km": prop.dist_nearest_outstanding_primary_km,
+        "dist_nearest_outstanding_secondary_km": prop.dist_nearest_outstanding_secondary_km,
+        "primary_schools_within_2km": prop.primary_schools_within_2km,
+        "secondary_schools_within_3km": prop.secondary_schools_within_3km,
         "sale_year": sale_year,
         "sale_month": sale_month,
         "sale_quarter": sale_quarter,

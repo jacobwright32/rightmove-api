@@ -20,6 +20,7 @@ import ListingStatusSection from "../components/ListingStatusSection";
 import PlanningSection from "../components/PlanningSection";
 import BroadbandSection from "../components/BroadbandSection";
 import IMDSection from "../components/IMDSection";
+import SchoolsSection from "../components/SchoolsSection";
 import TransportSection from "../components/TransportSection";
 import SaleHistoryTable from "../components/SaleHistoryTable";
 import { useDarkMode } from "../hooks/useDarkMode";
@@ -385,6 +386,13 @@ export default function PropertyDetailPage() {
       {property.postcode && (
         <div className="mb-6">
           <BroadbandSection property={property} onRefresh={setProperty} />
+        </div>
+      )}
+
+      {/* Schools */}
+      {property.postcode && (
+        <div className="mb-6">
+          <SchoolsSection property={property} onRefresh={setProperty} />
         </div>
       )}
 

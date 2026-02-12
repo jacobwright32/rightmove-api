@@ -16,6 +16,7 @@ from ..enrichment.flood import get_flood_risk
 from ..enrichment.imd import enrich_postcode_imd
 from ..enrichment.listing import check_property_listing, enrich_postcode_listings
 from ..enrichment.planning import get_planning_data
+from ..enrichment.schools import enrich_postcode_schools
 from ..enrichment.transport import enrich_postcode_transport
 from ..models import Property
 from ..schemas import (
@@ -27,6 +28,7 @@ from ..schemas import (
     ListingEnrichmentResponse,
     PlanningResponse,
     PropertyListingResponse,
+    SchoolsEnrichmentResponse,
     TransportEnrichmentResponse,
 )
 
@@ -142,6 +144,30 @@ def enrich_imd(postcode: str, db: Session = Depends(get_db)):
 
     result = enrich_postcode_imd(db, clean)
     return IMDEnrichmentResponse(
+        message=result["message"],
+        properties_updated=result["properties_updated"],
+        properties_skipped=result["properties_skipped"],
+    )
+
+
+@router.post("/schools/{postcode}", response_model=SchoolsEnrichmentResponse)
+def enrich_schools(postcode: str, db: Session = Depends(get_db)):
+    """Enrich properties with nearest school distances and Ofsted ratings.
+
+    Downloads GIAS CSV (~65MB) and converts BNG→WGS84 on first call.
+    Uses cKDTree for O(log n) nearest-neighbour lookups.
+    Properties need lat/lng — those without are skipped.
+    """
+    clean = postcode.upper().strip()
+    props = db.query(Property).filter(Property.postcode == clean).all()
+    if not props:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No properties found for postcode {clean}. Scrape first.",
+        )
+
+    result = enrich_postcode_schools(db, clean)
+    return SchoolsEnrichmentResponse(
         message=result["message"],
         properties_updated=result["properties_updated"],
         properties_skipped=result["properties_skipped"],

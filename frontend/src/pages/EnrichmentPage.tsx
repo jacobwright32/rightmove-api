@@ -16,6 +16,7 @@ const ENRICHMENT_TYPES = [
   { id: "planning", label: "Planning" },
   { id: "imd", label: "IMD Deprivation" },
   { id: "broadband", label: "Broadband" },
+  { id: "schools", label: "Schools" },
 ];
 
 export default function EnrichmentPage() {

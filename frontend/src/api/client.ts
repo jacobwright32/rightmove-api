@@ -10,6 +10,7 @@ import type {
   FloodRiskResponse,
   GrowthLeaderboardEntry,
   IMDEnrichmentResponse,
+  SchoolsEnrichmentResponse,
   PropertyGeoPoint,
   HousingInsightsFilters,
   HousingInsightsResponse,
@@ -245,6 +246,15 @@ export async function enrichIMD(
 ): Promise<IMDEnrichmentResponse> {
   const res = await api.post<IMDEnrichmentResponse>(
     `/enrich/imd/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichSchools(
+  postcode: string
+): Promise<SchoolsEnrichmentResponse> {
+  const res = await api.post<SchoolsEnrichmentResponse>(
+    `/enrich/schools/${encodeURIComponent(postcode)}`
   );
   return res.data;
 }
