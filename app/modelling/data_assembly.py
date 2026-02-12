@@ -284,17 +284,14 @@ def _assemble_price(
     target: str,
     selected_features: list[str],
 ) -> pd.DataFrame:
-    """Assemble dataset for price or price_per_sqft targets."""
-    # Get latest sale per property via subquery
-    latest_sale = (
-        db.query(Sale.property_id, func.max(Sale.id).label("max_id"))
-        .group_by(Sale.property_id)
-        .subquery()
-    )
+    """Assemble dataset for price or price_per_sqft targets.
+
+    Uses ALL sales per property (not just the latest), giving more training
+    rows and letting the model learn temporal price trends via sale_year/month.
+    """
     rows = (
         db.query(Property, Sale)
-        .join(latest_sale, Property.id == latest_sale.c.property_id)
-        .join(Sale, Sale.id == latest_sale.c.max_id)
+        .join(Sale, Property.id == Sale.property_id)
         .filter(Sale.price_numeric.isnot(None))
         .all()
     )
