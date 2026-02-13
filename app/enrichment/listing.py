@@ -87,7 +87,7 @@ def _extract_listing_from_detail_page(url: str) -> Optional[dict]:
         "listing_date": listing_date,
         "listing_url": listing_url,
         "listing_price": None,
-        "listing_price_display": reason or None,
+        "listing_price_display": None,
     }
 
     # For currently-listed-for-sale properties, try to get the asking price
@@ -138,14 +138,34 @@ def _fetch_listing_price(listing_url: str) -> Optional[dict]:
                         display = f"{qualifier} {display}"
                     return {"price": int(amount) if amount else None, "display": display}
 
-    # Fallback: parse price from <title> tag
+    # Fallback: parse price from og:description or <title> tag
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(resp.text, "lxml")
+
+    _PRICE_RE = re.compile(
+        r"(?:Guide [Pp]rice |Offers? (?:Over|in the region of|in excess of) )?"
+        r"(£[\d,]+)"
+    )
+
+    # og:description reliably contains "... for £1,100,000. Marketed by ..."
+    og = soup.find("meta", property="og:description")
+    if og:
+        content = og.get("content", "")
+        price_match = re.search(r"for (" + _PRICE_RE.pattern + r")", content)
+        if price_match:
+            display = price_match.group(1).strip()
+            amount_str = re.search(r"£([\d,]+)", display)
+            if amount_str:
+                try:
+                    return {"price": int(amount_str.group(1).replace(",", "")), "display": display}
+                except ValueError:
+                    return {"price": None, "display": display}
+
+    # Last resort: <title> tag
     title = soup.find("title")
     if title:
         title_text = title.get_text(strip=True)
-        # Match patterns like "£450,000" or "Guide Price £450,000"
-        price_match = re.search(r"(?:Guide Price\s+|Offers? (?:Over|in the region of)\s+)?(£[\d,]+)", title_text)
+        price_match = _PRICE_RE.search(title_text)
         if price_match:
             display = price_match.group(0).strip()
             amount_str = price_match.group(1).replace("£", "").replace(",", "")
