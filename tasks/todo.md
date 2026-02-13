@@ -60,14 +60,10 @@ _Backend endpoint + schemas + frontend API client already done (uncommitted from
 ## Session 5 — Feature Backlog (10 tasks)
 _Researched 2026-02-10. Each task has full implementation details so it can be picked up cold._
 
-### 1. Interactive Map View with Property Markers
-- [ ] **Backend**: Add `GET /api/v1/properties/geo` endpoint — returns properties with lat/lng coordinates. Use Postcodes.io batch API (`POST https://api.postcodes.io/postcodes` with array of postcodes) to geocode. Cache lat/lng on the Property model (add `latitude` and `longitude` nullable Float columns via Alembic migration). Batch geocode on first request, store results so subsequent loads are instant.
-- [ ] **Frontend**: New `MapViewPage.tsx` using `react-leaflet` (free, OpenStreetMap tiles, no API key). Install: `npm install leaflet react-leaflet @types/leaflet`. Use `react-leaflet-cluster` for marker clustering at low zoom. Colour-code markers by price range (green = below median, red = above). Click marker → popup with PropertyCard summary + link to `/property/:id`. Toggle between list/map view on SearchPage. Import leaflet CSS in main.tsx: `import 'leaflet/dist/leaflet.css'`.
-- [ ] **Route**: Add `/map` route in App.tsx + NavBar link.
-- [ ] **Tests**: Test geo endpoint returns lat/lng, test with missing coordinates gracefully handled.
-- **Why**: Maps are the #1 way users browse properties on Rightmove/Zoopla. Spatial patterns (expensive streets, clusters) become immediately visible. 60%+ of property searchers prefer map-based browsing.
-- **Complexity**: Medium
-- **Deps**: `react-leaflet`, `leaflet`, `@types/leaflet`, `react-leaflet-cluster`. Backend: `httpx` for Postcodes.io calls (already installed).
+### 1. ~~Interactive Map View with Property Markers~~ DONE
+- [x] **Backend**: `GET /api/v1/properties/geo` endpoint with lat/lng. Geocoding via Postcodes.io batch API cached on Property model.
+- [x] **Frontend**: `MapViewPage.tsx` with react-leaflet, marker clustering, colour-coded by price, popup with property summary.
+- [x] **Route**: `/map` in App.tsx + NavBar link.
 
 ### 2. ~~EPC Energy Rating Enrichment~~ DONE
 - [x] **Backend**: `app/enrichment/epc.py` service with `fetch_epc_for_postcode()`. `POST /api/v1/enrich/epc/{postcode}` endpoint with fuzzy address matching. EPC columns on Property model (`epc_rating`, `epc_score`, `epc_environment_impact`, `estimated_energy_cost`). DB migration for new columns. Config: `EPC_API_EMAIL` + `EPC_API_KEY`.
@@ -96,26 +92,18 @@ _Researched 2026-02-10. Each task has full implementation details so it can be p
 - [x] **Bug fix**: Scraper duplicate sale IntegrityError — wrapped sale inserts in `db.begin_nested()` savepoint.
 - **Commits**: `66fc6fa`, `af0a094`, `98359b9`, `8ffaa2f`
 
-### 5. Flood Risk Assessment
-- [ ] **Backend**: Environment Agency API is free, no auth. Create `app/enrichment/flood.py`. Two data sources: (1) EA Flood Risk API: `GET https://environment.data.gov.uk/flood-monitoring/id/floods?lat={lat}&lng={lng}&dist=1` for current warnings. (2) Open Flood Risk by Postcode: download CSV from https://www.getthedata.com/open-flood-risk-by-postcode (maps every UK postcode to flood risk zone 1/2/3). Add `flood_risk_level` column to Property model (values: "very_low", "low", "medium", "high"). Endpoint: `GET /api/v1/analytics/postcode/{postcode}/flood-risk` returns risk level + any active flood warnings.
-- [ ] **Frontend**: Flood risk badge on PropertyCard (green/amber/red). Flood risk section on PropertyDetailPage with explanation text. Flood risk comparison on CompareAreasPage. Filter by flood risk on HousingInsightsPage.
-- [ ] **Tests**: Test risk classification logic, test with/without active warnings.
-- **Why**: Directly impacts property values, insurance costs, and mortgage approvals. Many buyers don't check until late in the process — surfacing it early saves time and money. Free data, simple integration.
-- **Complexity**: Small
+### 5. ~~Flood Risk Assessment~~ DONE
+- [x] **Backend**: `app/enrichment/flood.py` — Environment Agency API, `flood_risk_level` column, `GET /api/v1/analytics/postcode/{postcode}/flood-risk`.
+- [x] **Frontend**: `FloodRiskSection.tsx` component on PropertyDetailPage.
+- [x] **Tests**: Flood risk endpoint tests.
 
-### 6. Capital Growth Tracker & Forecasting
-- [ ] **Backend**: Extend existing analytics in `app/routers/analytics.py`. New endpoint: `GET /api/v1/analytics/postcode/{postcode}/growth` with `?periods=1,3,5,10` param. For each period: calculate CAGR (Compound Annual Growth Rate) = `(end_price/start_price)^(1/years) - 1`. Use median prices per year to smooth outliers. Also calculate: volatility (standard deviation of annual returns), max drawdown (largest peak-to-trough decline), Sharpe-like ratio (growth / volatility). For forecasting: use scipy `curve_fit` with linear and polynomial (degree 2) models on historical median prices. Return predicted price at +1yr, +3yr, +5yr with confidence bands (±1 std dev of residuals). New endpoint: `GET /api/v1/analytics/growth-leaderboard?limit=20` returns top postcodes by 5yr CAGR.
-- [ ] **Frontend**: Growth dashboard section on PropertyDetailPage (CAGR badges for 1/3/5/10yr). Growth forecast chart with confidence bands (Recharts AreaChart with gradient fill for confidence). Growth leaderboard table on MarketOverviewPage (sortable by period). Growth comparison overlay on CompareAreasPage.
-- [ ] **Tests**: Test CAGR calculation, test with insufficient data (< 2 years), test forecast confidence band width.
-- **Why**: Builds on existing data with no new external sources. Growth metrics are what investors use to evaluate areas. Forecasting (even simple) adds perceived sophistication. The leaderboard creates a "discovery" use case — which areas are growing fastest?
-- **Complexity**: Small-Medium
+### 6. ~~Capital Growth Tracker & Forecasting~~ DONE
+- [x] **Backend**: `GET /api/v1/analytics/postcode/{postcode}/growth` (CAGR, volatility, forecast). `GET /api/v1/analytics/growth-leaderboard` (top postcodes by CAGR).
+- [x] **Frontend**: Growth section on PropertyDetailPage, leaderboard on MarketOverviewPage.
 
-### 7. Planning Applications Nearby
-- [ ] **Backend**: Use Planning Data platform API: `GET https://www.planning.data.gov.uk/api/v1/entity.json?dataset=planning-application&geometry_reference={postcode_lat_lng}&limit=50`. Also available as bulk CSV download. Create `PlanningApplication` table: `reference`, `description`, `status` (submitted/approved/refused), `decision_date`, `application_type` (householder/full/outline/listed-building), `latitude`, `longitude`, `local_authority`, `fetched_at`. Create `app/enrichment/planning.py`. Endpoint: `GET /api/v1/analytics/postcode/{postcode}/planning` returns recent applications within ~500m radius. Flag major developments (10+ dwellings, commercial, infrastructure) separately.
-- [ ] **Frontend**: Planning applications section on PropertyDetailPage — list with status badges (green=approved, amber=pending, red=refused). Map overlay showing application locations (integrate with map view from task 1). "Major developments" alert badge on PropertyCard if significant applications nearby. Filter: show only major/all applications.
-- [ ] **Tests**: Test planning endpoint with mocked response, test radius filtering, test major development flagging logic.
-- **Why**: Nearby developments significantly affect property values (positively: regeneration; negatively: overlooking, traffic). Investors need this to avoid nasty surprises. Data is free via gov.uk open data.
-- **Complexity**: Medium
+### 7. ~~Planning Applications Nearby~~ DONE
+- [x] **Backend**: `PlanningApplication` table, `app/enrichment/planning.py`, `GET /api/v1/analytics/postcode/{postcode}/planning`.
+- [x] **Frontend**: `PlanningSection.tsx` with status badges on PropertyDetailPage.
 
 ### 8. PDF Report Export
 - [ ] **Backend**: Install `weasyprint` (HTML-to-PDF) or `reportlab` (programmatic PDF). Create `app/export/pdf_report.py`. Endpoint: `POST /api/v1/export/report` with body `{postcode, include_sections: ["summary","charts","properties","crime","epc"]}`. Generate HTML template using Jinja2 (already a FastAPI dependency). Render charts as static SVGs using matplotlib (add to requirements.txt) — Recharts/Plotly are client-side only. Sections: cover page (postcode, date, property count), summary stats table, price trend chart (matplotlib line), property type breakdown (matplotlib bar), top 10 properties table, growth metrics, and any enrichment data available (crime, EPC, flood risk). Return PDF as `StreamingResponse` with `content-type: application/pdf`.
@@ -134,9 +122,81 @@ _Researched 2026-02-10. Each task has full implementation details so it can be p
 
 ---
 
+### 10. ~~Shared Enrichment Infrastructure~~ DONE
+- [x] **Backend**: `app/enrichment/ons_postcode.py` (ONS LSOA lookup), `app/enrichment/coord_convert.py` (BNG→WGS84), enrichment schemas in `app/schemas.py`, bulk enrichment orchestrator (`app/enrichment/bulk.py`), 11 enrichment types supported.
+- **Commits**: `7c63f51`
+
+### 11. ~~IMD Deprivation Enrichment~~ DONE
+- [x] **Backend**: `app/enrichment/imd.py` — 8 decile domains via LSOA bridge, 8 Property columns.
+- [x] **Frontend**: `IMDSection.tsx` component with radar chart.
+- **Commits**: `ca64a13`
+
+### 12. ~~Broadband Speed Enrichment~~ DONE
+- [x] **Backend**: `app/enrichment/broadband.py` — Ofcom Connected Nations, 4 metrics.
+- [x] **Frontend**: `BroadbandSection.tsx` component with speed bars.
+- **Commits**: `42668d5`
+
+### 13. ~~Schools & Ofsted Enrichment~~ DONE
+- [x] **Backend**: `app/enrichment/schools.py` — GIAS CSV, BNG→WGS84, 4 cKDTrees, 10 features.
+- [x] **Frontend**: `SchoolsSection.tsx` component with school cards.
+- **Commits**: `db76a8c`
+
+### 14. ~~Healthcare Enrichment~~ DONE
+- [x] **Backend**: `app/enrichment/healthcare.py` — NHS GP + hospitals, ONS geocoded, 2 cKDTrees, 5 features.
+- [x] **Frontend**: `HealthcareSection.tsx` component.
+- **Commits**: `23c9f65`
+
+### 15. ~~Supermarket Enrichment~~ DONE
+- [x] **Backend**: `app/enrichment/supermarkets.py` — Geolytix, 3 cKDTrees (all/premium/budget), 6 features.
+- [x] **Frontend**: `SupermarketsSection.tsx` component.
+- **Commits**: `d39a0a6`
+
+### 16. ~~Fix Broken Data Source URLs~~ DONE
+- [x] Fixed NaPTAN, GIAS, Geolytix, Ofcom, ONS data URLs and parsing for 5 enrichment sources.
+- **Commits**: `f77cd67`
+
+### 17. ~~Model Training: Use All Sales~~ DONE
+- [x] Changed model training to use all sales per property (not just latest) for more training data.
+- **Commits**: `8075075`
+
+### 18. ~~VPS Deployment Config~~ DONE
+- [x] systemd services, deploy script, production .env, accumulated bug fixes.
+- **Commits**: `ad612d6`
+
+### 19. ~~Rebrand to UK House Prices~~ DONE
+- [x] Renamed from Rightmove to UK House Prices throughout. Fixed flood severity bug.
+- **Commits**: `ac9c364`
+
+### 20. ~~Current Listings Scrape Mode~~ DONE
+- [x] **Backend**: Added `mode` query param to scrape endpoints (`house_prices` or `for_sale`). Scrapes Rightmove for-sale listings with asking prices, stores with `listing_status="for_sale"`.
+- [x] **Frontend**: SearchBar toggle between "House Prices" and "Current Listings" modes. PropertyCard shows asking prices for listings. Separate rendering paths for each mode.
+- [x] **Bug fix**: Mode-aware freshness check — for-sale data no longer blocks house-prices scraping.
+- [x] **Bug fix**: `listing_only` filter on `/properties` endpoint properly separates listing vs sales data.
+- **Commits**: `e7abbb9`, `3d92e9e`, `71379d4`
+
+### 21. ~~Has Listing Filter for Housing Insights~~ DONE
+- [x] **Backend**: Added `has_listing` query param to housing-insights endpoint. SQL-level filter on `Property.listing_status`.
+- [x] **Frontend**: "Has Current Listing" checkbox in filter panel alongside Garden, Parking, Chain Free.
+- [x] **Tests**: 2 new tests (listing_only filter, has_listing filter). 129 total passing.
+- **Commits**: `8f1c13e`
+
+### 22. ~~Stop App Button~~ DONE
+- [x] **Backend**: `POST /api/v1/admin/shutdown` endpoint with `SIGTERM`.
+- [x] **Frontend**: "Stop App" button in NavBar next to Reset DB.
+- **Commits**: `531b6ee`
+
+---
+
+## Remaining Backlog
+- [ ] PDF Report Export (weasyprint + matplotlib)
+- [ ] Stamp Duty & Mortgage Calculators (pure frontend)
+- [ ] Rental Yield Calculator (ONS data + calculations)
+
+---
+
 ## Verification
-- 109 backend tests passing: `pytest tests/ -v`
+- 129 backend tests passing: `pytest tests/ -v`
 - Frontend types clean: `npx tsc --noEmit`
 - Ruff lint clean: `ruff check app/ tests/`
-- App loads: `python -c "from app.main import app"` (34 routes)
+- App loads: `python -c "from app.main import app"` (51 endpoints)
 - 7 new DB indexes on Property, Sale, CrimeStats, PlanningApplication
