@@ -98,6 +98,15 @@ def reset_database():
     return {"message": "Database reset successfully. All data has been deleted."}
 
 
+@app.post("/api/v1/admin/shutdown")
+def shutdown():
+    """Gracefully shut down the server."""
+    import signal
+
+    os.kill(os.getpid(), signal.SIGTERM)
+    return {"message": "Server shutting down..."}
+
+
 # Serve React production build if it exists (with SPA fallback)
 _frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 if os.path.isdir(_frontend_dist):

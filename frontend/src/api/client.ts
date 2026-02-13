@@ -382,3 +382,8 @@ export async function resetDatabase(): Promise<{ message: string }> {
   const res = await api.post<{ message: string }>("/admin/reset-database");
   return res.data;
 }
+
+export async function shutdownServer(): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>("/admin/shutdown");
+  return res.data;
+}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { resetDatabase } from "../api/client";
+import { resetDatabase, shutdownServer } from "../api/client";
 import ThemeToggle from "./ThemeToggle";
 
 const links = [
@@ -16,6 +16,7 @@ const links = [
 export default function NavBar() {
   const [confirming, setConfirming] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [stopping, setStopping] = useState(false);
 
   const handleReset = async () => {
     if (!confirming) {
@@ -29,6 +30,15 @@ export default function NavBar() {
     } catch {
       setResetting(false);
       setConfirming(false);
+    }
+  };
+
+  const handleShutdown = async () => {
+    setStopping(true);
+    try {
+      await shutdownServer();
+    } catch {
+      // Expected — server dies before responding
     }
   };
 
@@ -80,6 +90,13 @@ export default function NavBar() {
                 : confirming
                   ? "Confirm Reset"
                   : "Reset DB"}
+            </button>
+            <button
+              onClick={handleShutdown}
+              disabled={stopping}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+            >
+              {stopping ? "Stopping..." : "Stop App"}
             </button>
             <ThemeToggle />
           </div>
