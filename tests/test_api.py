@@ -290,6 +290,44 @@ class TestHousingInsights:
         assert data["kpis"]["total_sales"] == 1
 
 
+    def test_has_listing_filter(self, client, db_session):
+        """has_listing=true returns only properties with listing_status AND sales."""
+        # Property with sales only
+        p1 = Property(address="1 Sale St, SW20 8NE", postcode="SW20 8NE", bedrooms=2)
+        db_session.add(p1)
+        db_session.flush()
+        db_session.add(Sale(property_id=p1.id, date_sold="1 Jan 2024", price="£300,000", price_numeric=300000, date_sold_iso="2024-01-01"))
+
+        # Property with sales AND listing
+        p2 = Property(address="2 Both Ave, SW20 8NE", postcode="SW20 8NE", bedrooms=3, listing_status="for_sale", listing_price=400000)
+        db_session.add(p2)
+        db_session.flush()
+        db_session.add(Sale(property_id=p2.id, date_sold="1 Jun 2023", price="£350,000", price_numeric=350000, date_sold_iso="2023-06-01"))
+
+        # Property with listing only (no sales) — won't appear in any housing insights (inner join)
+        p3 = Property(address="3 Listing Rd, SW20 8NE", postcode="SW20 8NE", listing_status="for_sale", listing_price=500000)
+        db_session.add(p3)
+        db_session.commit()
+
+        # has_listing=true: only p2
+        resp = client.get("/api/v1/analytics/housing-insights?has_listing=true")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["kpis"]["total_sales"] == 1
+
+        # has_listing=false: only p1
+        resp = client.get("/api/v1/analytics/housing-insights?has_listing=false")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["kpis"]["total_sales"] == 1
+
+        # No filter: both p1 and p2 (p3 excluded by inner join)
+        resp = client.get("/api/v1/analytics/housing-insights")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["kpis"]["total_sales"] == 2
+
+
 class TestSkipExistingScrape:
     """Tests for the skip-already-scraped feature."""
 

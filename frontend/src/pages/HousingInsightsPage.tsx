@@ -457,6 +457,20 @@ export default function HousingInsightsPage() {
                 />
                 Chain Free
               </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={pending.has_listing ?? false}
+                  onChange={(e) =>
+                    setPending((p) => ({
+                      ...p,
+                      has_listing: e.target.checked || undefined,
+                    }))
+                  }
+                  className="rounded"
+                />
+                Has Current Listing
+              </label>
             </div>
           </div>
 

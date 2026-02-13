@@ -248,6 +248,7 @@ def get_housing_insights(
     has_garden: Optional[bool] = None,
     has_parking: Optional[bool] = None,
     chain_free: Optional[bool] = None,
+    has_listing: Optional[bool] = None,
 ):
     """Investment-focused analytics dashboard with histogram, time series,
     scatter, heatmap, KPIs, and investment deals."""
@@ -279,6 +280,13 @@ def get_housing_insights(
         q = q.filter(Sale.price_numeric <= max_price)
     if tenure:
         q = q.filter(func.upper(Sale.tenure) == tenure.upper().strip())
+    if has_listing is not None:
+        if has_listing:
+            q = q.filter(Property.listing_status == "for_sale")
+        else:
+            q = q.filter(
+                (Property.listing_status.is_(None)) | (Property.listing_status != "for_sale")
+            )
 
     rows = q.all()
 
@@ -560,6 +568,8 @@ def get_housing_insights(
         filters_applied["has_parking"] = has_parking
     if chain_free is not None:
         filters_applied["chain_free"] = chain_free
+    if has_listing is not None:
+        filters_applied["has_listing"] = has_listing
 
     return HousingInsightsResponse(
         price_histogram=price_histogram,

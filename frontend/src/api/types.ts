@@ -261,6 +261,7 @@ export interface HousingInsightsFilters {
   has_garden?: boolean;
   has_parking?: boolean;
   chain_free?: boolean;
+  has_listing?: boolean;
 }
 
 export interface HousingInsightsResponse {

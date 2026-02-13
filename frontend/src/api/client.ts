@@ -167,6 +167,7 @@ export async function getHousingInsights(
   if (filters.has_garden !== undefined) params.has_garden = filters.has_garden;
   if (filters.has_parking !== undefined) params.has_parking = filters.has_parking;
   if (filters.chain_free !== undefined) params.chain_free = filters.chain_free;
+  if (filters.has_listing !== undefined) params.has_listing = filters.has_listing;
   const res = await api.get<HousingInsightsResponse>("/analytics/housing-insights", { params });
   return res.data;
 }
