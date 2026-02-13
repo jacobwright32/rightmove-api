@@ -1,16 +1,16 @@
 import logging
 import os
+import time
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
-from .config import CORS_ORIGINS, LOG_LEVEL, RATE_LIMIT_DEFAULT
+from .config import CORS_ORIGINS, ENABLE_ADMIN, LOG_LEVEL
 from .database import Base, _migrate_db, engine
+from .rate_limit import limiter
 from .routers import analytics, enrichment, modelling, properties, scraper
 
 logging.basicConfig(
@@ -21,9 +21,6 @@ logging.basicConfig(
 # Migrate existing databases, then create any new tables
 _migrate_db()
 Base.metadata.create_all(bind=engine)
-
-# Rate limiter
-limiter = Limiter(key_func=get_remote_address, default_limits=[RATE_LIMIT_DEFAULT])
 
 app = FastAPI(
     title="UK House Prices API",
@@ -46,9 +43,33 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
 )
+
+logger = logging.getLogger(__name__)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        logger.info(
+            "%s %s %d %.3fs",
+            request.method, request.url.path, response.status_code, time.time() - start,
+        )
+    return response
+
 
 app.include_router(scraper.router, prefix="/api/v1")
 app.include_router(properties.router, prefix="/api/v1")
@@ -90,21 +111,21 @@ def root():
     }
 
 
-@app.post("/api/v1/admin/reset-database")
-def reset_database():
-    """Drop all data and recreate tables. Irreversible."""
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    return {"message": "Database reset successfully. All data has been deleted."}
+if ENABLE_ADMIN:
+    @app.post("/api/v1/admin/reset-database")
+    def reset_database():
+        """Drop all data and recreate tables. Irreversible."""
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
+        return {"message": "Database reset successfully. All data has been deleted."}
 
+    @app.post("/api/v1/admin/shutdown")
+    def shutdown():
+        """Gracefully shut down the server."""
+        import signal
 
-@app.post("/api/v1/admin/shutdown")
-def shutdown():
-    """Gracefully shut down the server."""
-    import signal
-
-    os.kill(os.getpid(), signal.SIGTERM)
-    return {"message": "Server shutting down..."}
+        os.kill(os.getpid(), signal.SIGTERM)
+        return {"message": "Server shutting down..."}
 
 
 # Serve React production build if it exists (with SPA fallback)

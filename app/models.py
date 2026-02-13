@@ -28,6 +28,7 @@ class Property(Base):
     extra_features = Column(Text)  # JSON array of feature strings
     floorplan_urls = Column(Text)  # JSON array of floorplan image URLs
     url = Column(String)
+    address_key = Column(String, nullable=True, index=True)  # Normalized key for cross-source dedup
     # EPC data (populated via /enrich/epc endpoint)
     epc_rating = Column(String, nullable=True)  # A-G
     epc_score = Column(Integer, nullable=True)  # 1-100
@@ -119,6 +120,7 @@ class Sale(Base):
     price = Column(String)
     price_numeric = Column(Integer, nullable=True, index=True)
     date_sold_iso = Column(String, nullable=True, index=True)
+    land_registry_tx_id = Column(String, nullable=True, index=True)  # Land Registry transaction GUID
     price_change_pct = Column(String)
     property_type = Column(String)
     tenure = Column(String)

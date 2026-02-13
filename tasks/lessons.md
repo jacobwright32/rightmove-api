@@ -1,5 +1,13 @@
 # Lessons Learned
 
+## Session 7: 2026-02-13 (for-sale listings in Housing Insights)
+- **DATABASE_URL default mismatch**: Config defaulted to `uk_house_prices.db` but actual data lived in `rightmove.db`. Scraped 369 listings into the wrong DB. Always verify which DB the app uses before scraping — created `.env` with explicit `DATABASE_URL`.
+- **Rightmove for-sale URL format changed**: Old scraper used `/property-for-sale/SW20.html` which returned limited results. Real search uses `/property-for-sale/find.html?locationIdentifier=OUTCODE^2515&...` with a location ID from `los.rightmove.co.uk/typeahead`. Pagination is 24/page, not 25.
+- **For-sale scrape is outcode-level, not postcode-level**: Unlike house prices (per-postcode), Rightmove for-sale search returns all results for an outcode (e.g. SW20). Area scrape looping per-postcode was redundant — fixed to do a single outcode-level scrape for `mode=for_sale`.
+- **Ghost processes on Windows**: PID 16968 bound to `127.0.0.1:8000` persisted across multiple `taskkill` attempts (sandbox limitation). Solution: wait for it to die naturally or use a different port. Eventually freed up on its own.
+- **Stale __pycache__ on Windows**: Even after `find -exec rm -rf`, uvicorn sometimes loaded stale bytecode. Using a different port was the reliable workaround until the old process died.
+- **Frontend route mismatch**: Housing Insights page is at `/insights` not `/housing-insights`. Always check `App.tsx` routes before writing Playwright tests.
+
 ## Session 6: 2026-02-11 (modelling tab + bug fixes)
 - **Zombie processes on Windows**: A stale uvicorn process can hold a port indefinitely and resist `taskkill`/`Stop-Process`. Don't waste time fighting it — switch to a different port and update vite.config.ts proxy accordingly.
 - **SPA catch-all intercepts API routes**: The `/{full_path:path}` catch-all in FastAPI serves `index.html` for unknown routes. If API router registration fails silently (import error, stale cache), API requests get HTML instead of JSON. Always add an API guard: `if full_path.startswith("api/"): return 404 JSON`.

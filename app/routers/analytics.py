@@ -14,6 +14,7 @@ from ..models import Property, Sale
 from ..schemas import (
     AnnualMedian,
     BedroomDistribution,
+    CurrentListing,
     GrowthForecastPoint,
     GrowthLeaderboardEntry,
     GrowthPeriodMetric,
@@ -540,6 +541,49 @@ def get_housing_insights(
     investment_deals.sort(key=lambda x: x.value_score, reverse=True)
     investment_deals = investment_deals[:50]
 
+    # --- Current for-sale listings (independent of Sale records) ---
+    lq = db.query(Property).filter(Property.listing_status == "for_sale")
+    if postcode_prefix:
+        prefix = postcode_prefix.upper().strip()
+        lq = lq.filter(Property.postcode.isnot(None))
+        lq = lq.filter(func.upper(Property.postcode).like(f"{prefix}%"))
+    if property_type:
+        ptype = property_type.strip().upper()
+        lq = lq.filter(func.upper(Property.property_type) == ptype)
+    if min_bedrooms is not None:
+        lq = lq.filter(Property.bedrooms >= min_bedrooms)
+    if max_bedrooms is not None:
+        lq = lq.filter(Property.bedrooms <= max_bedrooms)
+    if min_bathrooms is not None:
+        lq = lq.filter(Property.bathrooms >= min_bathrooms)
+    if max_bathrooms is not None:
+        lq = lq.filter(Property.bathrooms <= max_bathrooms)
+    if min_price is not None:
+        lq = lq.filter(Property.listing_price >= min_price)
+    if max_price is not None:
+        lq = lq.filter(Property.listing_price <= max_price)
+
+    listing_props = lq.all()
+    current_listings = [
+        CurrentListing(
+            property_id=p.id,
+            address=p.address,
+            postcode=p.postcode,
+            property_type=(p.property_type or "Unknown").strip(),
+            bedrooms=p.bedrooms,
+            bathrooms=p.bathrooms,
+            listing_price=p.listing_price,
+            listing_price_display=p.listing_price_display,
+            listing_url=p.listing_url,
+            listing_checked_at=p.listing_checked_at,
+        )
+        for p in listing_props
+    ]
+
+    # Include listing-only properties in KPI total
+    listing_only_ids = {p.id for p in listing_props} - property_ids
+    kpis.total_properties += len(listing_only_ids)
+
     # --- Build filters_applied ---
     filters_applied: dict = {}
     if property_type:
@@ -578,6 +622,7 @@ def get_housing_insights(
         postcode_heatmap=postcode_heatmap,
         kpis=kpis,
         investment_deals=investment_deals,
+        current_listings=current_listings,
         filters_applied=filters_applied,
     )
 

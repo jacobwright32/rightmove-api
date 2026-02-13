@@ -185,6 +185,16 @@ _Researched 2026-02-10. Each task has full implementation details so it can be p
 - [x] **Frontend**: "Stop App" button in NavBar next to Reset DB.
 - **Commits**: `531b6ee`
 
+### 23. ~~Surface For-Sale Listings in Housing Insights~~ DONE
+- [x] **Backend schema**: `CurrentListing` Pydantic model + `current_listings` field on `HousingInsightsResponse`.
+- [x] **Backend query**: Separate `Property` query for `listing_status='for_sale'` with same filters (postcode, type, beds, baths, price range via `listing_price`). Listing-only property IDs added to KPI `total_properties`.
+- [x] **Frontend types**: `CurrentListing` interface + `current_listings` on response type.
+- [x] **Frontend table**: "Current Listings" section below Investment Deals — address (link to detail), postcode, type, beds, asking price, Rightmove link.
+- [x] **Scraper fix**: Rewrote `_fetch_for_sale_page` to use proper Rightmove search URL (`/property-for-sale/find.html?locationIdentifier=OUTCODE^ID`) with typeahead API lookup (`los.rightmove.co.uk`). Fixed pagination (24/page). Raised defaults to `max_properties=500`, `pages=20`.
+- [x] **Area scrape optimisation**: For-sale mode now does a single outcode-level scrape instead of per-postcode loop.
+- [x] **DB fix**: Created `.env` with `DATABASE_URL=sqlite:///./rightmove.db` to point at correct DB.
+- [x] **Playwright tests**: All 4 tests pass (KPI cards, 256 listings, deals table, detail page navigation).
+
 ---
 
 ## Remaining Backlog

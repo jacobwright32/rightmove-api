@@ -57,6 +57,9 @@ EPC_API_KEY: str = _read_secret("epc_api_key")
 # Listing freshness (how long before re-checking if a property is for sale)
 LISTING_FRESHNESS_HOURS: int = int(os.getenv("LISTING_FRESHNESS_HOURS", "24"))
 
+# Admin endpoints (disabled in production by default)
+ENABLE_ADMIN: bool = os.getenv("ENABLE_ADMIN", "false").lower() == "true"
+
 # Rate limiting
 RATE_LIMIT_SCRAPE: str = os.getenv("RATE_LIMIT_SCRAPE", "30/minute")
 RATE_LIMIT_DEFAULT: str = os.getenv("RATE_LIMIT_DEFAULT", "60/minute")

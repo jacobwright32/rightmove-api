@@ -6,16 +6,16 @@ from urllib.parse import urlparse
 
 import requests as req_lib
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..address import parse_rightmove_address_key
 from ..config import DATA_DIR, RATE_LIMIT_SCRAPE, SCRAPER_FRESHNESS_DAYS
 from ..database import get_db
 from ..export import save_property_parquet
 from ..models import Property, Sale
 from ..parsing import parse_date_to_iso, parse_price_to_int
+from ..rate_limit import limiter
 from ..schemas import AreaScrapeResponse, ScrapePropertyResponse, ScrapeResponse, ScrapeUrlRequest
 from ..scraper.scraper import (
     PropertyData,
@@ -27,7 +27,6 @@ from ..scraper.scraper import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/scrape", tags=["scraping"])
-limiter = Limiter(key_func=get_remote_address)
 
 
 def _scrape_postcode_properties(
@@ -126,10 +125,14 @@ def _upsert_property(db: Session, data: PropertyData) -> Property:
 
     norm_ptype = data.property_type.upper() if data.property_type else ""
 
+    addr_key = parse_rightmove_address_key(data.address)
+
     if existing:
         prop = existing
         prop.postcode = data.postcode if data.postcode is not None else prop.postcode
         prop.property_type = norm_ptype if norm_ptype else prop.property_type
+        if addr_key and not prop.address_key:
+            prop.address_key = addr_key
         prop.bedrooms = data.bedrooms if data.bedrooms is not None else prop.bedrooms
         prop.bathrooms = data.bathrooms if data.bathrooms is not None else prop.bathrooms
         prop.extra_features = (
@@ -149,6 +152,7 @@ def _upsert_property(db: Session, data: PropertyData) -> Property:
             extra_features=json.dumps(data.extra_features) if data.extra_features is not None else None,
             floorplan_urls=json.dumps(data.floorplan_urls) if data.floorplan_urls is not None else None,
             url=data.url,
+            address_key=addr_key,
         )
         db.add(prop)
 
@@ -360,7 +364,42 @@ def scrape_area(
     postcodes = all_postcodes if max_postcodes == 0 else all_postcodes[:max_postcodes]
     logger.info("Area scrape: found %d postcodes for '%s', scraping %d", len(all_postcodes), partial, len(postcodes))
 
-    # Step 2: scrape each postcode
+    # --- For-sale mode: single outcode-level scrape (all postcodes share same results) ---
+    if mode == "for_sale":
+        outcode = longest  # e.g. "SW20"
+        logger.info("Area scrape (for_sale): scraping outcode %s once", outcode)
+        try:
+            properties, _ = _scrape_postcode_properties(
+                outcode, mode="for_sale", max_properties=500, pages=pages,
+            )
+            count = 0
+            for prop_data in properties:
+                if prop_data.address:
+                    prop = _upsert_property(db, prop_data)
+                    db.flush()
+                    if save_parquet:
+                        save_property_parquet(prop)
+                    count += 1
+            db.commit()
+            return AreaScrapeResponse(
+                message=f"Scraped {count} for-sale listings for outcode {outcode}",
+                postcodes_scraped=[outcode],
+                postcodes_skipped=[],
+                postcodes_failed=[],
+                total_properties=count,
+            )
+        except Exception as e:
+            logger.error("Error scraping for-sale %s: %s", outcode, e, exc_info=True)
+            db.rollback()
+            return AreaScrapeResponse(
+                message=f"Failed to scrape for-sale listings for {outcode}: {e}",
+                postcodes_scraped=[],
+                postcodes_skipped=[],
+                postcodes_failed=[outcode],
+                total_properties=0,
+            )
+
+    # --- House prices mode: scrape each postcode individually ---
     total = 0
     use_detail_pages = floorplan or extra_features or link_count is not None
     scraped_postcodes = []

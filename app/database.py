@@ -83,6 +83,11 @@ def _migrate_db():
             "ALTER TABLE properties ADD COLUMN dist_nearest_premium_supermarket_km REAL",
             "ALTER TABLE properties ADD COLUMN dist_nearest_budget_supermarket_km REAL",
             "ALTER TABLE properties ADD COLUMN supermarkets_within_2km INTEGER",
+            # Cross-source deduplication
+            "ALTER TABLE properties ADD COLUMN address_key TEXT",
+            "ALTER TABLE sales ADD COLUMN land_registry_tx_id TEXT",
+            "CREATE INDEX IF NOT EXISTS ix_property_address_key ON properties (address_key)",
+            "CREATE INDEX IF NOT EXISTS ix_sale_land_registry_tx_id ON sales (land_registry_tx_id)",
         ]
         for sql in migrations:
             try:

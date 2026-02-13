@@ -287,6 +287,21 @@ class InvestmentDeal(BaseModel):
     risk_level: str
 
 
+class CurrentListing(BaseModel):
+    property_id: int
+    address: str
+    postcode: Optional[str] = None
+    property_type: Optional[str] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[int] = None
+    listing_price: Optional[int] = None
+    listing_price_display: Optional[str] = None
+    listing_url: Optional[str] = None
+    listing_checked_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
 class HousingInsightsResponse(BaseModel):
     price_histogram: list[PriceHistogramBucket] = []
     time_series: list[InsightsTimeSeriesPoint] = []
@@ -294,6 +309,7 @@ class HousingInsightsResponse(BaseModel):
     postcode_heatmap: list[PostcodeHeatmapPoint] = []
     kpis: KPIData = KPIData()
     investment_deals: list[InvestmentDeal] = []
+    current_listings: list[CurrentListing] = []
     filters_applied: dict = {}
 
 

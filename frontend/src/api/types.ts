@@ -264,6 +264,19 @@ export interface HousingInsightsFilters {
   has_listing?: boolean;
 }
 
+export interface CurrentListing {
+  property_id: number;
+  address: string;
+  postcode: string | null;
+  property_type: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  listing_price: number | null;
+  listing_price_display: string | null;
+  listing_url: string | null;
+  listing_checked_at: string | null;
+}
+
 export interface HousingInsightsResponse {
   price_histogram: PriceHistogramBucket[];
   time_series: InsightsTimeSeriesPoint[];
@@ -271,6 +284,7 @@ export interface HousingInsightsResponse {
   postcode_heatmap: PostcodeHeatmapPoint[];
   kpis: KPIData;
   investment_deals: InvestmentDeal[];
+  current_listings: CurrentListing[];
   filters_applied: Record<string, unknown>;
 }
 

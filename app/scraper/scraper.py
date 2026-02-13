@@ -718,34 +718,68 @@ def _extract_outcode(postcode: str) -> str:
     return no_space
 
 
-def _tokenize_for_typeahead(query: str) -> str:
-    """Tokenize a query for the Rightmove typeahead API.
+def _resolve_location_identifier(outcode: str) -> Optional[str]:
+    """Look up the Rightmove locationIdentifier for an outcode via typeahead API.
 
-    Splits into 2-character chunks separated by '/'.
-    Example: 'SW208NE' -> 'SW/20/8N/E'
+    E.g. 'SW20' -> 'OUTCODE^2515'
+    Returns None if the lookup fails.
     """
-    clean = re.sub(r"[\s\-]", "", query.upper())
-    parts = [clean[i:i + 2] for i in range(0, len(clean), 2)]
-    return "/".join(parts)
+    url = f"https://los.rightmove.co.uk/typeahead?query={outcode}&limit=5"
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+    except (requests.RequestException, json.JSONDecodeError):
+        logger.warning("Typeahead lookup failed for %s", outcode)
+        return None
+
+    for match in data.get("matches", []):
+        if match.get("type") == "OUTCODE" and match.get("displayName", "").upper() == outcode.upper():
+            return f"OUTCODE^{match['id']}"
+
+    logger.warning("No OUTCODE match found in typeahead for %s", outcode)
+    return None
+
+
+# Cache resolved location identifiers to avoid repeated lookups
+_location_id_cache: dict = {}
+
+PAGE_SIZE = 24  # Rightmove returns 24 properties per page
 
 
 def _fetch_for_sale_page(outcode: str, index: int = 0) -> Optional[list]:
     """Fetch a for-sale search page and extract the properties JSON array.
 
-    The for-sale pages use Next.js with embedded JSON in a <script> tag
-    containing {"props":{"pageProps":{"searchResults":{"properties":[...]}}}}.
+    Uses the /property-for-sale/find.html search endpoint with a
+    locationIdentifier resolved from the typeahead API.
 
     Returns the properties list or None on failure.
     """
-    url = f"{BASE_URL}/property-for-sale/{outcode}.html"
-    if index > 0:
-        url += f"?index={index}&sortType=6"
+    # Resolve locationIdentifier (cached)
+    if outcode not in _location_id_cache:
+        loc_id = _resolve_location_identifier(outcode)
+        _location_id_cache[outcode] = loc_id
+    loc_id = _location_id_cache[outcode]
+
+    if loc_id is None:
+        logger.warning("Cannot search for-sale: no locationIdentifier for %s", outcode)
+        return None
+
+    url = (
+        f"{BASE_URL}/property-for-sale/find.html"
+        f"?locationIdentifier={loc_id}"
+        f"&radius=0.0"
+        f"&_includeSSTC=on"
+        f"&index={index}"
+        f"&sortType=2"
+        f"&channel=BUY"
+        f"&transactionType=BUY"
+    )
 
     resp = _request_with_retry(url)
     if resp is None:
         return None
 
-    # Check for redirect to 404
     if "page-not-found" in str(resp.url):
         logger.warning("For-sale page not found for outcode %s", outcode)
         return None
@@ -814,21 +848,24 @@ def _for_sale_dict_to_property(d: dict, search_postcode: str) -> Optional[Proper
 
 
 def scrape_for_sale_listings(
-    postcode: str, max_properties: int = 25, pages: int = 1,
+    postcode: str, max_properties: int = 500, pages: int = 20,
 ) -> list[PropertyData]:
     """Scrape properties currently listed for sale from search results.
 
     Uses the outcode (e.g. 'SW20') from the given postcode to search
-    /property-for-sale/{outcode}.html which returns a Next.js page with
-    embedded JSON property data. Supports pagination via ?index=N (25/page).
+    /property-for-sale/find.html with a locationIdentifier resolved from
+    the typeahead API. Supports pagination via ?index=N (24/page).
+    Auto-paginates through all results up to max_properties/pages.
     """
     outcode = _extract_outcode(postcode)
     search_postcode = postcode.upper().strip()
 
     all_properties: list[PropertyData] = []
+    pages_fetched = 0
     for page in range(pages):
-        index = page * 25
+        index = page * PAGE_SIZE
         properties_json = _fetch_for_sale_page(outcode, index=index)
+        pages_fetched += 1
 
         if properties_json is None:
             logger.warning("Failed to fetch for-sale page %d for %s", page + 1, outcode)
@@ -854,6 +891,6 @@ def scrape_for_sale_listings(
 
     logger.info(
         "Scraped %d for-sale listings across %d pages for outcode %s",
-        len(all_properties), min(pages, page + 1), outcode,
+        len(all_properties), pages_fetched, outcode,
     )
     return all_properties

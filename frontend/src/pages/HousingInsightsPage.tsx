@@ -4,6 +4,7 @@ import Plotly from "plotly.js-dist-min";
 import { Link } from "react-router-dom";
 import { getHousingInsights } from "../api/client";
 import type {
+  CurrentListing,
   HousingInsightsFilters,
   HousingInsightsResponse,
   InvestmentDeal,
@@ -910,6 +911,72 @@ export default function HousingInsightsPage() {
           </p>
         )}
       </div>
+
+      {/* Current Listings Table */}
+      {data.current_listings.length > 0 && (
+        <div className="mt-6 rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
+            Current Listings
+            <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+              {data.current_listings.length} properties for sale
+            </span>
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm dark:text-gray-300">
+              <thead>
+                <tr className="border-b text-left text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                  <th className="py-2 pr-3">Address</th>
+                  <th className="py-2 pr-3">Postcode</th>
+                  <th className="py-2 pr-3">Type</th>
+                  <th className="py-2 pr-3">Beds</th>
+                  <th className="py-2 pr-3">Asking Price</th>
+                  <th className="py-2 pr-3">Listing</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.current_listings.map((listing: CurrentListing) => (
+                  <tr
+                    key={listing.property_id}
+                    className="border-b border-gray-100 dark:border-gray-700"
+                  >
+                    <td className="py-2 pr-3">
+                      <Link
+                        to={`/property/${listing.property_id}`}
+                        className="text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        {listing.address}
+                      </Link>
+                    </td>
+                    <td className="py-2 pr-3">{listing.postcode}</td>
+                    <td className="py-2 pr-3 capitalize">
+                      {listing.property_type?.toLowerCase()}
+                    </td>
+                    <td className="py-2 pr-3">
+                      {listing.bedrooms ?? "\u2014"}
+                    </td>
+                    <td className="py-2 pr-3 font-medium">
+                      {listing.listing_price_display ||
+                        formatPriceFull(listing.listing_price)}
+                    </td>
+                    <td className="py-2 pr-3">
+                      {listing.listing_url && (
+                        <a
+                          href={listing.listing_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline dark:text-blue-400"
+                        >
+                          View
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
