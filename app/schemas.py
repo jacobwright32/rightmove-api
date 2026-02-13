@@ -113,6 +113,7 @@ class ScrapeResponse(BaseModel):
     pages_scraped: int = 1
     detail_pages_visited: int = 0
     skipped: bool = False
+    mode: str = "house_prices"
 
 
 class AreaScrapeResponse(BaseModel):

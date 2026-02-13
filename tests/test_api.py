@@ -721,6 +721,44 @@ class TestListingStatus:
         assert resp.status_code == 404
 
 
+class TestScrapeMode:
+    def test_invalid_mode_returns_400(self, client):
+        resp = client.post("/api/v1/scrape/postcode/SW208NE?mode=invalid")
+        assert resp.status_code == 400
+        assert "Invalid mode" in resp.json()["detail"]
+
+    def test_default_mode_is_house_prices(self, client, db_session):
+        """ScrapeResponse schema should include mode field defaulting to house_prices."""
+        from app.schemas import ScrapeResponse
+        r = ScrapeResponse(message="test", properties_scraped=0)
+        assert r.mode == "house_prices"
+
+    def test_upsert_sets_listing_fields(self, client, db_session):
+        """When PropertyData has asking_price, _upsert_property should set listing columns."""
+        from app.routers.scraper import _upsert_property
+        from app.scraper.scraper import PropertyData
+
+        data = PropertyData(
+            address="99 Test Lane, SW20 8NE",
+            postcode="SW20 8NE",
+            property_type="DETACHED",
+            bedrooms=4,
+            asking_price=550000,
+            asking_price_display="\u00a3550,000",
+            listing_id="67890",
+            url="https://www.rightmove.co.uk/properties/67890",
+        )
+        prop = _upsert_property(db_session, data)
+        db_session.commit()
+        db_session.refresh(prop)
+
+        assert prop.listing_status == "for_sale"
+        assert prop.listing_price == 550000
+        assert prop.listing_price_display == "\u00a3550,000"
+        assert prop.listing_url == "https://www.rightmove.co.uk/properties/67890"
+        assert prop.listing_checked_at is not None
+
+
 class TestScrapePropertyValidation:
     def test_invalid_url(self, client):
         resp = client.post("/api/v1/scrape/property", json={"url": "https://example.com"})

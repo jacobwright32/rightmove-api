@@ -23,6 +23,7 @@ export interface ScrapeOptions {
   extraFeatures: boolean;
   saveParquet: boolean;
   force: boolean;
+  mode: "house_prices" | "for_sale";
 }
 
 export interface SearchResult {
@@ -71,6 +72,7 @@ export function usePostcodeSearch() {
           extraFeatures: opts.extraFeatures,
           saveParquet: opts.saveParquet,
           force: opts.force,
+          mode: opts.mode,
         });
         if (result.skipped) {
           setScrapeMessage(result.message);
@@ -85,6 +87,7 @@ export function usePostcodeSearch() {
           extraFeatures: opts.extraFeatures,
           saveParquet: opts.saveParquet,
           force: opts.force,
+          mode: opts.mode,
         });
         setScrapeMessage(areaResult.message);
       }

@@ -12,6 +12,7 @@ const UK_POSTCODE_RE = /^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$/;
 
 export default function SearchBar({ onSearch, disabled }: Props) {
   const [input, setInput] = useState("");
+  const [mode, setMode] = useState<"house_prices" | "for_sale">("house_prices");
   const [pages, setPages] = useState(1);
   const [linkCount, setLinkCount] = useState(0);
   const [maxPostcodes, setMaxPostcodes] = useState(0);
@@ -76,11 +77,37 @@ export default function SearchBar({ onSearch, disabled }: Props) {
     }
     setValidationError(null);
     setShowSuggestions(false);
-    onSearch(normalised, { pages, linkCount, maxPostcodes, floorplan, extraFeatures, saveParquet, force });
+    onSearch(normalised, { pages, linkCount, maxPostcodes, floorplan, extraFeatures, saveParquet, force, mode });
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col items-center gap-3">
+      {/* Mode toggle */}
+      <div className="flex rounded-lg border border-gray-300 overflow-hidden dark:border-gray-600">
+        <button
+          type="button"
+          onClick={() => setMode("house_prices")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            mode === "house_prices"
+              ? "bg-blue-600 text-white"
+              : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          }`}
+        >
+          House Prices
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("for_sale")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            mode === "for_sale"
+              ? "bg-blue-600 text-white"
+              : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          }`}
+        >
+          Current Listings
+        </button>
+      </div>
+
       <div className="flex gap-2" ref={wrapperRef}>
         <div className="relative">
           <input
@@ -134,7 +161,7 @@ export default function SearchBar({ onSearch, disabled }: Props) {
       </div>
 
       {/* Scrape options */}
-      <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
+      <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400 flex-wrap justify-center">
         <label className="flex items-center gap-2">
           Pages
           <input
@@ -147,22 +174,24 @@ export default function SearchBar({ onSearch, disabled }: Props) {
             className="w-16 rounded border border-gray-300 px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
           />
         </label>
-        <label className="flex items-center gap-2">
-          Detail links
-          <select
-            value={linkCount}
-            onChange={(e) => setLinkCount(Number(e.target.value))}
-            disabled={disabled}
-            className="rounded border border-gray-300 px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-          >
-            <option value={0}>Off</option>
-            <option value={5}>5</option>
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={-1}>All</option>
-          </select>
-        </label>
+        {mode === "house_prices" && (
+          <label className="flex items-center gap-2">
+            Detail links
+            <select
+              value={linkCount}
+              onChange={(e) => setLinkCount(Number(e.target.value))}
+              disabled={disabled}
+              className="rounded border border-gray-300 px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+            >
+              <option value={0}>Off</option>
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={-1}>All</option>
+            </select>
+          </label>
+        )}
         <label className="flex items-center gap-2">
           Max postcodes
           <select
@@ -180,26 +209,30 @@ export default function SearchBar({ onSearch, disabled }: Props) {
             <option value={200}>200</option>
           </select>
         </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={floorplan}
-            onChange={(e) => setFloorplan(e.target.checked)}
-            disabled={disabled}
-            className="rounded border-gray-300 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600"
-          />
-          Floorplans
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={extraFeatures}
-            onChange={(e) => setExtraFeatures(e.target.checked)}
-            disabled={disabled}
-            className="rounded border-gray-300 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600"
-          />
-          Key features
-        </label>
+        {mode === "house_prices" && (
+          <>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={floorplan}
+                onChange={(e) => setFloorplan(e.target.checked)}
+                disabled={disabled}
+                className="rounded border-gray-300 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600"
+              />
+              Floorplans
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={extraFeatures}
+                onChange={(e) => setExtraFeatures(e.target.checked)}
+                disabled={disabled}
+                className="rounded border-gray-300 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600"
+              />
+              Key features
+            </label>
+          </>
+        )}
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -220,7 +253,9 @@ export default function SearchBar({ onSearch, disabled }: Props) {
           />
           Re-scrape existing
         </label>
-        <span className="text-xs text-gray-400">Off = fast mode</span>
+        {mode === "house_prices" && (
+          <span className="text-xs text-gray-400">Off = fast mode</span>
+        )}
       </div>
 
       {validationError && (

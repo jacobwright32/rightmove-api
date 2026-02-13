@@ -77,6 +77,10 @@ class PropertyData:
     floorplan_urls: list[str] = field(default_factory=list)
     url: str = ""
     sales: list[SaleRecord] = field(default_factory=list)
+    # For-sale listing fields (populated in for_sale mode)
+    asking_price: Optional[int] = None
+    asking_price_display: str = ""
+    listing_id: str = ""
 
 
 def extract_postcode(address: str) -> str:
@@ -688,3 +692,168 @@ def scrape_postcode_with_details(
         postcode,
     )
     return properties
+
+
+# ---------------------------------------------------------------------------
+# For-sale listings scraper
+# ---------------------------------------------------------------------------
+
+def _extract_outcode(postcode: str) -> str:
+    """Extract the outcode from a UK postcode.
+
+    Example: 'SW20 8NE' -> 'SW20', 'E1W 1AT' -> 'E1W', 'E1' -> 'E1'
+
+    Uses the space/dash to split if present. Otherwise strips the 3-char
+    incode suffix from full postcodes (5-7 chars without space).
+    """
+    cleaned = postcode.upper().strip()
+    # If there's a space or dash, outcode is the part before it
+    for sep in (" ", "-"):
+        if sep in cleaned:
+            return cleaned.split(sep)[0]
+    # No separator: if it looks like a full postcode, strip the 3-char incode
+    no_space = cleaned.replace(" ", "")
+    if len(no_space) >= 5:
+        return no_space[:-3]
+    return no_space
+
+
+def _tokenize_for_typeahead(query: str) -> str:
+    """Tokenize a query for the Rightmove typeahead API.
+
+    Splits into 2-character chunks separated by '/'.
+    Example: 'SW208NE' -> 'SW/20/8N/E'
+    """
+    clean = re.sub(r"[\s\-]", "", query.upper())
+    parts = [clean[i:i + 2] for i in range(0, len(clean), 2)]
+    return "/".join(parts)
+
+
+def _fetch_for_sale_page(outcode: str, index: int = 0) -> Optional[list]:
+    """Fetch a for-sale search page and extract the properties JSON array.
+
+    The for-sale pages use Next.js with embedded JSON in a <script> tag
+    containing {"props":{"pageProps":{"searchResults":{"properties":[...]}}}}.
+
+    Returns the properties list or None on failure.
+    """
+    url = f"{BASE_URL}/property-for-sale/{outcode}.html"
+    if index > 0:
+        url += f"?index={index}&sortType=6"
+
+    resp = _request_with_retry(url)
+    if resp is None:
+        return None
+
+    # Check for redirect to 404
+    if "page-not-found" in str(resp.url):
+        logger.warning("For-sale page not found for outcode %s", outcode)
+        return None
+
+    # Parse the Next.js JSON blob from the page
+    soup = BeautifulSoup(resp.text, "lxml")
+    for script in soup.select("script"):
+        text = script.string or ""
+        if text.startswith('{"props"'):
+            try:
+                data = json.loads(text)
+                sr = data.get("props", {}).get("pageProps", {}).get("searchResults", {})
+                return sr.get("properties", [])
+            except (json.JSONDecodeError, KeyError, TypeError):
+                logger.warning("Failed to parse Next.js JSON for %s", outcode)
+                return None
+
+    return None
+
+
+def _for_sale_dict_to_property(d: dict, search_postcode: str) -> Optional[PropertyData]:
+    """Convert a for-sale search result dict to PropertyData."""
+    address = d.get("displayAddress", "") or d.get("address", "")
+    if not address:
+        return None
+
+    prop_id = str(d.get("id", ""))
+    prop_url = f"{BASE_URL}/properties/{prop_id}" if prop_id else ""
+
+    # Extract price
+    price_obj = d.get("price", {})
+    if isinstance(price_obj, dict):
+        asking_price = price_obj.get("amount")
+        display_prices = price_obj.get("displayPrices", [])
+        if display_prices and isinstance(display_prices, list):
+            asking_price_display = display_prices[0].get("displayPrice", "")
+        else:
+            asking_price_display = price_obj.get("displayPrice", "")
+        if not asking_price_display and asking_price:
+            asking_price_display = f"\u00a3{asking_price:,}"
+    else:
+        asking_price = None
+        asking_price_display = ""
+
+    postcode = extract_postcode(address) or search_postcode
+
+    bedrooms = d.get("bedrooms", 0)
+    bathrooms = d.get("bathrooms", 0)
+    property_type = (
+        d.get("propertySubType", "")
+        or d.get("displayPropertyType", "")
+        or d.get("propertyType", "")
+    )
+
+    return PropertyData(
+        address=address,
+        postcode=postcode,
+        property_type=property_type,
+        bedrooms=int(bedrooms) if bedrooms else 0,
+        bathrooms=int(bathrooms) if bathrooms else 0,
+        url=prop_url,
+        asking_price=int(asking_price) if asking_price else None,
+        asking_price_display=asking_price_display,
+        listing_id=prop_id,
+    )
+
+
+def scrape_for_sale_listings(
+    postcode: str, max_properties: int = 25, pages: int = 1,
+) -> list[PropertyData]:
+    """Scrape properties currently listed for sale from search results.
+
+    Uses the outcode (e.g. 'SW20') from the given postcode to search
+    /property-for-sale/{outcode}.html which returns a Next.js page with
+    embedded JSON property data. Supports pagination via ?index=N (25/page).
+    """
+    outcode = _extract_outcode(postcode)
+    search_postcode = postcode.upper().strip()
+
+    all_properties: list[PropertyData] = []
+    for page in range(pages):
+        index = page * 25
+        properties_json = _fetch_for_sale_page(outcode, index=index)
+
+        if properties_json is None:
+            logger.warning("Failed to fetch for-sale page %d for %s", page + 1, outcode)
+            break
+
+        if not properties_json:
+            logger.info("No more for-sale properties on page %d for %s", page + 1, outcode)
+            break
+
+        for item in properties_json:
+            if not isinstance(item, dict):
+                continue
+            prop = _for_sale_dict_to_property(item, search_postcode)
+            if prop:
+                all_properties.append(prop)
+
+        if len(all_properties) >= max_properties:
+            all_properties = all_properties[:max_properties]
+            break
+
+        if page < pages - 1 and SCRAPER_DELAY_BETWEEN_REQUESTS > 0:
+            time.sleep(SCRAPER_DELAY_BETWEEN_REQUESTS)
+
+    logger.info(
+        "Scraped %d for-sale listings across %d pages for outcode %s",
+        len(all_properties), min(pages, page + 1), outcode,
+    )
+    return all_properties

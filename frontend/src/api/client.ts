@@ -45,9 +45,9 @@ export async function checkPostcodeStatus(
 
 export async function scrapePostcode(
   postcode: string,
-  opts?: { pages?: number; linkCount?: number; floorplan?: boolean; extraFeatures?: boolean; saveParquet?: boolean; skipExisting?: boolean; force?: boolean }
+  opts?: { pages?: number; linkCount?: number; floorplan?: boolean; extraFeatures?: boolean; saveParquet?: boolean; skipExisting?: boolean; force?: boolean; mode?: string }
 ): Promise<ScrapeResponse> {
-  const params: Record<string, number | boolean> = {};
+  const params: Record<string, number | boolean | string> = {};
   if (opts?.pages) params.pages = opts.pages;
   if (opts?.linkCount !== undefined) params.link_count = opts.linkCount;
   if (opts?.floorplan) params.floorplan = true;
@@ -55,6 +55,7 @@ export async function scrapePostcode(
   if (opts?.saveParquet) params.save_parquet = true;
   if (opts?.skipExisting === false) params.skip_existing = false;
   if (opts?.force) params.force = true;
+  if (opts?.mode) params.mode = opts.mode;
   const res = await api.post<ScrapeResponse>(
     `/scrape/postcode/${encodeURIComponent(postcode)}`,
     null,
@@ -74,9 +75,9 @@ export async function getAnalytics(
 
 export async function scrapeArea(
   partial: string,
-  opts?: { pages?: number; linkCount?: number; maxPostcodes?: number; floorplan?: boolean; extraFeatures?: boolean; saveParquet?: boolean; skipExisting?: boolean; force?: boolean }
+  opts?: { pages?: number; linkCount?: number; maxPostcodes?: number; floorplan?: boolean; extraFeatures?: boolean; saveParquet?: boolean; skipExisting?: boolean; force?: boolean; mode?: string }
 ): Promise<AreaScrapeResponse> {
-  const params: Record<string, number | boolean> = {};
+  const params: Record<string, number | boolean | string> = {};
   if (opts?.pages) params.pages = opts.pages;
   if (opts?.linkCount !== undefined) params.link_count = opts.linkCount;
   if (opts?.maxPostcodes !== undefined) params.max_postcodes = opts.maxPostcodes;
@@ -85,6 +86,7 @@ export async function scrapeArea(
   if (opts?.saveParquet) params.save_parquet = true;
   if (opts?.skipExisting === false) params.skip_existing = false;
   if (opts?.force) params.force = true;
+  if (opts?.mode) params.mode = opts.mode;
   const res = await api.post<AreaScrapeResponse>(
     `/scrape/area/${encodeURIComponent(partial)}`,
     null,

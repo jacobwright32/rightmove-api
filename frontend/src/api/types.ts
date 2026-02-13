@@ -95,6 +95,7 @@ export interface ScrapeResponse {
   pages_scraped: number;
   detail_pages_visited: number;
   skipped: boolean;
+  mode: string;
 }
 
 export interface AreaScrapeResponse {

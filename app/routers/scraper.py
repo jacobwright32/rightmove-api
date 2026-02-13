@@ -1,7 +1,6 @@
 import json
 import logging
 import re
-from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -21,6 +20,7 @@ from ..schemas import AreaScrapeResponse, ScrapePropertyResponse, ScrapeResponse
 from ..scraper.scraper import (
     PropertyData,
     get_single_house_details,
+    scrape_for_sale_listings,
     scrape_postcode_from_listing,
     scrape_postcode_with_details,
 )
@@ -33,6 +33,7 @@ limiter = Limiter(key_func=get_remote_address)
 def _scrape_postcode_properties(
     postcode: str,
     *,
+    mode: str = "house_prices",
     max_properties: int = 50,
     pages: int = 1,
     link_count: Optional[int] = None,
@@ -42,6 +43,12 @@ def _scrape_postcode_properties(
 
     Returns (properties, detail_pages_visited).
     """
+    if mode == "for_sale":
+        props = scrape_for_sale_listings(
+            postcode, max_properties=max_properties, pages=pages,
+        )
+        return props, 0
+
     use_detail_pages = floorplan or link_count is not None
     if use_detail_pages:
         props = scrape_postcode_with_details(
@@ -132,6 +139,15 @@ def _upsert_property(db: Session, data: PropertyData) -> Property:
         )
         db.add(prop)
 
+    # Populate listing fields if this is from a for-sale scrape
+    if data.asking_price is not None:
+        from datetime import datetime, timezone
+        prop.listing_status = "for_sale"
+        prop.listing_price = data.asking_price
+        prop.listing_price_display = data.asking_price_display
+        prop.listing_url = data.url
+        prop.listing_checked_at = datetime.now(timezone.utc)
+
     db.flush()  # Get the property ID
 
     # Add sales, skipping duplicates
@@ -179,6 +195,7 @@ def _upsert_property(db: Session, data: PropertyData) -> Property:
 def scrape_postcode(
     request: Request,
     postcode: str,
+    mode: str = Query(default="house_prices", description="Scrape mode: 'house_prices' or 'for_sale'"),
     max_properties: int = Query(default=50, ge=1, le=500),
     pages: int = Query(default=1, ge=1, le=50, description="Number of listing pages to scrape"),
     link_count: Optional[int] = Query(
@@ -192,7 +209,11 @@ def scrape_postcode(
     force: bool = Query(default=False, description="Force re-scrape even if data is fresh"),
     db: Session = Depends(get_db),
 ):
-    """Scrape properties for a given postcode from the house prices site.
+    """Scrape properties for a given postcode.
+
+    **Modes:**
+    - `house_prices` (default): Scrapes historical sale data from house prices pages.
+    - `for_sale`: Scrapes properties currently listed for sale with asking prices.
 
     **Fast path** (default): Extracts data from listing page embedded data.
     Single HTTP request per page.
@@ -203,6 +224,9 @@ def scrape_postcode(
 
     Set `skip_existing=false` or `force=true` to re-scrape postcodes that already have data.
     """
+    if mode not in ("house_prices", "for_sale"):
+        raise HTTPException(status_code=400, detail=f"Invalid mode '{mode}'. Must be 'house_prices' or 'for_sale'.")
+
     # Check if we should skip this postcode
     if skip_existing and not force:
         is_fresh, prop_count = _is_postcode_fresh(db, postcode)
@@ -214,10 +238,12 @@ def scrape_postcode(
                 pages_scraped=0,
                 detail_pages_visited=0,
                 skipped=True,
+                mode=mode,
             )
 
     properties, detail_pages_visited = _scrape_postcode_properties(
         postcode,
+        mode=mode,
         max_properties=max_properties,
         pages=pages,
         link_count=link_count if (extra_features or floorplan or link_count is not None) else None,
@@ -242,11 +268,13 @@ def scrape_postcode(
 
     db.commit()
 
+    label = "for-sale listings" if mode == "for_sale" else "properties"
     return ScrapeResponse(
-        message=f"Scraped {scraped_count} properties for postcode {postcode}",
+        message=f"Scraped {scraped_count} {label} for postcode {postcode}",
         properties_scraped=scraped_count,
         pages_scraped=pages,
         detail_pages_visited=detail_pages_visited,
+        mode=mode,
     )
 
 
@@ -255,6 +283,7 @@ def scrape_postcode(
 def scrape_area(
     request: Request,
     partial: str,
+    mode: str = Query(default="house_prices", description="Scrape mode: 'house_prices' or 'for_sale'"),
     pages: int = Query(default=1, ge=1, le=50),
     link_count: Optional[int] = Query(default=None, ge=0, description="Detail pages per postcode (0 = all)"),
     max_postcodes: int = Query(default=0, ge=0, description="Max postcodes to scrape (0 = all)"),
@@ -272,6 +301,9 @@ def scrape_area(
 
     Set `skip_existing=false` or `force=true` to re-scrape postcodes that already have data.
     """
+    if mode not in ("house_prices", "for_sale"):
+        raise HTTPException(status_code=400, detail=f"Invalid mode '{mode}'. Must be 'house_prices' or 'for_sale'.")
+
     import pyarrow.parquet as pq
 
     from ..scraper.scraper import normalise_postcode_for_url
@@ -338,6 +370,7 @@ def scrape_area(
             lc = link_count if use_detail_pages else None
             properties, _ = _scrape_postcode_properties(
                 pc_norm,
+                mode=mode,
                 max_properties=max_props,
                 pages=pages,
                 link_count=lc,
