@@ -25,6 +25,12 @@ export default function PropertyCard({ property }: Props) {
   const sales = property.sales ?? [];
   const features = parseJsonArray(property.extra_features);
   const floorplans = parseJsonArray(property.floorplan_urls);
+  const isListing = property.listing_status === "for_sale" && sales.length === 0;
+
+  // Summary text for the right side
+  const summaryText = isListing
+    ? property.listing_price_display || "Price on application"
+    : `${sales.length} sale${sales.length !== 1 ? "s" : ""}`;
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -33,13 +39,13 @@ export default function PropertyCard({ property }: Props) {
         className="flex w-full cursor-pointer items-start justify-between text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded dark:focus:ring-offset-gray-800"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
-        aria-label={`${property.address} — ${sales.length} sale${sales.length !== 1 ? "s" : ""}. Click to ${expanded ? "collapse" : "expand"}`}
+        aria-label={`${property.address} — ${summaryText}. Click to ${expanded ? "collapse" : "expand"}`}
       >
         <div>
           <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-            {property.url ? (
+            {property.url || property.listing_url ? (
               <a
-                href={property.url}
+                href={property.listing_url || property.url || "#"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-blue-600 hover:underline"
@@ -57,6 +63,11 @@ export default function PropertyCard({ property }: Props) {
             {property.bathrooms != null && (
               <span>{property.bathrooms} bath</span>
             )}
+            {isListing && property.listing_price_display && (
+              <span className="font-semibold text-green-600 dark:text-green-400">
+                {property.listing_price_display}
+              </span>
+            )}
             {floorplans.length > 0 && (
               <span className="text-blue-500">Floorplan</span>
             )}
@@ -67,8 +78,8 @@ export default function PropertyCard({ property }: Props) {
             <FloodRiskBadge riskLevel={property.flood_risk_level} />
           </div>
         </div>
-        <span className="text-gray-400 text-sm dark:text-gray-500" aria-hidden="true">
-          {sales.length} sale{sales.length !== 1 && "s"}{" "}
+        <span className={`text-sm whitespace-nowrap ${isListing ? "font-semibold text-green-600 dark:text-green-400" : "text-gray-400 dark:text-gray-500"}`} aria-hidden="true">
+          {summaryText}{" "}
           {expanded ? "\u25B2" : "\u25BC"}
         </span>
       </button>
@@ -123,8 +134,8 @@ export default function PropertyCard({ property }: Props) {
             </div>
           )}
 
-          {/* Sale history */}
-          <SaleHistoryTable sales={sales} />
+          {/* Sale history (only for properties with sales) */}
+          {sales.length > 0 && <SaleHistoryTable sales={sales} />}
 
           {/* Detail page link */}
           <Link

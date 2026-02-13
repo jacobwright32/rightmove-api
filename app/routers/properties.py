@@ -23,6 +23,7 @@ def list_properties(
     property_type: Optional[str] = Query(default=None, description="Filter by property type"),
     min_bedrooms: Optional[int] = Query(default=None, ge=0, description="Minimum bedrooms"),
     max_bedrooms: Optional[int] = Query(default=None, ge=0, description="Maximum bedrooms"),
+    listing_only: Optional[bool] = Query(default=None, description="True=only for-sale listings, False=only properties with sales"),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=0, ge=0, description="Max properties to return (0 = all)"),
     db: Session = Depends(get_db),
@@ -39,6 +40,12 @@ def list_properties(
         query = query.filter(Property.bedrooms >= min_bedrooms)
     if max_bedrooms is not None:
         query = query.filter(Property.bedrooms <= max_bedrooms)
+
+    # Separate listing-only properties from sale-history properties
+    if listing_only is True:
+        query = query.filter(Property.listing_status == "for_sale")
+    elif listing_only is False:
+        query = query.filter(Property.sales.any())
 
     query = query.order_by(Property.created_at.desc()).offset(skip)
     if limit > 0:

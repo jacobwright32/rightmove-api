@@ -105,11 +105,12 @@ export async function suggestPostcodes(
 }
 
 export async function getProperties(
-  postcode: string
+  postcode: string,
+  opts?: { listingOnly?: boolean }
 ): Promise<PropertyDetail[]> {
-  const res = await api.get<PropertyDetail[]>("/properties", {
-    params: { postcode, limit: 500 },
-  });
+  const params: Record<string, string | number | boolean> = { postcode, limit: 500 };
+  if (opts?.listingOnly !== undefined) params.listing_only = opts.listingOnly;
+  const res = await api.get<PropertyDetail[]>("/properties", { params });
   return res.data;
 }
 

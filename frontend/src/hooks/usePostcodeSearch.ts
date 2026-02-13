@@ -29,6 +29,7 @@ export interface ScrapeOptions {
 export interface SearchResult {
   analytics: PostcodeAnalytics | null;
   properties: PropertyDetail[];
+  mode: "house_prices" | "for_sale";
 }
 
 const FULL_POSTCODE_RE = /^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$/;
@@ -39,6 +40,7 @@ export function usePostcodeSearch() {
   const [result, setResult] = useState<SearchResult>({
     analytics: null,
     properties: [],
+    mode: "house_prices",
   });
   const [scrapeMessage, setScrapeMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -98,18 +100,24 @@ export function usePostcodeSearch() {
       setState("loading");
       if (controller.signal.aborted) return;
 
-      const [analytics, properties] = await Promise.allSettled([
-        getAnalytics(clean),
-        getProperties(clean),
-      ]);
-
-      // Check after await — if aborted during fetch, discard stale results
-      if (controller.signal.aborted) return;
-
-      setResult({
-        analytics: analytics.status === "fulfilled" ? analytics.value : null,
-        properties: properties.status === "fulfilled" ? properties.value : [],
-      });
+      if (opts.mode === "for_sale") {
+        // For-sale mode: only fetch listing properties (no sale-based analytics)
+        const properties = await getProperties(clean, { listingOnly: true });
+        if (controller.signal.aborted) return;
+        setResult({ analytics: null, properties, mode: "for_sale" });
+      } else {
+        // House prices mode: fetch analytics + only properties with sales
+        const [analytics, properties] = await Promise.allSettled([
+          getAnalytics(clean),
+          getProperties(clean, { listingOnly: false }),
+        ]);
+        if (controller.signal.aborted) return;
+        setResult({
+          analytics: analytics.status === "fulfilled" ? analytics.value : null,
+          properties: properties.status === "fulfilled" ? properties.value : [],
+          mode: "house_prices",
+        });
+      }
       setState("done");
     } catch (err: unknown) {
       // Don't set error state if this was an intentional cancellation

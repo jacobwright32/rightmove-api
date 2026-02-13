@@ -67,6 +67,39 @@ class TestPropertiesEndpoints:
         assert data["sales"][0]["price_numeric"] == 450000
 
 
+    def test_listing_only_filter(self, client, db_session):
+        """listing_only=true returns only for-sale listings, false returns only properties with sales."""
+        # Property with sale history (house prices data)
+        sale_prop = Property(address="1 Sale Rd, SW20 8NE", postcode="SW20 8NE")
+        db_session.add(sale_prop)
+        db_session.flush()
+        db_session.add(Sale(property_id=sale_prop.id, date_sold="1 Jan 2024", price="£300,000", price_numeric=300000, date_sold_iso="2024-01-01"))
+
+        # Property with listing status (for-sale data)
+        listing_prop = Property(address="2 Listing Ave, SW20 8NE", postcode="SW20 8NE", listing_status="for_sale", listing_price=400000)
+        db_session.add(listing_prop)
+        db_session.commit()
+
+        # listing_only=true -> only the listing property
+        resp = client.get("/api/v1/properties?postcode=SW20&listing_only=true")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["address"] == "2 Listing Ave, SW20 8NE"
+
+        # listing_only=false -> only the property with sales
+        resp = client.get("/api/v1/properties?postcode=SW20&listing_only=false")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["address"] == "1 Sale Rd, SW20 8NE"
+
+        # No filter -> both
+        resp = client.get("/api/v1/properties?postcode=SW20")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+
+
 class TestPostcodesEndpoint:
     def test_list_postcodes_empty(self, client):
         resp = client.get("/api/v1/postcodes")

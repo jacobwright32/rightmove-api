@@ -2,6 +2,7 @@ import { useState } from "react";
 import { exportSalesData } from "../api/client";
 import AnalyticsDashboard from "../components/AnalyticsDashboard";
 import LoadingOverlay from "../components/LoadingOverlay";
+import PropertyList from "../components/PropertyList";
 import SearchBar from "../components/SearchBar";
 import { usePostcodeSearch } from "../hooks/usePostcodeSearch";
 
@@ -49,8 +50,8 @@ export default function SearchPage() {
           </div>
         )}
 
-        {/* Results dashboard */}
-        {state === "done" && result.analytics && (
+        {/* House Prices mode — full analytics dashboard */}
+        {state === "done" && result.mode === "house_prices" && result.analytics && (
           <AnalyticsDashboard
             analytics={result.analytics}
             properties={result.properties}
@@ -59,6 +60,18 @@ export default function SearchPage() {
             exporting={exporting}
             onExport={handleExport}
           />
+        )}
+
+        {/* Current Listings mode — property list with asking prices */}
+        {state === "done" && result.mode === "for_sale" && (
+          <div className="mt-8 flex flex-col gap-6">
+            {scrapeMessage && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-center text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                {scrapeMessage}
+              </div>
+            )}
+            <PropertyList properties={result.properties} />
+          </div>
         )}
       </div>
     </div>
