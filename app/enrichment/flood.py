@@ -75,7 +75,7 @@ def _fetch_active_warnings(lat: float, lng: float) -> list:
         items = data.get("items", [])
         return [
             {
-                "severity": item.get("severityLevel", "Unknown"),
+                "severity": str(item.get("severityLevel", "Unknown")),
                 "message": item.get("message", ""),
                 "area": item.get("description", item.get("eaAreaName", "")),
             }

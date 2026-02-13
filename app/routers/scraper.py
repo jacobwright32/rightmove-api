@@ -18,7 +18,7 @@ from ..export import save_property_parquet
 from ..models import Property, Sale
 from ..parsing import parse_date_to_iso, parse_price_to_int
 from ..schemas import AreaScrapeResponse, ScrapePropertyResponse, ScrapeResponse, ScrapeUrlRequest
-from ..scraper.rightmove import (
+from ..scraper.scraper import (
     PropertyData,
     get_single_house_details,
     scrape_postcode_from_listing,
@@ -192,7 +192,7 @@ def scrape_postcode(
     force: bool = Query(default=False, description="Force re-scrape even if data is fresh"),
     db: Session = Depends(get_db),
 ):
-    """Scrape properties for a given postcode from Rightmove house prices.
+    """Scrape properties for a given postcode from the house prices site.
 
     **Fast path** (default): Extracts data from listing page embedded data.
     Single HTTP request per page.
@@ -274,7 +274,7 @@ def scrape_area(
     """
     import pyarrow.parquet as pq
 
-    from ..scraper.rightmove import normalise_postcode_for_url
+    from ..scraper.scraper import normalise_postcode_for_url
 
     partial_clean = partial.upper().replace("-", "").replace(" ", "")
 
@@ -390,12 +390,12 @@ def scrape_single_property(
     body: ScrapeUrlRequest,
     db: Session = Depends(get_db),
 ):
-    """Scrape a single property by its Rightmove URL."""
+    """Scrape a single property by its URL."""
     parsed = urlparse(body.url)
     if not parsed.hostname or not parsed.hostname.endswith("rightmove.co.uk"):
         raise HTTPException(
             status_code=400,
-            detail="URL must be a Rightmove URL.",
+            detail="URL must be a valid property source URL.",
         )
 
     data = get_single_house_details(body.url, extract_floorplan=body.floorplan)

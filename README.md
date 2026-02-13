@@ -1,7 +1,7 @@
-# Rightmove House Prices API
+# UK House Prices API
 
 A full-stack application for scraping, storing, enriching, and analyzing UK property sale data
-from [Rightmove](https://www.rightmove.co.uk/house-prices.html). Combines a FastAPI
+from public house price records. Combines a FastAPI
 backend with a React frontend to provide on-demand data collection, multi-source enrichment,
 ML price modelling, and interactive visualizations.
 
@@ -57,7 +57,7 @@ ML price modelling, and interactive visualizations.
 | **Flood risk** | Flood zone classification from Environment Agency open data |
 | **Transport distances** | Distance to nearest rail, tube, bus, airport, and port via NaPTAN + cKDTree |
 | **Planning applications** | Nearby planning applications from planning.data.gov.uk |
-| **Listing status** | Checks if properties are currently listed on Rightmove |
+| **Listing status** | Checks if properties are currently listed for sale |
 | **ML modelling** | Train LightGBM/XGBoost models on 60+ features to predict prices, price/sqft, or price change % |
 | **Interactive map** | Leaflet-based map view with clustered, colour-coded property markers |
 | **Dark mode** | Full dark theme with reactive Recharts/Plotly chart theming |
@@ -80,8 +80,8 @@ ML price modelling, and interactive visualizations.
                                          │ /api/v1/*
                                          ▼
 ┌────────────┐    HTTP     ┌──────────────────────────────────┐
-│  Rightmove │◄───────────►│        FastAPI Backend            │
-│  (source)  │             │                                   │
+│  Data Source │◄───────────►│        FastAPI Backend            │
+│  (scraper)  │             │                                   │
 └────────────┘             │  ┌──────────┐ ┌──────────────┐    │
                            │  │ Scraper  │ │  Analytics   │    │
 ┌────────────┐             │  │ Router   │ │   Router     │    │
@@ -92,7 +92,7 @@ ML price modelling, and interactive visualizations.
                            │       │              │            │
                            │       ▼              ▼            │
                            │  ┌────────────────────────────┐   │
-                           │  │    SQLite (rightmove.db)   │   │
+                           │  │    SQLite (uk_house_prices.db)   │   │
                            │  │ Property | Sale | Crime |  │   │
                            │  │       Planning             │   │
                            │  └────────────────────────────┘   │
@@ -111,7 +111,7 @@ The application integrates with multiple free, public data sources to enrich pro
 
 | Source | Auth Required | Data Provided | Caching |
 |---|---|---|---|
-| **[Rightmove](https://www.rightmove.co.uk/house-prices.html)** | None | Property sales, prices, addresses, features, floorplans | Stored in DB |
+| **[Source site](https://www.rightmove.co.uk/house-prices.html)** | None | Property sales, prices, addresses, features, floorplans | Stored in DB |
 | **[EPC Register](https://epc.opendatacommunities.org/)** | Free API key | Energy ratings (A-G), EPC score, environment impact, energy cost | Stored on Property |
 | **[Police API](https://data.police.uk/docs/)** | None | Monthly crime counts by category within 1 mile radius | `CrimeStats` table, 30-day TTL |
 | **[Postcodes.io](https://postcodes.io/)** | None | Postcode geocoding (lat/lng), used by crime + transport enrichment | Stored on Property |
@@ -134,8 +134,8 @@ Static data (no API calls): **25 UK airports** and **20 major ports** with coord
 ### Installation
 
 ```bash
-git clone https://github.com/jacobwright32/rightmove-api.git
-cd rightmove-api
+git clone https://github.com/jacobwright32/uk-house-prices.git
+cd uk-house-prices
 
 # Backend
 pip install -r requirements.txt
@@ -270,7 +270,7 @@ Scrape all postcodes matching a partial postcode prefix.
 
 #### `POST /api/v1/scrape/property`
 
-Scrape a single property by its Rightmove URL.
+Scrape a single property by its URL.
 
 **Request body:**
 
@@ -324,7 +324,7 @@ List all scraped postcodes with property counts.
 
 #### `GET /api/v1/postcodes/suggest/{partial}`
 
-Autocomplete postcodes from a partial input. Checks both the database and Rightmove.
+Autocomplete postcodes from a partial input. Checks both the database and the source site.
 
 ---
 
@@ -364,8 +364,8 @@ Enrichment endpoints fetch data from external APIs and store results on Property
 |---|---|---|
 | `POST /api/v1/enrich/epc/{postcode}` | EPC Register | Fetch energy certificates, fuzzy-match to properties by address |
 | `POST /api/v1/enrich/transport/{postcode}` | NaPTAN (cached) | Compute distances to nearest rail, tube, tram, bus, airport, port via cKDTree |
-| `POST /api/v1/enrich/listing/{postcode}` | Rightmove | Check current listing status for all properties in postcode |
-| `GET /api/v1/properties/{property_id}/listing` | Rightmove | Get listing status for a single property |
+| `POST /api/v1/enrich/listing/{postcode}` | Source site | Check current listing status for all properties in postcode |
+| `GET /api/v1/properties/{property_id}/listing` | Source site | Get listing status for a single property |
 
 **Transport enrichment details:**
 
@@ -571,7 +571,7 @@ python-dotenv). All values have sensible defaults.
 
 | Variable | Type | Default | Description |
 |---|---|---|---|
-| `DATABASE_URL` | string | `sqlite:///./rightmove.db` | SQLAlchemy database URL |
+| `DATABASE_URL` | string | `sqlite:///./uk_house_prices.db` | SQLAlchemy database URL |
 | `CORS_ORIGINS` | string | `http://localhost:5173,...` | Comma-separated allowed origins |
 | `LOG_LEVEL` | string | `INFO` | Python logging level |
 | `SCRAPER_REQUEST_TIMEOUT` | integer | `30` | HTTP request timeout in seconds |
@@ -590,7 +590,7 @@ python-dotenv). All values have sensible defaults.
 ## Project Structure
 
 ```
-rightmove-api/
+uk-house-prices/
 ├── app/
 │   ├── main.py              # FastAPI application, middleware, SPA fallback, router mounting
 │   ├── config.py            # Environment-based configuration
@@ -610,14 +610,14 @@ rightmove-api/
 │   │   ├── epc.py           # EPC Register API service
 │   │   ├── crime.py         # Police API + Postcodes.io geocoding
 │   │   ├── transport.py     # NaPTAN data + cKDTree distance computation
-│   │   ├── listing.py       # Rightmove listing status checker
+│   │   ├── listing.py       # Listing status checker
 │   │   └── geocoding.py     # Postcodes.io geocoding helper
 │   ├── modelling/
 │   │   ├── data_assembly.py # Feature registry (60+), dataset building from DB
 │   │   ├── trainer.py       # LightGBM/XGBoost training with metrics
 │   │   └── predictor.py     # Single-property and postcode prediction
 │   └── scraper/
-│       └── rightmove.py     # Rightmove HTTP client and Turbo Stream parser
+│       └── scraper.py     # HTTP client and Turbo Stream parser
 ├── frontend/
 │   ├── src/
 │   │   ├── api/             # Axios client and TypeScript types
@@ -650,7 +650,7 @@ rightmove-api/
 
 ## Technical Details
 
-**Turbo Stream parsing.** Rightmove uses React Router v7 with Turbo Stream data
+**Turbo Stream parsing.** The source site uses React Router v7 with Turbo Stream data
 format. Property data is embedded in `streamController.enqueue()` calls as a flat
 JSON array with positional reference keys. The scraper decodes this format to extract
 structured property and sale data.
@@ -685,8 +685,8 @@ SPA uses a FastAPI catch-all that serves `index.html` for non-API routes.
 
 ## Limitations
 
-- Data availability depends on what Rightmove publishes on their house-prices pages.
-- Scraping patterns (Turbo Stream format) may change if Rightmove updates their frontend.
+- Data availability depends on what the source site publishes on their house-prices pages.
+- Scraping patterns (Turbo Stream format) may change if the source site updates their frontend.
 - SQLite is single-writer &mdash; concurrent write-heavy workloads may need PostgreSQL.
 - ML models are stored in-memory and lost on server restart.
 - EPC enrichment requires a free API key from epc.opendatacommunities.org.
@@ -696,5 +696,5 @@ SPA uses a FastAPI catch-all that serves `index.html` for non-API routes.
 
 ## License
 
-This project is for educational and personal use. Rightmove data is subject to their
-terms of service.
+This project is for educational and personal use. Source data is subject to the
+original provider's terms of service.

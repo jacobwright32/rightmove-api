@@ -725,4 +725,4 @@ class TestScrapePropertyValidation:
     def test_invalid_url(self, client):
         resp = client.post("/api/v1/scrape/property", json={"url": "https://example.com"})
         assert resp.status_code == 400
-        assert "Rightmove" in resp.json()["detail"]
+        assert "URL" in resp.json()["detail"]

@@ -40,7 +40,7 @@ class Property(Base):
     listing_price = Column(Integer, nullable=True)  # Numeric asking price
     listing_price_display = Column(String, nullable=True)  # "Guide Price £450,000"
     listing_date = Column(String, nullable=True)  # When listed, e.g. "16th January 2026"
-    listing_url = Column(String, nullable=True)  # Rightmove for-sale page URL
+    listing_url = Column(String, nullable=True)  # For-sale page URL
     listing_checked_at = Column(DateTime, nullable=True)  # Last check timestamp
     # Geocoded coordinates (populated via /properties/geo endpoint)
     latitude = Column(Float, nullable=True)

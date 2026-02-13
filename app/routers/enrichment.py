@@ -344,8 +344,8 @@ listing_router = APIRouter(tags=["enrichment"])
 def get_property_listing(property_id: int, db: Session = Depends(get_db)):
     """Get current listing status for a single property.
 
-    Returns cached data if fresh, otherwise scrapes Rightmove for the
-    property's postcode and matches by address.
+    Returns cached data if fresh, otherwise scrapes the source site for the
+    property's listing data.
     """
     result = check_property_listing(db, property_id)
     if result is None:
@@ -355,9 +355,9 @@ def get_property_listing(property_id: int, db: Session = Depends(get_db)):
 
 @router.post("/listing/{postcode}", response_model=ListingEnrichmentResponse)
 def enrich_listing(postcode: str, db: Session = Depends(get_db)):
-    """Check which properties in a postcode are currently for sale on Rightmove.
+    """Check which properties in a postcode are currently listed for sale.
 
-    Scrapes Rightmove's for-sale search, matches to stored properties by address.
+    Scrapes the source site's for-sale search, matches to stored properties by address.
     Results are cached for LISTING_FRESHNESS_HOURS.
     """
     clean = postcode.upper().strip()

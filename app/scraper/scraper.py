@@ -86,7 +86,7 @@ def extract_postcode(address: str) -> str:
 
 
 def normalise_postcode_for_url(postcode: str) -> str:
-    """Convert a postcode like 'AB10 1AA' or 'AB10-1AA' to 'AB101AA' for Rightmove URLs."""
+    """Convert a postcode like 'AB10 1AA' or 'AB10-1AA' to 'AB101AA' for URL lookups."""
     return re.sub(r"[\s\-]", "", postcode.upper())
 
 
@@ -97,7 +97,7 @@ def normalise_postcode_for_url(postcode: str) -> str:
 def _parse_turbo_stream(html: str) -> Optional[list]:
     """Extract the main data array from React Router's Turbo Stream format.
 
-    Rightmove uses React Router v7 which embeds route loader data in
+    The source site uses React Router v7 which embeds route loader data in
     window.__reactRouterContext.streamController.enqueue() calls. The main
     data chunk is a JSON array (not P-prefixed) with 50+ elements.
     """
@@ -240,7 +240,7 @@ def _fetch_listing_page(normalised: str, page: int) -> Optional[list]:
 def get_postcode_page_urls(
     postcode: str, max_properties: int = 50, pages: int = 1,
 ) -> list[str]:
-    """Fetch property detail URLs for a postcode from Rightmove house prices.
+    """Fetch property detail URLs for a postcode from the house prices site.
 
     Parses the React Router Turbo Stream data embedded in the page HTML
     to extract property detail URLs. Supports multi-page pagination.
@@ -372,7 +372,7 @@ def _format_price(price) -> str:
 def get_single_house_details(
     url: str, extract_floorplan: bool = False,
 ) -> Optional[PropertyData]:
-    """Scrape details for a single property from its Rightmove detail page.
+    """Scrape details for a single property from its detail page.
 
     Uses the HTML table for sale history and Turbo Stream data for property
     attributes. Optionally extracts floorplan image URLs.
@@ -425,7 +425,7 @@ def get_single_house_details(
 def _extract_sales_from_table(soup: BeautifulSoup) -> list[SaleRecord]:
     """Extract sale history from the HTML table.
 
-    Rightmove detail pages have tables with either 4 or 5 columns:
+    Detail pages have tables with either 4 or 5 columns:
     5-col: Date sold | Price change % | Price | Property | Tenure
     4-col: Date sold | Price change % | Price | Tenure
     """

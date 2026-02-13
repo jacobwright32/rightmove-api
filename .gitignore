@@ -25,7 +25,7 @@ frontend/dist/
 # Data / exports
 *.parquet
 sales_data/
-rightmove_export.csv
+uk_house_prices_export.csv
 data/postcodes/
 data/
 

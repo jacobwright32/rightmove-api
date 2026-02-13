@@ -19,7 +19,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from app.config import DATA_DIR, SCRAPER_FRESHNESS_DAYS
 from app.database import SessionLocal
 from app.routers.scraper import _is_postcode_fresh, _scrape_postcode_properties, _upsert_property
-from app.scraper.rightmove import normalise_postcode_for_url
+from app.scraper.scraper import normalise_postcode_for_url
 
 logging.basicConfig(
     level=logging.INFO,

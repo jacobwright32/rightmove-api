@@ -1,9 +1,9 @@
 """Active listing status enrichment service.
 
-Checks each property's Rightmove house-prices detail page for listing
-data embedded in the React Router turbo stream.  The ``propertyListing``
-object tells us whether the property is currently advertised for sale (or
-rent), when it was listed, and gives us a listing ID to build the URL.
+Checks each property's house-prices detail page for listing data embedded
+in the React Router turbo stream.  The ``propertyListing`` object tells us
+whether the property is currently advertised for sale (or rent), when it
+was listed, and gives us a listing ID to build the URL.
 """
 
 import logging
@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from ..config import LISTING_FRESHNESS_HOURS, SCRAPER_DELAY_BETWEEN_REQUESTS
 from ..models import Property
-from ..scraper.rightmove import (
+from ..scraper.scraper import (
     _parse_turbo_stream,
     _request_with_retry,
     _resolve_object,
@@ -24,7 +24,7 @@ from ..scraper.rightmove import (
 
 logger = logging.getLogger(__name__)
 
-RIGHTMOVE_BASE = "https://www.rightmove.co.uk"
+SOURCE_BASE_URL = "https://www.rightmove.co.uk"
 
 
 # ------------------------------------------------------------------
@@ -80,7 +80,7 @@ def _extract_listing_from_detail_page(url: str) -> Optional[dict]:
         listing_date = pl_dict.get("advertisedFrom")
 
     # Build listing URL
-    listing_url = f"{RIGHTMOVE_BASE}/properties/{listing_id}" if listing_id else None
+    listing_url = f"{SOURCE_BASE_URL}/properties/{listing_id}" if listing_id else None
 
     result = {
         "listing_status": listing_status,
@@ -113,9 +113,9 @@ def _parse_listing_date(reason: str) -> Optional[str]:
 def _fetch_listing_price(listing_url: str) -> Optional[dict]:
     """Try to extract the asking price from the listing page title.
 
-    Rightmove listing page titles follow patterns like:
-      "3 bed house for sale, Guide Price £450,000 in London | Rightmove"
-      "2 bed flat for sale, £325,000 in Somewhere | Rightmove"
+    Listing page titles follow patterns like:
+      "3 bed house for sale, Guide Price £450,000 in London | ..."
+      "2 bed flat for sale, £325,000 in Somewhere | ..."
     """
     resp = _request_with_retry(listing_url)
     if not resp:
@@ -212,7 +212,7 @@ def check_property_listing(db: Session, property_id: int) -> Optional[dict]:
     if stale and prop.url:
         url = prop.url
         if not url.startswith("http"):
-            url = RIGHTMOVE_BASE + url
+            url = SOURCE_BASE_URL + url
 
         listing = _extract_listing_from_detail_page(url)
         _apply_listing_to_property(prop, listing)
@@ -288,7 +288,7 @@ def enrich_postcode_listings(db: Session, postcode: str) -> dict:
 
         url = prop.url
         if not url.startswith("http"):
-            url = RIGHTMOVE_BASE + url
+            url = SOURCE_BASE_URL + url
 
         listing = _extract_listing_from_detail_page(url)
         _apply_listing_to_property(prop, listing)

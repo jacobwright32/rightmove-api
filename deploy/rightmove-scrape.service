@@ -1,9 +1,0 @@
-[Unit]
-Description=Rightmove scheduled scrape
-
-[Service]
-Type=oneshot
-User=rightmove
-WorkingDirectory=/opt/rightmove-api
-EnvironmentFile=/opt/rightmove-api/.env
-ExecStart=/opt/rightmove-api/venv/bin/python scripts/scheduled_scrape.py

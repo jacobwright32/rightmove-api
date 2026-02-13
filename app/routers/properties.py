@@ -10,7 +10,7 @@ from ..enrichment.geocoding import batch_geocode_postcodes
 from ..export import SALES_DATA_DIR, save_property_parquet
 from ..models import Property, Sale
 from ..schemas import ExportResponse, PostcodeStatus, PostcodeSummary, PropertyDetail, PropertyGeoPoint
-from ..scraper.rightmove import scrape_postcode_from_listing
+from ..scraper.scraper import scrape_postcode_from_listing
 
 _OUTCODE_RE = re.compile(r"^([A-Z]{1,2}\d[A-Z\d]?)\s", re.IGNORECASE)
 
@@ -260,7 +260,7 @@ def get_postcode_status(postcode: str, db: Session = Depends(get_db)):
 def suggest_postcodes(partial: str, db: Session = Depends(get_db)):
     """Suggest full postcodes for a partial input like 'SW20 8'.
 
-    Checks the local DB first, then scrapes Rightmove for more matches.
+    Checks the local DB first, then scrapes the source site for more matches.
     """
     partial_clean = partial.upper().replace("-", "").replace(" ", "")
 

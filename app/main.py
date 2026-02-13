@@ -26,8 +26,8 @@ Base.metadata.create_all(bind=engine)
 limiter = Limiter(key_func=get_remote_address, default_limits=[RATE_LIMIT_DEFAULT])
 
 app = FastAPI(
-    title="Rightmove House Prices API",
-    description="On-demand scraping and querying of Rightmove house price data.",
+    title="UK House Prices API",
+    description="On-demand scraping and querying of UK house price data.",
     version="1.0.0",
 )
 
@@ -85,7 +85,7 @@ def health_check():
 @app.get("/")
 def root():
     return {
-        "message": "Rightmove House Prices API",
+        "message": "UK House Prices API",
         "docs": "/docs",
     }
 

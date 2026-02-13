@@ -1,4 +1,4 @@
-"""Parse structured fields from Rightmove extra_features JSON arrays."""
+"""Parse structured fields from extra_features JSON arrays."""
 
 import json
 import re

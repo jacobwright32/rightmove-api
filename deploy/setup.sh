@@ -1,5 +1,5 @@
 #!/bin/bash
-# Rightmove API — one-shot VPS setup script
+# UK House Prices — one-shot VPS setup script
 # Run as root on a fresh Ubuntu 24.04 server:
 #   curl -sSL <raw-url>/deploy/setup.sh | bash
 # Or: scp deploy/setup.sh root@server: && ssh root@server bash setup.sh
@@ -8,9 +8,9 @@
 
 set -euo pipefail
 
-REPO_URL="${1:-https://github.com/YOUR_USERNAME/rightmove-api.git}"
-APP_DIR="/opt/rightmove-api"
-APP_USER="rightmove"
+REPO_URL="${1:-https://github.com/YOUR_USERNAME/uk-house-prices.git}"
+APP_DIR="/opt/uk-house-prices"
+APP_USER="ukhp"
 
 echo "==> Installing system dependencies..."
 apt-get update
@@ -62,17 +62,17 @@ if [ ! -f .env ]; then
 fi
 
 echo "==> Installing systemd services..."
-cp deploy/rightmove-api.service /etc/systemd/system/
-cp deploy/rightmove-scrape.service /etc/systemd/system/
-cp deploy/rightmove-scrape.timer /etc/systemd/system/
+cp deploy/uk-house-prices.service /etc/systemd/system/
+cp deploy/uk-house-prices-scrape.service /etc/systemd/system/
+cp deploy/uk-house-prices-scrape.timer /etc/systemd/system/
 
 echo "==> Setting up Caddy..."
 cp deploy/Caddyfile /etc/caddy/Caddyfile
 
 echo "==> Enabling and starting services..."
 systemctl daemon-reload
-systemctl enable --now rightmove-api
-systemctl enable --now rightmove-scrape.timer
+systemctl enable --now uk-house-prices
+systemctl enable --now uk-house-prices-scrape.timer
 systemctl restart caddy
 
 echo ""
@@ -81,9 +81,9 @@ echo "  Setup complete!"
 echo "============================================"
 echo ""
 echo "  App:    http://$(hostname -I | awk '{print $1}')"
-echo "  Status: systemctl status rightmove-api"
-echo "  Logs:   journalctl -u rightmove-api -f"
-echo "  Timer:  systemctl list-timers rightmove-scrape*"
+echo "  Status: systemctl status uk-house-prices"
+echo "  Logs:   journalctl -u uk-house-prices -f"
+echo "  Timer:  systemctl list-timers uk-house-prices-scrape*"
 echo ""
 echo "  Next steps:"
 echo "  1. Edit $APP_DIR/.env with your API keys and domain"

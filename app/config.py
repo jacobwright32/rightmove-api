@@ -31,7 +31,7 @@ def _read_secret(name: str, default: str = "") -> str:
 
 
 # Database
-DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./rightmove.db")
+DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./uk_house_prices.db")
 
 # CORS
 CORS_ORIGINS: list[str] = [

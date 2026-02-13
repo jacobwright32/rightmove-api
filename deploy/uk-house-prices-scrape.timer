@@ -1,5 +1,5 @@
 [Unit]
-Description=Run Rightmove scrape daily at 3am
+Description=Run house prices scrape daily at 3am
 
 [Timer]
 OnCalendar=*-*-* 03:00:00

@@ -1,7 +1,7 @@
 """Tests for scraper utility functions."""
 
 
-from app.scraper.rightmove import (
+from app.scraper.scraper import (
     _format_price,
     _resolve_ref,
     extract_postcode,
