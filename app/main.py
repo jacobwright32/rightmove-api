@@ -10,8 +10,8 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from .config import CORS_ORIGINS, LOG_LEVEL, RATE_LIMIT_DEFAULT
-from .database import Base, engine, _migrate_db
-from .routers import analytics, properties, scraper
+from .database import Base, _migrate_db, engine
+from .routers import analytics, enrichment, modelling, properties, scraper
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
@@ -26,8 +26,8 @@ Base.metadata.create_all(bind=engine)
 limiter = Limiter(key_func=get_remote_address, default_limits=[RATE_LIMIT_DEFAULT])
 
 app = FastAPI(
-    title="Rightmove House Prices API",
-    description="On-demand scraping and querying of Rightmove house price data.",
+    title="UK House Prices API",
+    description="On-demand scraping and querying of UK house price data.",
     version="1.0.0",
 )
 
@@ -53,6 +53,14 @@ app.add_middleware(
 app.include_router(scraper.router, prefix="/api/v1")
 app.include_router(properties.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(analytics.postcode_router, prefix="/api/v1")
+app.include_router(enrichment.router, prefix="/api/v1")
+app.include_router(enrichment.crime_router, prefix="/api/v1")
+app.include_router(enrichment.flood_router, prefix="/api/v1")
+app.include_router(enrichment.planning_router, prefix="/api/v1")
+app.include_router(enrichment.listing_router, prefix="/api/v1")
+app.include_router(enrichment.bulk_router, prefix="/api/v1")
+app.include_router(modelling.router, prefix="/api/v1")
 
 
 @app.get("/health")
@@ -77,12 +85,47 @@ def health_check():
 @app.get("/")
 def root():
     return {
-        "message": "Rightmove House Prices API",
+        "message": "UK House Prices API",
         "docs": "/docs",
     }
 
 
-# Serve React production build if it exists
+@app.post("/api/v1/admin/reset-database")
+def reset_database():
+    """Drop all data and recreate tables. Irreversible."""
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    return {"message": "Database reset successfully. All data has been deleted."}
+
+
+@app.post("/api/v1/admin/shutdown")
+def shutdown():
+    """Gracefully shut down the server."""
+    import signal
+
+    os.kill(os.getpid(), signal.SIGTERM)
+    return {"message": "Server shutting down..."}
+
+
+# Serve React production build if it exists (with SPA fallback)
 _frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 if os.path.isdir(_frontend_dist):
-    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="frontend")
+    from fastapi.responses import FileResponse
+
+    _index_html = os.path.join(_frontend_dist, "index.html")
+
+    app.mount("/assets", StaticFiles(directory=os.path.join(_frontend_dist, "assets")), name="assets")
+
+    _frontend_dist_real = os.path.realpath(_frontend_dist)
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """SPA fallback — serve index.html for all non-API routes."""
+        if full_path.startswith("api/"):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        file_path = os.path.realpath(os.path.join(_frontend_dist, full_path))
+        if not file_path.startswith(_frontend_dist_real):
+            return JSONResponse(status_code=403, content={"detail": "Forbidden"})
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(_index_html)

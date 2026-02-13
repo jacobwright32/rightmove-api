@@ -1,0 +1,9 @@
+[Unit]
+Description=UK House Prices scheduled scrape
+
+[Service]
+Type=oneshot
+User=ukhp
+WorkingDirectory=/opt/uk-house-prices
+EnvironmentFile=/opt/uk-house-prices/.env
+ExecStart=/opt/uk-house-prices/venv/bin/python scripts/scheduled_scrape.py

@@ -1,4 +1,4 @@
-"""Utilities for parsing Rightmove price and date strings into structured formats."""
+"""Utilities for parsing price and date strings into structured formats."""
 
 import re
 from datetime import datetime

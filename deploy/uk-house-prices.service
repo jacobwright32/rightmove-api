@@ -1,0 +1,15 @@
+[Unit]
+Description=UK House Prices API
+After=network.target
+
+[Service]
+Type=simple
+User=ukhp
+WorkingDirectory=/opt/uk-house-prices
+EnvironmentFile=/opt/uk-house-prices/.env
+ExecStart=/opt/uk-house-prices/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

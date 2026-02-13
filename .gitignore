@@ -20,16 +20,21 @@ build/
 # Node
 node_modules/
 frontend/dist/
+*.tsbuildinfo
 
 # Data / exports
 *.parquet
 sales_data/
-rightmove_export.csv
+uk_house_prices_export.csv
 data/postcodes/
+data/
 
 # OS
 Thumbs.db
 .DS_Store
+
+# Secrets
+secrets/
 
 # Testing
 .pytest_cache/

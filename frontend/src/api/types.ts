@@ -20,6 +20,66 @@ export interface PropertyBrief {
   bathrooms: number | null;
   floorplan_urls: string | null;
   url: string | null;
+  epc_rating: string | null;
+  epc_score: number | null;
+  epc_environment_impact: number | null;
+  estimated_energy_cost: number | null;
+  flood_risk_level: string | null;
+  listing_status: string | null;
+  listing_price: number | null;
+  listing_price_display: string | null;
+  listing_date: string | null;
+  listing_url: string | null;
+  listing_checked_at: string | null;
+  // Transport distances
+  dist_nearest_rail_km: number | null;
+  dist_nearest_tube_km: number | null;
+  dist_nearest_bus_km: number | null;
+  dist_nearest_airport_km: number | null;
+  dist_nearest_port_km: number | null;
+  nearest_rail_station: string | null;
+  nearest_tube_station: string | null;
+  nearest_airport: string | null;
+  nearest_port: string | null;
+  bus_stops_within_500m: number | null;
+  // IMD deprivation
+  imd_decile: number | null;
+  imd_income_decile: number | null;
+  imd_employment_decile: number | null;
+  imd_education_decile: number | null;
+  imd_health_decile: number | null;
+  imd_crime_decile: number | null;
+  imd_housing_decile: number | null;
+  imd_environment_decile: number | null;
+  // Broadband
+  broadband_median_speed: number | null;
+  broadband_superfast_pct: number | null;
+  broadband_ultrafast_pct: number | null;
+  broadband_full_fibre_pct: number | null;
+  // Schools
+  dist_nearest_primary_km: number | null;
+  dist_nearest_secondary_km: number | null;
+  nearest_primary_school: string | null;
+  nearest_secondary_school: string | null;
+  nearest_primary_ofsted: string | null;
+  nearest_secondary_ofsted: string | null;
+  dist_nearest_outstanding_primary_km: number | null;
+  dist_nearest_outstanding_secondary_km: number | null;
+  primary_schools_within_2km: number | null;
+  secondary_schools_within_3km: number | null;
+  // Healthcare
+  dist_nearest_gp_km: number | null;
+  nearest_gp_name: string | null;
+  dist_nearest_hospital_km: number | null;
+  nearest_hospital_name: string | null;
+  gp_practices_within_2km: number | null;
+  // Supermarkets
+  dist_nearest_supermarket_km: number | null;
+  nearest_supermarket_name: string | null;
+  nearest_supermarket_brand: string | null;
+  dist_nearest_premium_supermarket_km: number | null;
+  dist_nearest_budget_supermarket_km: number | null;
+  supermarkets_within_2km: number | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -34,11 +94,14 @@ export interface ScrapeResponse {
   properties_scraped: number;
   pages_scraped: number;
   detail_pages_visited: number;
+  skipped: boolean;
+  mode: string;
 }
 
 export interface AreaScrapeResponse {
   message: string;
   postcodes_scraped: string[];
+  postcodes_skipped: string[];
   total_properties: number;
 }
 
@@ -96,4 +159,396 @@ export interface PostcodeAnalytics {
   postcode_comparison: PostcodeComparison[];
   bedroom_distribution: BedroomDistribution[];
   sales_volume: SalesVolumePoint[];
+}
+
+// Market Overview types
+
+export interface PriceRangeBucket {
+  range: string;
+  count: number;
+}
+
+export interface RecentSale {
+  property_id: number;
+  address: string;
+  postcode: string | null;
+  price: number;
+  date_sold: string | null;
+  property_type: string | null;
+  bedrooms: number | null;
+}
+
+export interface MarketOverview {
+  total_postcodes: number;
+  total_properties: number;
+  total_sales: number;
+  date_range: { earliest: string | null; latest: string | null };
+  avg_price: number | null;
+  median_price: number | null;
+  price_distribution: PriceRangeBucket[];
+  top_postcodes: PostcodeComparison[];
+  property_types: PropertyTypeBreakdown[];
+  bedroom_distribution: BedroomDistribution[];
+  yearly_trends: SalesVolumePoint[];
+  price_trends: PriceTrendPoint[];
+  recent_sales: RecentSale[];
+}
+
+// Housing Insights types
+
+export interface PriceHistogramBucket {
+  range_label: string;
+  min_price: number;
+  max_price: number;
+  count: number;
+}
+
+export interface InsightsTimeSeriesPoint {
+  month: string;
+  median_price: number | null;
+  sales_count: number;
+}
+
+export interface ScatterPoint {
+  bedrooms: number;
+  price: number;
+  postcode: string;
+  property_type: string;
+}
+
+export interface PostcodeHeatmapPoint {
+  postcode: string;
+  avg_price: number;
+  count: number;
+  growth_pct: number | null;
+}
+
+export interface KPIData {
+  appreciation_rate: number | null;
+  price_per_bedroom: number | null;
+  market_velocity_pct: number | null;
+  market_velocity_direction: string | null;
+  price_volatility_pct: number | null;
+  total_sales: number;
+  total_properties: number;
+  median_price: number | null;
+}
+
+export interface InvestmentDeal {
+  property_id: number;
+  address: string;
+  postcode: string | null;
+  property_type: string | null;
+  bedrooms: number | null;
+  price: number;
+  date_sold: string | null;
+  postcode_avg: number;
+  value_score: number;
+  risk_level: string;
+}
+
+export interface HousingInsightsFilters {
+  property_type?: string;
+  min_bedrooms?: number;
+  max_bedrooms?: number;
+  min_bathrooms?: number;
+  max_bathrooms?: number;
+  min_price?: number;
+  max_price?: number;
+  postcode_prefix?: string;
+  tenure?: string;
+  epc_rating?: string;
+  has_garden?: boolean;
+  has_parking?: boolean;
+  chain_free?: boolean;
+  has_listing?: boolean;
+}
+
+export interface HousingInsightsResponse {
+  price_histogram: PriceHistogramBucket[];
+  time_series: InsightsTimeSeriesPoint[];
+  scatter_data: ScatterPoint[];
+  postcode_heatmap: PostcodeHeatmapPoint[];
+  kpis: KPIData;
+  investment_deals: InvestmentDeal[];
+  filters_applied: Record<string, unknown>;
+}
+
+// Transport Enrichment
+
+export interface TransportEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
+}
+
+// EPC Enrichment
+
+export interface EPCEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  certificates_found: number;
+}
+
+// Geo / Map
+
+export interface PropertyGeoPoint {
+  id: number;
+  address: string;
+  postcode: string | null;
+  latitude: number;
+  longitude: number;
+  latest_price: number | null;
+  property_type: string | null;
+  bedrooms: number | null;
+  epc_rating: string | null;
+  flood_risk_level: string | null;
+}
+
+// Flood Risk
+
+export interface FloodWarning {
+  severity: string;
+  message: string;
+  area: string;
+}
+
+export interface FloodRiskResponse {
+  postcode: string;
+  risk_level: string;
+  flood_zone: number | null;
+  active_warnings: FloodWarning[];
+  description: string;
+}
+
+// Growth & Forecasting
+
+export interface AnnualMedian {
+  year: number;
+  median_price: number;
+  sale_count: number;
+}
+
+export interface GrowthPeriodMetric {
+  period_years: number;
+  cagr_pct: number | null;
+  start_price: number | null;
+  end_price: number | null;
+}
+
+export interface GrowthForecastPoint {
+  year: number;
+  predicted_price: number;
+  lower_bound: number;
+  upper_bound: number;
+}
+
+export interface PostcodeGrowthResponse {
+  postcode: string;
+  metrics: GrowthPeriodMetric[];
+  volatility_pct: number | null;
+  max_drawdown_pct: number | null;
+  forecast: GrowthForecastPoint[];
+  annual_medians: AnnualMedian[];
+  data_years: number;
+}
+
+export interface GrowthLeaderboardEntry {
+  postcode: string;
+  cagr_pct: number;
+  data_years: number;
+  latest_median: number | null;
+  sale_count: number;
+}
+
+// Planning Applications
+
+export interface PlanningApplicationOut {
+  reference: string;
+  description: string;
+  status: string;
+  decision_date: string | null;
+  application_type: string;
+  is_major: boolean;
+}
+
+export interface PlanningResponse {
+  postcode: string;
+  applications: PlanningApplicationOut[];
+  total_count: number;
+  major_count: number;
+  cached: boolean;
+}
+
+// Listing Status
+
+export interface PropertyListingResponse {
+  property_id: number;
+  listing_status: string | null;
+  listing_price: number | null;
+  listing_price_display: string | null;
+  listing_date: string | null;
+  listing_url: string | null;
+  listing_checked_at: string | null;
+  stale: boolean;
+}
+
+// Crime Data
+
+export interface CrimeMonthlyStat {
+  month: string;
+  total: number;
+}
+
+export interface CrimeSummaryResponse {
+  postcode: string;
+  categories: Record<string, number>;
+  monthly_trend: CrimeMonthlyStat[];
+  total_crimes: number;
+  months_covered: number;
+  cached: boolean;
+}
+
+// Modelling
+
+export interface FeatureInfo {
+  name: string;
+  category: string;
+  label: string;
+  dtype: string;
+}
+
+export interface TargetInfo {
+  name: string;
+  label: string;
+}
+
+export interface AvailableFeaturesResponse {
+  features: FeatureInfo[];
+  targets: TargetInfo[];
+  total_properties_with_sales: number;
+}
+
+export interface TrainRequest {
+  target: string;
+  features: string[];
+  model_type: string;
+  split_strategy: string;
+  split_params: Record<string, string | number>;
+  hyperparameters?: Record<string, unknown>;
+  log_transform?: boolean;
+}
+
+export interface ModelMetrics {
+  r_squared: number;
+  rmse: number;
+  mae: number;
+  mape: number;
+}
+
+export interface FeatureImportance {
+  feature: string;
+  importance: number;
+}
+
+export interface PredictionPoint {
+  actual: number;
+  predicted: number;
+  residual: number;
+  property_id: number;
+  address: string;
+}
+
+export interface TrainResponse {
+  model_id: string;
+  metrics: ModelMetrics;
+  feature_importances: FeatureImportance[];
+  predictions: PredictionPoint[];
+  train_size: number;
+  test_size: number;
+}
+
+export interface SinglePredictionResponse {
+  property_id: number;
+  address: string;
+  predicted_value: number;
+}
+
+export interface PostcodePredictionItem {
+  property_id: number;
+  address: string;
+  predicted_value: number;
+  last_sale_price: number | null;
+  difference: number | null;
+  difference_pct: number | null;
+}
+
+export interface PostcodePredictionResponse {
+  postcode: string;
+  count: number;
+  predictions: PostcodePredictionItem[];
+}
+
+// Bulk Enrichment
+
+export interface CoverageFeature {
+  name: string;
+  filled: number;
+  total: number;
+  note: string;
+}
+
+export interface CoverageResponse {
+  total_properties: number;
+  total_postcodes: number;
+  total_sales: number;
+  features: CoverageFeature[];
+}
+
+export interface BulkEnrichmentStatus {
+  running: boolean;
+  current_postcode: string | null;
+  current_type: string | null;
+  postcodes_done: number;
+  postcodes_total: number;
+  properties_enriched: number;
+  errors: number;
+  started_at: string | null;
+  finished_at: string | null;
+  log: string[];
+  types: string[];
+  delay: number;
+  error?: string;
+}
+
+// New enrichment responses
+
+export interface IMDEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
+}
+
+export interface BroadbandEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
+}
+
+export interface SchoolsEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
+}
+
+export interface HealthcareEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
+}
+
+export interface SupermarketsEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
 }

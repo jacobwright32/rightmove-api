@@ -10,7 +10,8 @@ interface Props {
 export default memo(function PriceHeatmap({ data }: Props) {
   if (!data.length) return null;
 
-  const prices = data.map((d) => d.avg_price ?? 0).filter((p) => p > 0);
+  const prices = data.map((d) => d.avg_price ?? 0).filter((p) => p > 0 && Number.isFinite(p));
+  if (!prices.length) return null;
   const min = Math.min(...prices);
   const max = Math.max(...prices);
 
