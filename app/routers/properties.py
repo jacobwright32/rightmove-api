@@ -45,7 +45,9 @@ def list_properties(
     if listing_only is True:
         query = query.filter(Property.listing_status == "for_sale")
     elif listing_only is False:
-        query = query.filter(Property.sales.any())
+        query = query.filter(
+            (Property.listing_status.is_(None)) | (Property.listing_status != "for_sale")
+        )
 
     query = query.order_by(Property.created_at.desc()).offset(skip)
     if limit > 0:

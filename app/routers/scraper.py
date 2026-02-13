@@ -78,16 +78,29 @@ def _normalise_price(price: str) -> str:
     return price
 
 
-def _is_postcode_fresh(db: Session, postcode: str) -> tuple[bool, int]:
+def _is_postcode_fresh(db: Session, postcode: str, mode: str = "house_prices") -> tuple[bool, int]:
     """Check if a postcode has fresh data within the configured freshness window.
+
+    Only considers properties relevant to the given mode:
+    - house_prices: properties with sale records (ignores for-sale listings)
+    - for_sale: properties with listing_status='for_sale'
 
     Returns (is_fresh, property_count).
     """
     from datetime import datetime, timedelta, timezone
 
     clean = postcode.upper().replace("-", " ").strip()
-    # Match by postcode prefix (e.g. "SW20 8ND" matches properties with postcode "SW20 8ND")
-    props = db.query(Property).filter(Property.postcode == clean).all()
+    query = db.query(Property).filter(Property.postcode == clean)
+
+    if mode == "for_sale":
+        query = query.filter(Property.listing_status == "for_sale")
+    else:
+        # House prices mode: only consider properties that have sales
+        query = query.filter(
+            (Property.listing_status.is_(None)) | (Property.listing_status != "for_sale")
+        )
+
+    props = query.all()
     if not props:
         return False, 0
 
@@ -229,7 +242,7 @@ def scrape_postcode(
 
     # Check if we should skip this postcode
     if skip_existing and not force:
-        is_fresh, prop_count = _is_postcode_fresh(db, postcode)
+        is_fresh, prop_count = _is_postcode_fresh(db, postcode, mode)
         if is_fresh:
             logger.info("Skipping %s: already has %d properties (fresh data)", postcode, prop_count)
             return ScrapeResponse(
@@ -357,7 +370,7 @@ def scrape_area(
     for i, pc in enumerate(postcodes):
         # Check freshness before scraping
         if skip_existing and not force:
-            is_fresh, prop_count = _is_postcode_fresh(db, pc)
+            is_fresh, prop_count = _is_postcode_fresh(db, pc, mode)
             if is_fresh:
                 logger.info("Area scrape: [%d/%d] skipping %s (%d properties, fresh data)", i + 1, len(postcodes), pc, prop_count)
                 skipped_postcodes.append(pc)
