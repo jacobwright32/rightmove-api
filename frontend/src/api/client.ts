@@ -8,6 +8,7 @@ import type {
   CrimeSummaryResponse,
   EPCEnrichmentResponse,
   FloodRiskResponse,
+  GreenSpacesEnrichmentResponse,
   GrowthLeaderboardEntry,
   HealthcareEnrichmentResponse,
   IMDEnrichmentResponse,
@@ -279,6 +280,15 @@ export async function enrichSupermarkets(
 ): Promise<SupermarketsEnrichmentResponse> {
   const res = await api.post<SupermarketsEnrichmentResponse>(
     `/enrich/supermarkets/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichGreenSpaces(
+  postcode: string
+): Promise<GreenSpacesEnrichmentResponse> {
+  const res = await api.post<GreenSpacesEnrichmentResponse>(
+    `/enrich/green-spaces/${encodeURIComponent(postcode)}`
   );
   return res.data;
 }

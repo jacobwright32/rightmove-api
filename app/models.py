@@ -28,7 +28,6 @@ class Property(Base):
     extra_features = Column(Text)  # JSON array of feature strings
     floorplan_urls = Column(Text)  # JSON array of floorplan image URLs
     url = Column(String)
-    address_key = Column(String, nullable=True, index=True)  # Normalized key for cross-source dedup
     # EPC data (populated via /enrich/epc endpoint)
     epc_rating = Column(String, nullable=True)  # A-G
     epc_score = Column(Integer, nullable=True)  # 1-100
@@ -96,6 +95,12 @@ class Property(Base):
     dist_nearest_premium_supermarket_km = Column(Float, nullable=True)  # Waitrose/M&S
     dist_nearest_budget_supermarket_km = Column(Float, nullable=True)  # Aldi/Lidl
     supermarkets_within_2km = Column(Integer, nullable=True)
+    # Green Spaces (OS Open Greenspace) — populated via /enrich/green-spaces endpoint
+    dist_nearest_park_km = Column(Float, nullable=True)
+    nearest_park_name = Column(String, nullable=True)
+    dist_nearest_green_space_km = Column(Float, nullable=True)
+    nearest_green_space_name = Column(String, nullable=True)
+    green_spaces_within_1km = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,
@@ -106,6 +111,8 @@ class Property(Base):
     __table_args__ = (
         Index("ix_property_postcode_created", "postcode", "created_at"),
         Index("ix_property_type_bedrooms", "property_type", "bedrooms"),
+        Index("ix_property_listing_status", "listing_status"),
+        Index("ix_property_lat_lng", "latitude", "longitude"),
     )
 
     sales = relationship("Sale", back_populates="property", cascade="all, delete-orphan")
@@ -120,7 +127,6 @@ class Sale(Base):
     price = Column(String)
     price_numeric = Column(Integer, nullable=True, index=True)
     date_sold_iso = Column(String, nullable=True, index=True)
-    land_registry_tx_id = Column(String, nullable=True, index=True)  # Land Registry transaction GUID
     price_change_pct = Column(String)
     property_type = Column(String)
     tenure = Column(String)
@@ -132,6 +138,8 @@ class Sale(Base):
         Index("ix_sale_property_date", "property_id", "date_sold_iso"),
         Index("ix_sale_property_price", "property_id", "price_numeric"),
         Index("ix_sale_date_price", "date_sold_iso", "price_numeric"),
+        Index("ix_sale_property_type", "property_type"),
+        Index("ix_sale_tenure", "tenure"),
     )
 
 

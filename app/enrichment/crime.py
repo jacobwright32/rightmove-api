@@ -9,12 +9,14 @@ uses time-matched crime features — trailing 12-month window from sale date.
 """
 
 import logging
+import re
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import httpx
+from dateutil.relativedelta import relativedelta
 from sqlalchemy.orm import Session
 
 from ..models import CrimeStats
@@ -29,36 +31,67 @@ CRIME_CACHE_DAYS = 30
 
 # Fetch 5 years of history (Police API data available from Dec 2010)
 CRIME_FETCH_MONTHS = 60
-CRIME_API_DELAY = 0.125  # seconds between API calls (within 15 req/s limit)
+
+# Delay between API calls — Police API allows 15 req/s, we stay at ~5 req/s
+# to leave headroom and avoid 429s
+CRIME_API_DELAY = 0.2
+
+# Max retries per month when Police API returns 503 or network error
+_MAX_RETRIES = 3
+_RETRY_BACKOFF = 2.0  # seconds — doubled each retry
+
+# Regex for valid YYYY-MM format
+_MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
 
 
-def fetch_crimes(lat: float, lng: float, date: Optional[str] = None) -> list:
-    """Fetch street-level crimes from Police API.
+def fetch_crimes(lat: float, lng: float, date: Optional[str] = None) -> Optional[list]:
+    """Fetch street-level crimes from Police API with retry + backoff.
 
     Args:
         lat: Latitude
         lng: Longitude
         date: Optional YYYY-MM string (defaults to latest available month)
 
-    Returns list of crime dicts with 'category' and 'month' keys.
+    Returns list of crime dicts, or None on API/network failure (distinct
+    from empty list which means zero crimes for that month).
     """
     params = {"lat": str(lat), "lng": str(lng)}
     if date:
         params["date"] = date
 
-    try:
-        resp = httpx.get(POLICE_API_URL, params=params, timeout=15)
-        if resp.status_code == 503:
-            logger.warning("Police API returned 503 — data may not be available for %s", date)
-            return []
-        resp.raise_for_status()
-        return resp.json()
-    except httpx.HTTPStatusError as e:
-        logger.warning("Police API error: %s", e.response.status_code)
-        return []
-    except httpx.RequestError as e:
-        logger.warning("Police API request failed: %s", e)
-        return []
+    backoff = _RETRY_BACKOFF
+    for attempt in range(_MAX_RETRIES):
+        try:
+            resp = httpx.get(POLICE_API_URL, params=params, timeout=15)
+            if resp.status_code == 503:
+                # Data not yet available for this month — not a transient error
+                logger.debug("Police API 503 for %s (data not available)", date)
+                return []
+            if resp.status_code == 429:
+                logger.warning("Police API rate-limited (429), backing off %.1fs", backoff)
+                time.sleep(backoff)
+                backoff *= 2
+                continue
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("Police API HTTP %s for %s (attempt %d/%d)",
+                           e.response.status_code, date, attempt + 1, _MAX_RETRIES)
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(backoff)
+                backoff *= 2
+                continue
+            return None
+        except httpx.RequestError as e:
+            logger.warning("Police API request failed for %s: %s (attempt %d/%d)",
+                           date, e, attempt + 1, _MAX_RETRIES)
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(backoff)
+                backoff *= 2
+                continue
+            return None
+
+    return None
 
 
 def get_crime_summary(
@@ -100,30 +133,60 @@ def get_crime_summary(
 
     lat, lng = coords
 
-    # Fetch last 5 years of monthly data
+    # Fetch last 5 years of monthly data using proper month arithmetic
     all_crimes = []
     now = datetime.now(timezone.utc)
-    # Police API data lags ~2 months, fetch from month -2 to -(CRIME_FETCH_MONTHS+2)
+    api_failures = 0
+
+    # Police API data lags ~2 months, fetch from month -2 to -(CRIME_FETCH_MONTHS+1)
     for months_ago in range(2, CRIME_FETCH_MONTHS + 2):
-        dt = now - timedelta(days=30 * months_ago)
+        dt = now - relativedelta(months=months_ago)
         date_str = dt.strftime("%Y-%m")
         crimes = fetch_crimes(lat, lng, date_str)
-        if crimes:
+        if crimes is None:
+            # API/network failure — don't count as "zero crimes"
+            api_failures += 1
+        elif crimes:
             all_crimes.extend(crimes)
         time.sleep(CRIME_API_DELAY)
+
+    # If >50% of months had API failures, don't cache — data is unreliable
+    if api_failures > CRIME_FETCH_MONTHS * 0.5:
+        logger.warning(
+            "Crime fetch for %s: %d/%d months had API failures, not caching",
+            clean, api_failures, CRIME_FETCH_MONTHS,
+        )
+        if not all_crimes:
+            return _empty_summary()
+        # Return what we have without caching
+        return _build_summary_from_crimes(all_crimes, cached=False)
 
     if not all_crimes:
         return _empty_summary()
 
-    # Aggregate by category and month
+    # Aggregate by category and month, filtering out invalid data
     aggregated: dict[tuple[str, str], int] = defaultdict(int)
+    skipped = 0
     for crime in all_crimes:
-        cat = crime.get("category", "other")
-        month = crime.get("month", "unknown")
+        cat = crime.get("category", "")
+        month = crime.get("month", "")
+        if not cat or not _MONTH_RE.match(month):
+            skipped += 1
+            continue
         aggregated[(cat, month)] += 1
 
-    # Clear old cache for this postcode and insert new
+    if skipped:
+        logger.debug("Crime aggregation for %s: skipped %d records with missing category/month", clean, skipped)
+
+    if not aggregated:
+        return _empty_summary()
+
+    # Atomic cache update: delete + insert in same transaction
+    # flush() ensures the delete is sent before inserts, but both
+    # are committed together — no window where data is missing
     db.query(CrimeStats).filter(CrimeStats.postcode == clean).delete()
+    db.flush()
+
     now_ts = datetime.now(timezone.utc)
     for (cat, month), count in aggregated.items():
         db.add(CrimeStats(
@@ -137,6 +200,35 @@ def get_crime_summary(
 
     all_stats = db.query(CrimeStats).filter(CrimeStats.postcode == clean).all()
     return _build_summary(all_stats, cached=False)
+
+
+def _build_summary_from_crimes(crimes: list, cached: bool) -> dict:
+    """Build summary directly from raw crime API records (no DB caching)."""
+    categories: dict[str, int] = defaultdict(int)
+    monthly: dict[str, int] = defaultdict(int)
+
+    for crime in crimes:
+        cat = crime.get("category", "")
+        month = crime.get("month", "")
+        if not cat or not _MONTH_RE.match(month):
+            continue
+        categories[cat] += 1
+        monthly[month] += 1
+
+    sorted_cats = dict(sorted(categories.items(), key=lambda x: -x[1]))
+    sorted_months = [
+        {"month": m, "total": monthly[m]}
+        for m in sorted(monthly.keys())
+    ]
+
+    total = sum(categories.values())
+    return {
+        "categories": sorted_cats,
+        "monthly_trend": sorted_months,
+        "total_crimes": total,
+        "months_covered": len(sorted_months),
+        "cached": cached,
+    }
 
 
 def _build_summary(stats: list, cached: bool) -> dict:

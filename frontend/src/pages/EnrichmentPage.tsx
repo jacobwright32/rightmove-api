@@ -19,6 +19,7 @@ const ENRICHMENT_TYPES = [
   { id: "schools", label: "Schools" },
   { id: "healthcare", label: "Healthcare" },
   { id: "supermarkets", label: "Supermarkets" },
+  { id: "green_spaces", label: "Green Spaces" },
 ];
 
 export default function EnrichmentPage() {

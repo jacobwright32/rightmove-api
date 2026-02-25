@@ -32,6 +32,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   "bicycle-theft": "Bicycle theft",
   burglary: "Burglary",
   "criminal-damage-arson": "Criminal damage & arson",
+  "criminal-damage-and-arson": "Criminal damage & arson",
   drugs: "Drugs",
   "other-crime": "Other crime",
   "other-theft": "Other theft",
@@ -42,6 +43,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   "theft-from-the-person": "Theft from person",
   "vehicle-crime": "Vehicle crime",
   "violent-crime": "Violence & sexual offences",
+  "violence-and-sexual-offences": "Violence & sexual offences",
 };
 
 function formatCategory(cat: string): string {
@@ -88,14 +90,27 @@ export default function CrimeSection({ postcode }: Props) {
     );
   }
 
-  if (error || !data || data.total_crimes === 0) {
+  if (error) {
+    return (
+      <div className="rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
+          Crime Statistics
+        </h3>
+        <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
+      </div>
+    );
+  }
+
+  if (!data || data.total_crimes === 0) {
     return (
       <div className="rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
           Crime Statistics
         </h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          {error || "No crime data available for this area"}
+          {data && data.months_covered > 0
+            ? `No crimes recorded in this area over ${data.months_covered} months of data.`
+            : "No crime data available yet. The Police API may not cover this area, or data has not been fetched."}
         </p>
       </div>
     );

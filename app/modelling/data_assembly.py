@@ -31,6 +31,7 @@ _CATEGORICAL_FEATURES = {
     "nearest_primary_ofsted", "nearest_secondary_ofsted",
     "nearest_gp_name", "nearest_hospital_name",
     "nearest_supermarket_name", "nearest_supermarket_brand",
+    "nearest_park_name", "nearest_green_space_name",
 }
 
 # Numeric features from parsed extras
@@ -43,13 +44,21 @@ _NUMERIC_PARSED = {
 # categorical or numeric)
 _BOOLEAN_PARSED = set(_ALL_KEYS) - _CATEGORICAL_FEATURES - _NUMERIC_PARSED
 
-# Top crime categories to include as separate features
+# Crime categories from UK Police API — all categories included as ML features
 CRIME_CATEGORIES = [
     "anti-social-behaviour",
     "burglary",
-    "violence-and-sexual-offences",
     "criminal-damage-and-arson",
     "drugs",
+    "other-crime",
+    "other-theft",
+    "possession-of-weapons",
+    "public-order",
+    "robbery",
+    "shoplifting",
+    "theft-from-the-person",
+    "vehicle-crime",
+    "violence-and-sexual-offences",
 ]
 
 # Clean column names for crime features (replace hyphens)
@@ -130,6 +139,13 @@ def _build_registry() -> list[dict[str, str]]:
     registry.append({"name": "dist_nearest_premium_supermarket_km", "category": "Amenities", "label": "Dist. to Premium Supermarket (km)", "dtype": "numeric"})
     registry.append({"name": "dist_nearest_budget_supermarket_km", "category": "Amenities", "label": "Dist. to Budget Supermarket (km)", "dtype": "numeric"})
     registry.append({"name": "supermarkets_within_2km", "category": "Amenities", "label": "Supermarkets within 2km", "dtype": "numeric"})
+
+    # Green Spaces
+    registry.append({"name": "dist_nearest_park_km", "category": "Green Spaces", "label": "Dist. to Nearest Park (km)", "dtype": "numeric"})
+    registry.append({"name": "nearest_park_name", "category": "Green Spaces", "label": "Nearest Park", "dtype": "categorical"})
+    registry.append({"name": "dist_nearest_green_space_km", "category": "Green Spaces", "label": "Dist. to Nearest Green Space (km)", "dtype": "numeric"})
+    registry.append({"name": "nearest_green_space_name", "category": "Green Spaces", "label": "Nearest Green Space", "dtype": "categorical"})
+    registry.append({"name": "green_spaces_within_1km", "category": "Green Spaces", "label": "Green Spaces within 1km", "dtype": "numeric"})
 
     # Crime
     registry.append({"name": "total_crime", "category": "Crime", "label": "Total Crime Count", "dtype": "numeric"})
@@ -224,6 +240,7 @@ def _aggregate_crime_window(
     try:
         year, month = int(sale_month[:4]), int(sale_month[5:7])
     except (ValueError, IndexError):
+        logger.debug("Invalid sale_month '%s', skipping crime window aggregation", sale_month)
         return result
 
     months_to_check = []
@@ -467,6 +484,12 @@ def _build_record(
         "dist_nearest_premium_supermarket_km": prop.dist_nearest_premium_supermarket_km,
         "dist_nearest_budget_supermarket_km": prop.dist_nearest_budget_supermarket_km,
         "supermarkets_within_2km": prop.supermarkets_within_2km,
+        # Green Spaces
+        "dist_nearest_park_km": prop.dist_nearest_park_km,
+        "nearest_park_name": prop.nearest_park_name,
+        "dist_nearest_green_space_km": prop.dist_nearest_green_space_km,
+        "nearest_green_space_name": prop.nearest_green_space_name,
+        "green_spaces_within_1km": prop.green_spaces_within_1km,
         "sale_year": sale_year,
         "sale_month": sale_month,
         "sale_quarter": sale_quarter,

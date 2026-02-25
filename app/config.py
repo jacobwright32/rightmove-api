@@ -48,7 +48,7 @@ SCRAPER_REQUEST_TIMEOUT: int = int(os.getenv("SCRAPER_REQUEST_TIMEOUT", "30"))
 SCRAPER_RETRY_ATTEMPTS: int = int(os.getenv("SCRAPER_RETRY_ATTEMPTS", "3"))
 SCRAPER_RETRY_BACKOFF: float = float(os.getenv("SCRAPER_RETRY_BACKOFF", "1.0"))
 SCRAPER_DELAY_BETWEEN_REQUESTS: float = float(os.getenv("SCRAPER_DELAY_BETWEEN_REQUESTS", "0.25"))
-SCRAPER_FRESHNESS_DAYS: int = int(os.getenv("SCRAPER_FRESHNESS_DAYS", "7"))
+SCRAPER_FRESHNESS_DAYS: int = int(os.getenv("SCRAPER_FRESHNESS_DAYS", "30"))
 
 # EPC API (register free at https://epc.opendatacommunities.org/)
 EPC_API_EMAIL: str = _read_secret("epc_api_email")
@@ -92,3 +92,7 @@ HEALTHCARE_MAX_AGE_DAYS: int = int(os.getenv("HEALTHCARE_MAX_AGE_DAYS", "180"))
 # Supermarkets (Geolytix)
 SUPERMARKETS_CACHE_PATH: Path = DATA_DIR / "geolytix_supermarkets.parquet"
 SUPERMARKETS_MAX_AGE_DAYS: int = int(os.getenv("SUPERMARKETS_MAX_AGE_DAYS", "180"))
+
+# Green Spaces (OS Open Greenspace)
+GREENSPACE_CACHE_PATH: Path = DATA_DIR / "os_greenspace.parquet"
+GREENSPACE_MAX_AGE_DAYS: int = int(os.getenv("GREENSPACE_MAX_AGE_DAYS", "180"))

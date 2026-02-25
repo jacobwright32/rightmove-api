@@ -80,6 +80,12 @@ export interface PropertyBrief {
   dist_nearest_premium_supermarket_km: number | null;
   dist_nearest_budget_supermarket_km: number | null;
   supermarkets_within_2km: number | null;
+  // Green Spaces
+  dist_nearest_park_km: number | null;
+  nearest_park_name: string | null;
+  dist_nearest_green_space_km: number | null;
+  nearest_green_space_name: string | null;
+  green_spaces_within_1km: number | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -562,6 +568,12 @@ export interface HealthcareEnrichmentResponse {
 }
 
 export interface SupermarketsEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
+}
+
+export interface GreenSpacesEnrichmentResponse {
   message: string;
   properties_updated: number;
   properties_skipped: number;

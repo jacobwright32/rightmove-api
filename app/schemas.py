@@ -89,6 +89,12 @@ class PropertyBrief(BaseModel):
     dist_nearest_premium_supermarket_km: Optional[float] = None
     dist_nearest_budget_supermarket_km: Optional[float] = None
     supermarkets_within_2km: Optional[int] = None
+    # Green Spaces
+    dist_nearest_park_km: Optional[float] = None
+    nearest_park_name: Optional[str] = None
+    dist_nearest_green_space_km: Optional[float] = None
+    nearest_green_space_name: Optional[str] = None
+    green_spaces_within_1km: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -571,6 +577,12 @@ class HealthcareEnrichmentResponse(BaseModel):
 
 
 class SupermarketsEnrichmentResponse(BaseModel):
+    message: str
+    properties_updated: int
+    properties_skipped: int
+
+
+class GreenSpacesEnrichmentResponse(BaseModel):
     message: str
     properties_updated: int
     properties_skipped: int
