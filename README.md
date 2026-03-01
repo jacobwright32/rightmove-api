@@ -140,8 +140,8 @@ Make sure you have installed:
 ### Step 2 &mdash; Clone and install dependencies
 
 ```bash
-git clone https://github.com/jacobwright32/uk-house-prices.git
-cd uk-house-prices
+git clone https://github.com/jacobwright32/rightmove-api.git
+cd rightmove-api
 
 # Create a virtual environment (recommended)
 python -m venv venv
@@ -297,8 +297,8 @@ http://localhost:8000.
 ### Quick-start summary
 
 ```bash
-git clone https://github.com/jacobwright32/uk-house-prices.git
-cd uk-house-prices
+git clone https://github.com/jacobwright32/rightmove-api.git
+cd rightmove-api
 python -m venv venv && source venv/bin/activate  # or venv\Scripts\activate on Windows
 pip install -r requirements.txt
 cp .env.example .env
@@ -709,7 +709,7 @@ python-dotenv). All values have sensible defaults.
 ## Project Structure
 
 ```
-uk-house-prices/
+rightmove-api/
 ├── app/
 │   ├── main.py              # FastAPI application, middleware, SPA fallback, router mounting
 │   ├── config.py            # Environment-based configuration
