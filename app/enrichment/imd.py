@@ -14,29 +14,11 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from .. import config
+from ..constants import IMD_DECILE_COLUMNS, IMD_TIMEOUT, IMD_URL
 from ..models import Property
 from .ons_postcode import postcode_to_lsoa
 
 logger = logging.getLogger(__name__)
-
-# IMD 2019 CSV URL (gov.uk — File 7: all domains)
-_IMD_URL = (
-    "https://assets.publishing.service.gov.uk/media/"
-    "5dc407b440f0b6379a7acc8d/File_7_-_All_IoD2019_Scores__Ranks"
-    "__Deciles_and_Population_Denominators_3.csv"
-)
-
-# Column mapping: CSV column name → our field name
-_DECILE_COLS = {
-    "Index of Multiple Deprivation (IMD) Decile": "imd_decile",
-    "Income Decile": "imd_income_decile",
-    "Employment Decile": "imd_employment_decile",
-    "Education, Skills and Training Decile": "imd_education_decile",
-    "Health Deprivation and Disability Decile": "imd_health_decile",
-    "Crime Decile": "imd_crime_decile",
-    "Barriers to Housing and Services Decile": "imd_housing_decile",
-    "Living Environment Decile": "imd_environment_decile",
-}
 
 _lsoa_to_deciles: Optional[dict[str, dict[str, int]]] = None
 _initialized = False
@@ -71,7 +53,7 @@ def _ensure_data() -> bool:
         import httpx
 
         logger.info("Downloading IMD 2019 data (~5MB)...")
-        resp = httpx.get(_IMD_URL, timeout=120, follow_redirects=True)
+        resp = httpx.get(IMD_URL, timeout=IMD_TIMEOUT, follow_redirects=True)
         resp.raise_for_status()
 
         from io import StringIO
@@ -92,7 +74,7 @@ def _ensure_data() -> bool:
         # Select LSOA + decile columns
         select_cols = [lsoa_col]
         rename = {lsoa_col: "lsoa"}
-        for csv_col, our_col in _DECILE_COLS.items():
+        for csv_col, our_col in IMD_DECILE_COLUMNS.items():
             # Find matching column (may have extra whitespace)
             matched = None
             for col in df.columns:
@@ -114,7 +96,7 @@ def _ensure_data() -> bool:
         df["lsoa"] = df["lsoa"].astype(str).str.strip()
 
         # Convert deciles to int
-        for col in _DECILE_COLS.values():
+        for col in IMD_DECILE_COLUMNS.values():
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -142,7 +124,7 @@ def _load_dict(df):
         if not lsoa:
             continue
         deciles = {}
-        for col in _DECILE_COLS.values():
+        for col in IMD_DECILE_COLUMNS.values():
             val = row.get(col)
             if pd.notna(val):
                 deciles[col] = int(val)

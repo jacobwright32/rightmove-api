@@ -21,20 +21,11 @@ from scipy.spatial import cKDTree
 from sqlalchemy.orm import Session
 
 from .. import config
+from ..constants import GP_RADIUS_KM, GP_URL, HEALTHCARE_TIMEOUT, HOSPITAL_URL
 from ..models import Property
 from .ons_postcode import batch_postcode_to_coords
 
 logger = logging.getLogger(__name__)
-
-# NHS GP practice list (epraccur — ODS Data Search and Export API)
-_GP_URL = (
-    "https://www.odsdatasearchandexport.nhs.uk/api/getReport?report=epraccur"
-)
-
-# NHS hospitals — England trust sites (ets — ODS DSE API)
-_HOSPITAL_URL = (
-    "https://www.odsdatasearchandexport.nhs.uk/api/getReport?report=ets"
-)
 
 # Earth radius in km
 _R = 6371.0
@@ -125,7 +116,7 @@ def _download_gp_practices(httpx, zipfile, pd) -> list:
     """Download and parse NHS GP practice list."""
     records = []
     try:
-        resp = httpx.get(_GP_URL, timeout=120, follow_redirects=True)
+        resp = httpx.get(GP_URL, timeout=HEALTHCARE_TIMEOUT, follow_redirects=True)
         resp.raise_for_status()
 
         # New ODS DSE API returns direct CSV (not ZIP)
@@ -153,7 +144,7 @@ def _download_hospitals(httpx, zipfile, pd) -> list:
     """Download and parse NHS hospital list."""
     records = []
     try:
-        resp = httpx.get(_HOSPITAL_URL, timeout=120, follow_redirects=True)
+        resp = httpx.get(HOSPITAL_URL, timeout=HEALTHCARE_TIMEOUT, follow_redirects=True)
         resp.raise_for_status()
 
         # New ODS DSE API returns direct CSV (not ZIP)
@@ -229,7 +220,7 @@ def compute_healthcare_distances(lat: float, lon: float) -> Optional[dict]:
 
     gp_dist, gp_name = _query_nearest(_gp_tree, _gp_data, lat, lon)
     hosp_dist, hosp_name = _query_nearest(_hospital_tree, _hospital_data, lat, lon)
-    gp_count = _count_within(_gp_tree, lat, lon, 2.0)
+    gp_count = _count_within(_gp_tree, lat, lon, GP_RADIUS_KM)
 
     return {
         "dist_nearest_gp_km": round(gp_dist, 2) if gp_dist is not None else None,

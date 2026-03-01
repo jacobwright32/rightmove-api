@@ -12,14 +12,9 @@ from io import BytesIO
 from typing import Optional
 
 from .. import config
+from ..constants import NSPL_URL, ONS_TIMEOUT
 
 logger = logging.getLogger(__name__)
-
-# ONS NSPL download URL (Nov 2025 release — full NSPL with lat/long)
-_NSPL_URL = (
-    "https://www.arcgis.com/sharing/rest/content/items/"
-    "8a1d5b58df824b2e86fe07ddfdd87165/data"
-)
 
 _pc_to_lsoa: Optional[dict[str, str]] = None
 _pc_to_coords: Optional[dict[str, tuple[float, float]]] = None
@@ -62,7 +57,7 @@ def _ensure_data() -> bool:
         import httpx
 
         logger.info("Downloading ONS NSPL data (~120MB)...")
-        resp = httpx.get(_NSPL_URL, timeout=300, follow_redirects=True)
+        resp = httpx.get(NSPL_URL, timeout=ONS_TIMEOUT, follow_redirects=True)
         resp.raise_for_status()
 
         # The download is a ZIP; find the main combined CSV

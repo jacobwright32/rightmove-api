@@ -1,18 +1,16 @@
-import re
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from ..constants import OUTCODE_RE
 from ..database import get_db
 from ..enrichment.geocoding import batch_geocode_postcodes
 from ..export import SALES_DATA_DIR, save_property_parquet
 from ..models import Property, Sale
 from ..schemas import ExportResponse, PostcodeStatus, PostcodeSummary, PropertyDetail, PropertyGeoPoint
 from ..scraper.scraper import scrape_postcode_from_listing
-
-_OUTCODE_RE = re.compile(r"^([A-Z]{1,2}\d[A-Z\d]?)\s", re.IGNORECASE)
 
 router = APIRouter(tags=["properties"])
 
@@ -187,7 +185,7 @@ def get_similar_properties(
             status_code=404,
             detail="Target property has no postcode",
         )
-    outcode_match = _OUTCODE_RE.match(target.postcode.strip())
+    outcode_match = OUTCODE_RE.match(target.postcode.strip())
     if not outcode_match:
         raise HTTPException(
             status_code=404,

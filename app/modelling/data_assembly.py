@@ -12,7 +12,8 @@ import pandas as pd
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..feature_parser import _ALL_KEYS, parse_all_features
+from ..constants import FEATURE_PARSER_KEYS
+from ..feature_parser import parse_all_features
 from ..models import CrimeStats, Property, Sale
 
 logger = logging.getLogger(__name__)
@@ -40,9 +41,9 @@ _NUMERIC_PARSED = {
     "ground_rent", "distance_to_station",
 }
 
-# Boolean features from parsed extras (everything in _ALL_KEYS that isn't
+# Boolean features from parsed extras (everything in FEATURE_PARSER_KEYS that isn't
 # categorical or numeric)
-_BOOLEAN_PARSED = set(_ALL_KEYS) - _CATEGORICAL_FEATURES - _NUMERIC_PARSED
+_BOOLEAN_PARSED = set(FEATURE_PARSER_KEYS) - _CATEGORICAL_FEATURES - _NUMERIC_PARSED
 
 # Crime categories from UK Police API — all categories included as ML features
 CRIME_CATEGORIES = [
@@ -154,7 +155,7 @@ def _build_registry() -> list[dict[str, str]]:
         registry.append({"name": col, "category": "Crime", "label": label, "dtype": "numeric"})
 
     # Parsed features
-    for key in _ALL_KEYS:
+    for key in FEATURE_PARSER_KEYS:
         # Skip features already added above
         if key in ("epc_rating",):
             continue
@@ -498,7 +499,7 @@ def _build_record(
 
     # Parsed extra features
     parsed = parse_all_features(prop.extra_features)
-    for key in _ALL_KEYS:
+    for key in FEATURE_PARSER_KEYS:
         record[key] = parsed.get(key)
 
     # Crime data — time-matched trailing 12-month window from sale date

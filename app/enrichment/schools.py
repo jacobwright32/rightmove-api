@@ -26,16 +26,17 @@ from scipy.spatial import cKDTree
 from sqlalchemy.orm import Session
 
 from .. import config
+from ..constants import (
+    GIAS_BASE_URL,
+    GIAS_RETRY_DAYS,
+    SCHOOL_PRIMARY_RADIUS_KM,
+    SCHOOL_SECONDARY_RADIUS_KM,
+    SCHOOLS_TIMEOUT,
+)
 from ..models import Property
 from .coord_convert import bng_to_wgs84
 
 logger = logging.getLogger(__name__)
-
-# GIAS CSV download URL — try today's date, fall back up to 7 days
-_GIAS_BASE_URL = (
-    "https://ea-edubase-api-prod.azurewebsites.net/edubase/downloads/public/"
-    "edubasealldata{date}.csv"
-)
 
 # Earth radius in km (for cKDTree conversion)
 _R = 6371.0
@@ -98,11 +99,11 @@ def _init_trees() -> bool:
         import httpx
 
         df = None
-        for days_back in range(8):
+        for days_back in range(GIAS_RETRY_DAYS):
             date_str = (datetime.now() - timedelta(days=days_back)).strftime("%Y%m%d")
-            url = _GIAS_BASE_URL.format(date=date_str)
+            url = GIAS_BASE_URL.format(date=date_str)
             try:
-                resp = httpx.get(url, timeout=120, follow_redirects=True)
+                resp = httpx.get(url, timeout=SCHOOLS_TIMEOUT, follow_redirects=True)
                 if resp.status_code == 200:
                     from io import StringIO
                     df = pd.read_csv(StringIO(resp.text), encoding="latin-1", low_memory=False)
@@ -301,8 +302,8 @@ def compute_school_distances(lat: float, lon: float) -> Optional[dict]:
     )
 
     # Counts
-    pri_count = _count_within(_primary_tree, lat, lon, 2.0)
-    sec_count = _count_within(_secondary_tree, lat, lon, 3.0)
+    pri_count = _count_within(_primary_tree, lat, lon, SCHOOL_PRIMARY_RADIUS_KM)
+    sec_count = _count_within(_secondary_tree, lat, lon, SCHOOL_SECONDARY_RADIUS_KM)
 
     return {
         "dist_nearest_primary_km": round(pri_dist, 2) if pri_dist is not None else None,

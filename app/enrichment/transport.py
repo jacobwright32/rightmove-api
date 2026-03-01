@@ -15,15 +15,16 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from ..config import NAPTAN_CACHE_DIR, NAPTAN_CACHE_PATH, NAPTAN_MAX_AGE_DAYS
+from ..constants import (
+    BUS_STOP_RADIUS_M,
+    NAPTAN_CSV_URL,
+    NAPTAN_STOP_TYPE_BUS,
+    NAPTAN_STOP_TYPE_METRO,
+    NAPTAN_STOP_TYPE_RAIL,
+    NAPTAN_TIMEOUT,
+)
 
 logger = logging.getLogger(__name__)
-
-NAPTAN_CSV_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=csv"
-
-# ── NaPTAN StopType codes ────────────────────────────────────────
-STOP_TYPE_RAIL = "RSE"   # Rail Station Entrance
-STOP_TYPE_METRO = "TMU"  # Tram/Metro/Underground Entrance
-STOP_TYPE_BUS = "BCT"    # On-Street Bus Stop
 
 EARTH_RADIUS_KM = 6371.0
 
@@ -138,7 +139,7 @@ def _ensure_naptan_data():
     logger.info("Downloading NaPTAN data (~96MB)...")
     try:
         import httpx
-        resp = httpx.get(NAPTAN_CSV_URL, timeout=180, follow_redirects=True)
+        resp = httpx.get(NAPTAN_CSV_URL, timeout=NAPTAN_TIMEOUT, follow_redirects=True)
         resp.raise_for_status()
     except Exception as e:
         logger.error("Failed to download NaPTAN data: %s", e)
@@ -149,7 +150,7 @@ def _ensure_naptan_data():
     from io import BytesIO
     df = pd.read_csv(BytesIO(resp.content), encoding="latin-1", low_memory=False)
 
-    keep_types = {STOP_TYPE_RAIL, STOP_TYPE_METRO, STOP_TYPE_BUS}
+    keep_types = {NAPTAN_STOP_TYPE_RAIL, NAPTAN_STOP_TYPE_METRO, NAPTAN_STOP_TYPE_BUS}
     df = df[df["StopType"].isin(keep_types)].copy()
 
     cols = ["ATCOCode", "CommonName", "Latitude", "Longitude", "StopType"]
@@ -183,9 +184,9 @@ def _init_trees() -> bool:
         return False
 
     # Split by stop type (all TMU stops = "tube")
-    rail = naptan[naptan["StopType"] == STOP_TYPE_RAIL]
-    tube = naptan[naptan["StopType"] == STOP_TYPE_METRO]
-    bus = naptan[naptan["StopType"] == STOP_TYPE_BUS]
+    rail = naptan[naptan["StopType"] == NAPTAN_STOP_TYPE_RAIL]
+    tube = naptan[naptan["StopType"] == NAPTAN_STOP_TYPE_METRO]
+    bus = naptan[naptan["StopType"] == NAPTAN_STOP_TYPE_BUS]
 
     for key, subset in [("rail", rail), ("tube", tube), ("bus", bus)]:
         if subset.empty:
@@ -261,8 +262,8 @@ def compute_transport_distances(lat: float, lon: float) -> Optional[dict]:
         km = _haversine_km(lat, lon, float(coords[idx][0]), float(coords[idx][1]))
         result["dist_nearest_bus_km"] = round(km, 2)
 
-        # 500m in Cartesian units on unit sphere (approximate)
-        radius_cart = 500.0 / (EARTH_RADIUS_KM * 1000)
+        # Bus stop radius in Cartesian units on unit sphere (approximate)
+        radius_cart = BUS_STOP_RADIUS_M / (EARTH_RADIUS_KM * 1000)
         indices = tree.query_ball_point(point_cart, radius_cart)
         result["bus_stops_within_500m"] = len(indices)
     else:

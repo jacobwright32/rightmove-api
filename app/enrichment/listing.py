@@ -15,6 +15,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from ..config import LISTING_FRESHNESS_HOURS, SCRAPER_DELAY_BETWEEN_REQUESTS
+from ..constants import RIGHTMOVE_BASE_URL
 from ..models import Property
 from ..scraper.scraper import (
     _parse_turbo_stream,
@@ -23,8 +24,6 @@ from ..scraper.scraper import (
 )
 
 logger = logging.getLogger(__name__)
-
-SOURCE_BASE_URL = "https://www.rightmove.co.uk"
 
 
 # ------------------------------------------------------------------
@@ -80,7 +79,7 @@ def _extract_listing_from_detail_page(url: str) -> Optional[dict]:
         listing_date = pl_dict.get("advertisedFrom")
 
     # Build listing URL
-    listing_url = f"{SOURCE_BASE_URL}/properties/{listing_id}" if listing_id else None
+    listing_url = f"{RIGHTMOVE_BASE_URL}/properties/{listing_id}" if listing_id else None
 
     result = {
         "listing_status": listing_status,
@@ -232,7 +231,7 @@ def check_property_listing(db: Session, property_id: int) -> Optional[dict]:
     if stale and prop.url:
         url = prop.url
         if not url.startswith("http"):
-            url = SOURCE_BASE_URL + url
+            url = RIGHTMOVE_BASE_URL + url
 
         listing = _extract_listing_from_detail_page(url)
         _apply_listing_to_property(prop, listing)
@@ -308,7 +307,7 @@ def enrich_postcode_listings(db: Session, postcode: str) -> dict:
 
         url = prop.url
         if not url.startswith("http"):
-            url = SOURCE_BASE_URL + url
+            url = RIGHTMOVE_BASE_URL + url
 
         listing = _extract_listing_from_detail_page(url)
         _apply_listing_to_property(prop, listing)

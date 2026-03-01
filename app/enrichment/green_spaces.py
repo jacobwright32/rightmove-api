@@ -24,15 +24,10 @@ from scipy.spatial import cKDTree
 from sqlalchemy.orm import Session
 
 from .. import config
+from ..constants import GREEN_SPACE_RADIUS_KM, GREENSPACE_TIMEOUT, GREENSPACE_URL
 from ..models import Property
 
 logger = logging.getLogger(__name__)
-
-# OS Open Greenspace — free download (GeoPackage ZIP, ~55MB)
-_GREENSPACE_URL = (
-    "https://api.os.uk/downloads/v1/products/OpenGreenspace/downloads"
-    "?area=GB&format=GeoPackage&redirect"
-)
 
 # Earth radius in km
 _R = 6371.0
@@ -187,7 +182,7 @@ def _init_trees() -> bool:
         df = None
         try:
             logger.info("Downloading OS Open Greenspace data...")
-            resp = httpx.get(_GREENSPACE_URL, timeout=600, follow_redirects=True)
+            resp = httpx.get(GREENSPACE_URL, timeout=GREENSPACE_TIMEOUT, follow_redirects=True)
             resp.raise_for_status()
 
             # ZIP contains a .gpkg file
@@ -326,7 +321,7 @@ def compute_green_space_distances(lat: float, lon: float) -> Optional[dict]:
 
     all_dist, all_name = _query_nearest(_all_tree, _all_data, lat, lon)
     park_dist, park_name = _query_nearest(_park_tree, _park_data, lat, lon)
-    count = _count_within(_all_tree, lat, lon, 1.0)
+    count = _count_within(_all_tree, lat, lon, GREEN_SPACE_RADIUS_KM)
 
     return {
         "dist_nearest_park_km": round(park_dist, 2) if park_dist is not None else None,

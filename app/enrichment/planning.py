@@ -5,32 +5,26 @@ No authentication required. Geocodes postcodes via Postcodes.io.
 """
 
 import logging
-import re
 from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
 from sqlalchemy.orm import Session
 
+from ..constants import (
+    PLANNING_API_URL,
+    PLANNING_CACHE_DAYS,
+    PLANNING_DEFAULT_LIMIT,
+    PLANNING_DWELLING_RE,
+    PLANNING_DWELLING_THRESHOLD,
+    PLANNING_MAJOR_KEYWORDS,
+    PLANNING_MAX_LIMIT,
+    PLANNING_TIMEOUT,
+)
 from ..models import PlanningApplication
 from .geocoding import geocode_postcode
 
 logger = logging.getLogger(__name__)
-
-PLANNING_API_URL = "https://www.planning.data.gov.uk/entity.json"
-
-# Cache planning data for 30 days
-PLANNING_CACHE_DAYS = 30
-
-_DWELLING_RE = re.compile(r"(\d+)\s*(dwelling|flat|apartment|house|unit)")
-
-# Keywords that indicate major developments
-_MAJOR_KEYWORDS = [
-    "demolition", "new build", "erection of", "residential development",
-    "mixed use", "commercial", "industrial", "warehouse", "hotel",
-    "student accommodation", "care home", "school", "hospital",
-    "solar farm", "wind turbine", "infrastructure",
-]
 
 
 def _is_major_development(description: str) -> bool:
@@ -39,11 +33,11 @@ def _is_major_development(description: str) -> bool:
         return False
     lower = description.lower()
     # Check for dwelling counts (e.g. "10 dwellings", "15 flats")
-    dwelling_match = _DWELLING_RE.search(lower)
-    if dwelling_match and int(dwelling_match.group(1)) >= 10:
+    dwelling_match = PLANNING_DWELLING_RE.search(lower)
+    if dwelling_match and int(dwelling_match.group(1)) >= PLANNING_DWELLING_THRESHOLD:
         return True
     # Check keyword list
-    return any(kw in lower for kw in _MAJOR_KEYWORDS)
+    return any(kw in lower for kw in PLANNING_MAJOR_KEYWORDS)
 
 
 def _parse_status(entity: dict) -> str:
@@ -81,7 +75,7 @@ def _parse_application_type(reference: str) -> str:
 def fetch_planning_applications(
     lat: float,
     lng: float,
-    limit: int = 50,
+    limit: int = PLANNING_DEFAULT_LIMIT,
 ) -> list:
     """Fetch planning applications near coordinates from Planning Data API."""
     try:
@@ -91,9 +85,9 @@ def fetch_planning_applications(
                 "latitude": lat,
                 "longitude": lng,
                 "dataset": "planning-application",
-                "limit": min(limit, 500),
+                "limit": min(limit, PLANNING_MAX_LIMIT),
             },
-            timeout=15,
+            timeout=PLANNING_TIMEOUT,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -109,7 +103,7 @@ def fetch_planning_applications(
 def get_planning_data(
     db: Session,
     postcode: str,
-    limit: int = 50,
+    limit: int = PLANNING_DEFAULT_LIMIT,
 ) -> dict:
     """Get planning applications for a postcode.
 

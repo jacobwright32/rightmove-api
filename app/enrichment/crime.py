@@ -9,7 +9,6 @@ uses time-matched crime features — trailing 12-month window from sale date.
 """
 
 import logging
-import re
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -19,29 +18,21 @@ import httpx
 from dateutil.relativedelta import relativedelta
 from sqlalchemy.orm import Session
 
+from ..constants import (
+    CRIME_API_DELAY,
+    CRIME_CACHE_DAYS,
+    CRIME_FAILURE_THRESHOLD,
+    CRIME_FETCH_MONTHS,
+    CRIME_MAX_RETRIES,
+    CRIME_MONTH_RE,
+    CRIME_RETRY_BACKOFF,
+    CRIME_TIMEOUT,
+    POLICE_API_URL,
+)
 from ..models import CrimeStats
 from .geocoding import geocode_postcode  # noqa: F401 — re-exported for backwards compat
 
 logger = logging.getLogger(__name__)
-
-POLICE_API_URL = "https://data.police.uk/api/crimes-street/all-crime"
-
-# Cache crime data for 30 days
-CRIME_CACHE_DAYS = 30
-
-# Fetch 5 years of history (Police API data available from Dec 2010)
-CRIME_FETCH_MONTHS = 60
-
-# Delay between API calls — Police API allows 15 req/s, we stay at ~5 req/s
-# to leave headroom and avoid 429s
-CRIME_API_DELAY = 0.2
-
-# Max retries per month when Police API returns 503 or network error
-_MAX_RETRIES = 3
-_RETRY_BACKOFF = 2.0  # seconds — doubled each retry
-
-# Regex for valid YYYY-MM format
-_MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
 
 
 def fetch_crimes(lat: float, lng: float, date: Optional[str] = None) -> Optional[list]:
@@ -59,10 +50,10 @@ def fetch_crimes(lat: float, lng: float, date: Optional[str] = None) -> Optional
     if date:
         params["date"] = date
 
-    backoff = _RETRY_BACKOFF
-    for attempt in range(_MAX_RETRIES):
+    backoff = CRIME_RETRY_BACKOFF
+    for attempt in range(CRIME_MAX_RETRIES):
         try:
-            resp = httpx.get(POLICE_API_URL, params=params, timeout=15)
+            resp = httpx.get(POLICE_API_URL, params=params, timeout=CRIME_TIMEOUT)
             if resp.status_code == 503:
                 # Data not yet available for this month — not a transient error
                 logger.debug("Police API 503 for %s (data not available)", date)
@@ -76,16 +67,16 @@ def fetch_crimes(lat: float, lng: float, date: Optional[str] = None) -> Optional
             return resp.json()
         except httpx.HTTPStatusError as e:
             logger.warning("Police API HTTP %s for %s (attempt %d/%d)",
-                           e.response.status_code, date, attempt + 1, _MAX_RETRIES)
-            if attempt < _MAX_RETRIES - 1:
+                           e.response.status_code, date, attempt + 1, CRIME_MAX_RETRIES)
+            if attempt < CRIME_MAX_RETRIES - 1:
                 time.sleep(backoff)
                 backoff *= 2
                 continue
             return None
         except httpx.RequestError as e:
             logger.warning("Police API request failed for %s: %s (attempt %d/%d)",
-                           date, e, attempt + 1, _MAX_RETRIES)
-            if attempt < _MAX_RETRIES - 1:
+                           date, e, attempt + 1, CRIME_MAX_RETRIES)
+            if attempt < CRIME_MAX_RETRIES - 1:
                 time.sleep(backoff)
                 backoff *= 2
                 continue
@@ -151,7 +142,7 @@ def get_crime_summary(
         time.sleep(CRIME_API_DELAY)
 
     # If >50% of months had API failures, don't cache — data is unreliable
-    if api_failures > CRIME_FETCH_MONTHS * 0.5:
+    if api_failures > CRIME_FETCH_MONTHS * CRIME_FAILURE_THRESHOLD:
         logger.warning(
             "Crime fetch for %s: %d/%d months had API failures, not caching",
             clean, api_failures, CRIME_FETCH_MONTHS,
@@ -170,7 +161,7 @@ def get_crime_summary(
     for crime in all_crimes:
         cat = crime.get("category", "")
         month = crime.get("month", "")
-        if not cat or not _MONTH_RE.match(month):
+        if not cat or not CRIME_MONTH_RE.match(month):
             skipped += 1
             continue
         aggregated[(cat, month)] += 1
@@ -210,7 +201,7 @@ def _build_summary_from_crimes(crimes: list, cached: bool) -> dict:
     for crime in crimes:
         cat = crime.get("category", "")
         month = crime.get("month", "")
-        if not cat or not _MONTH_RE.match(month):
+        if not cat or not CRIME_MONTH_RE.match(month):
             continue
         categories[cat] += 1
         monthly[month] += 1

@@ -8,19 +8,17 @@ import logging
 
 import httpx
 
+from ..constants import (
+    EA_FLOOD_AREAS_URL,
+    EA_FLOOD_WARNINGS_URL,
+    FLOOD_AREAS_DIST_KM,
+    FLOOD_RISK_LEVELS,
+    FLOOD_TIMEOUT,
+    FLOOD_WARNINGS_DIST_KM,
+)
 from .geocoding import geocode_postcode
 
 logger = logging.getLogger(__name__)
-
-EA_FLOOD_AREAS_URL = "https://environment.data.gov.uk/flood-monitoring/id/floodAreas"
-EA_FLOOD_WARNINGS_URL = "https://environment.data.gov.uk/flood-monitoring/id/floods"
-
-# Risk level mapping based on flood zone proximity
-RISK_LEVELS = {
-    1: "very_low",
-    2: "low",
-    3: "medium",
-}
 
 
 def get_flood_risk(postcode: str) -> dict:
@@ -65,8 +63,8 @@ def _fetch_active_warnings(lat: float, lng: float) -> list:
     try:
         resp = httpx.get(
             EA_FLOOD_WARNINGS_URL,
-            params={"lat": str(lat), "long": str(lng), "dist": "5"},
-            timeout=10,
+            params={"lat": str(lat), "long": str(lng), "dist": FLOOD_WARNINGS_DIST_KM},
+            timeout=FLOOD_TIMEOUT,
         )
         if resp.status_code != 200:
             logger.warning("EA flood warnings API returned %d", resp.status_code)
@@ -96,8 +94,8 @@ def _assess_risk_from_areas(
     try:
         resp = httpx.get(
             EA_FLOOD_AREAS_URL,
-            params={"lat": str(lat), "long": str(lng), "dist": "1"},
-            timeout=10,
+            params={"lat": str(lat), "long": str(lng), "dist": FLOOD_AREAS_DIST_KM},
+            timeout=FLOOD_TIMEOUT,
         )
         if resp.status_code != 200:
             return ("unknown", None, "Could not determine flood risk")
@@ -123,7 +121,7 @@ def _assess_risk_from_areas(
         if highest_zone == 1 and items:
             highest_zone = 2
 
-        risk_level = RISK_LEVELS.get(highest_zone, "medium")
+        risk_level = FLOOD_RISK_LEVELS.get(highest_zone, "medium")
         descriptions = {
             1: "Low probability of flooding",
             2: "Medium probability of flooding (Flood Zone 2)",

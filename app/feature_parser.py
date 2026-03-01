@@ -4,19 +4,15 @@ import json
 import re
 from typing import Optional
 
-# ── word-to-number mapping ──────────────────────────────────────────────────
-_WORD_NUM = {
-    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
-    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
-}
+from .constants import FEATURE_PARSER_KEYS, WORD_TO_NUMBER
 
 _NUM_RE = re.compile(r"(\d+|one|two|three|four|five|six|seven|eight|nine|ten)", re.I)
 
 
 def _to_int(s: str) -> Optional[int]:
     low = s.lower()
-    if low in _WORD_NUM:
-        return _WORD_NUM[low]
+    if low in WORD_TO_NUMBER:
+        return WORD_TO_NUMBER[low]
     try:
         return int(s)
     except ValueError:
@@ -446,17 +442,6 @@ def parse_split_level(features: list[str]) -> Optional[bool]:
 
 # ── convenience: parse all fields at once ───────────────────────────────────
 
-_ALL_KEYS = [
-    "epc_rating", "council_tax_band", "chain_free", "parking", "garden",
-    "heating", "double_glazed", "lease_type", "lease_years", "receptions",
-    "furnished", "period_property", "utility_room", "conservatory", "ensuite",
-    "cloakroom", "floor_level", "sq_ft", "service_charge", "ground_rent",
-    "wooden_floors", "gym", "lift", "dining_room", "ev_charger", "fireplace",
-    "study", "shower_room", "fitted_wardrobes", "new_build", "concierge",
-    "swimming_pool", "air_conditioning", "solar_panels", "loft",
-    "entrance_hall", "white_goods", "bay_window", "distance_to_station",
-    "intercom", "split_level",
-]
 
 
 def parse_all_features(raw: Optional[str]) -> dict:
@@ -471,7 +456,7 @@ def parse_all_features(raw: Optional[str]) -> dict:
             pass
 
     if not features:
-        return {k: None for k in _ALL_KEYS}
+        return {k: None for k in FEATURE_PARSER_KEYS}
 
     lease_type, lease_years = parse_lease(features)
 

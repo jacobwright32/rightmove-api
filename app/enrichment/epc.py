@@ -12,21 +12,9 @@ from typing import Optional
 import httpx
 
 from ..config import EPC_API_EMAIL, EPC_API_KEY
+from ..constants import EPC_BASE_URL, EPC_RATING_COLORS, EPC_TIMEOUT
 
 logger = logging.getLogger(__name__)
-
-EPC_BASE_URL = "https://epc.opendatacommunities.org/api/v1/domestic/search"
-
-# Map EPC rating letters to display colors (for frontend reference)
-EPC_RATING_COLORS = {
-    "A": "#00C853",
-    "B": "#66BB6A",
-    "C": "#C6FF00",
-    "D": "#FFEB3B",
-    "E": "#FFB300",
-    "F": "#FF6D00",
-    "G": "#D50000",
-}
 
 
 def _get_auth_header() -> Optional[str]:
@@ -58,7 +46,7 @@ def fetch_epc_for_postcode(postcode: str) -> list[dict]:
             EPC_BASE_URL,
             params={"postcode": postcode, "size": 500},
             headers=headers,
-            timeout=15,
+            timeout=EPC_TIMEOUT,
         )
         resp.raise_for_status()
     except httpx.HTTPStatusError as e:

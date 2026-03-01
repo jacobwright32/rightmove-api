@@ -22,31 +22,17 @@ from scipy.spatial import cKDTree
 from sqlalchemy.orm import Session
 
 from .. import config
+from ..constants import (
+    BUDGET_BRANDS,
+    GEOLYTIX_URL,
+    PREMIUM_BRANDS,
+    SUPERMARKET_BRANDS,
+    SUPERMARKET_RADIUS_KM,
+    SUPERMARKETS_TIMEOUT,
+)
 from ..models import Property
 
 logger = logging.getLogger(__name__)
-
-# Geolytix Retail Points — open data supermarket locations (Google Drive ZIP)
-_GEOLYTIX_URL = (
-    "https://drive.usercontent.google.com/download"
-    "?id=1B8M7m86rQg2sx2TsHhFa2d-x-dZ1DbSy&export=download&confirm=t"
-)
-
-# Premium and budget brand classification
-_PREMIUM_BRANDS = {"waitrose", "m&s food", "m&s simply food", "marks & spencer"}
-_BUDGET_BRANDS = {"aldi", "lidl"}
-
-# Major supermarket brands to include (filter out non-grocery)
-_SUPERMARKET_BRANDS = {
-    "tesco", "tesco express", "tesco extra", "tesco metro",
-    "sainsburys", "sainsbury's", "sainsbury's local",
-    "asda", "morrisons",
-    "waitrose", "m&s food", "m&s simply food", "marks & spencer",
-    "aldi", "lidl",
-    "co-op", "cooperative", "the co-operative",
-    "iceland", "farmfoods",
-    "spar", "nisa", "costcutter", "budgens", "londis",
-}
 
 # Earth radius in km
 _R = 6371.0
@@ -107,7 +93,7 @@ def _init_trees() -> bool:
 
         df = None
         try:
-            resp = httpx.get(_GEOLYTIX_URL, timeout=300, follow_redirects=True)
+            resp = httpx.get(GEOLYTIX_URL, timeout=SUPERMARKETS_TIMEOUT, follow_redirects=True)
             resp.raise_for_status()
 
             # ZIP contains multiple CSVs — find the latest retailpoints CSV
@@ -177,7 +163,7 @@ def _init_trees() -> bool:
         # Filter to known supermarket brands
         df["brand_lower"] = df["brand"].str.lower()
         mask = df["brand_lower"].apply(
-            lambda b: any(known in b for known in _SUPERMARKET_BRANDS)
+            lambda b: any(known in b for known in SUPERMARKET_BRANDS)
         )
         df = df[mask].reset_index(drop=True)
         df = df.drop(columns=["brand_lower"])
@@ -221,10 +207,10 @@ def _build_trees(df):
     # Premium and budget subsets
     brand_lower = df["brand"].str.lower()
     premium_mask = brand_lower.apply(
-        lambda b: any(p in b for p in _PREMIUM_BRANDS)
+        lambda b: any(p in b for p in PREMIUM_BRANDS)
     )
     budget_mask = brand_lower.apply(
-        lambda b: any(p in b for p in _BUDGET_BRANDS)
+        lambda b: any(p in b for p in BUDGET_BRANDS)
     )
 
     _premium_tree, _premium_data = _make_tree(df[premium_mask].reset_index(drop=True))
@@ -264,7 +250,7 @@ def compute_supermarket_distances(lat: float, lon: float) -> Optional[dict]:
     all_dist, all_name, all_brand = _query_nearest(_all_tree, _all_data, lat, lon)
     premium_dist, _, _ = _query_nearest(_premium_tree, _premium_data, lat, lon)
     budget_dist, _, _ = _query_nearest(_budget_tree, _budget_data, lat, lon)
-    count = _count_within(_all_tree, lat, lon, 2.0)
+    count = _count_within(_all_tree, lat, lon, SUPERMARKET_RADIUS_KM)
 
     return {
         "dist_nearest_supermarket_km": round(all_dist, 2) if all_dist is not None else None,

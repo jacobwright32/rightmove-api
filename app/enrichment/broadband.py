@@ -13,17 +13,10 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from .. import config
+from ..constants import BROADBAND_TIMEOUT, BROADBAND_URL
 from ..models import Property
 
 logger = logging.getLogger(__name__)
-
-# Ofcom Connected Nations fixed broadband data (latest available)
-_BROADBAND_URL = (
-    "https://www.ofcom.org.uk/siteassets/resources/documents/"
-    "research-and-data/multi-sector/infrastructure-research/"
-    "connected-nations-2023/data-downloads/"
-    "202305_fixed_postcode_performance_r01.zip"
-)
 
 _pc_to_broadband: Optional[dict[str, dict[str, float]]] = None
 _initialized = False
@@ -63,7 +56,7 @@ def _ensure_data() -> bool:
         import httpx
 
         logger.info("Downloading Ofcom broadband data...")
-        resp = httpx.get(_BROADBAND_URL, timeout=300, follow_redirects=True)
+        resp = httpx.get(BROADBAND_URL, timeout=BROADBAND_TIMEOUT, follow_redirects=True)
         resp.raise_for_status()
 
         zf = zipfile.ZipFile(BytesIO(resp.content))

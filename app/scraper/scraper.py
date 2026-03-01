@@ -14,19 +14,21 @@ from ..config import (
     SCRAPER_RETRY_ATTEMPTS,
     SCRAPER_RETRY_BACKOFF,
 )
+from ..constants import (
+    FLOORPLAN_EXTENSIONS,
+    POSTCODE_PATTERN,
+    RIGHTMOVE_BASE_URL,
+    RIGHTMOVE_PAGE_SIZE,
+    RIGHTMOVE_TYPEAHEAD_URL,
+    SCRAPER_USER_AGENT,
+    TURBO_STREAM_NULL,
+    TURBO_STREAM_UNDEFINED,
+    TYPEAHEAD_LIMIT,
+)
 
 logger = logging.getLogger(__name__)
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/123.0.0.0 Safari/537.36"
-    ),
-}
-
-BASE_URL = "https://www.rightmove.co.uk"
-POSTCODE_PATTERN = r"(?:[A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2})"
+HEADERS = {"User-Agent": SCRAPER_USER_AGENT}
 
 
 def _request_with_retry(url: str, **kwargs) -> Optional[requests.Response]:
@@ -136,7 +138,7 @@ def _parse_turbo_stream(html: str) -> Optional[list]:
 
 def _resolve_ref(flat: list, ref_val):
     """Resolve a single Turbo Stream reference value."""
-    if ref_val == -5 or ref_val == -6:
+    if ref_val == TURBO_STREAM_NULL or ref_val == TURBO_STREAM_UNDEFINED:
         return None
     if isinstance(ref_val, bool):
         return ref_val
@@ -195,7 +197,7 @@ def _extract_urls_from_stream(flat: list, max_items: int) -> list[str]:
                     detail_url = prop.get("detailUrl", "")
                     if detail_url:
                         if not detail_url.startswith("http"):
-                            detail_url = BASE_URL + detail_url
+                            detail_url = RIGHTMOVE_BASE_URL + detail_url
                         detail_urls.append(detail_url)
                         if len(detail_urls) >= max_items:
                             break
@@ -229,7 +231,7 @@ def _extract_properties_from_stream(
 
 def _fetch_listing_page(normalised: str, page: int) -> Optional[list]:
     """Fetch a single listing page and return the parsed turbo stream data."""
-    url = f"{BASE_URL}/house-prices/{normalised}.html"
+    url = f"{RIGHTMOVE_BASE_URL}/house-prices/{normalised}.html"
     if page > 1:
         url += f"?page={page}"
     logger.info("Fetching listing page: %s", url)
@@ -311,7 +313,7 @@ def _listing_dict_to_property(d: dict, postcode: str) -> Optional[PropertyData]:
 
     detail_url = d.get("detailUrl", "")
     if detail_url and not detail_url.startswith("http"):
-        detail_url = BASE_URL + detail_url
+        detail_url = RIGHTMOVE_BASE_URL + detail_url
 
     prop = PropertyData(
         address=address,
@@ -629,7 +631,7 @@ def _extract_floorplan_urls_from_html(soup: BeautifulSoup) -> list[str]:
         text = a_tag.get_text(strip=True).lower()
         if "floorplan" in text or "floorplan" in href.lower():
             # Check if href points to an image
-            if any(href.lower().endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".gif", ".webp")):
+            if any(href.lower().endswith(ext) for ext in FLOORPLAN_EXTENSIONS):
                 urls.append(href)
             # Check for img inside the link
             inner_img = a_tag.find("img")
@@ -724,7 +726,7 @@ def _resolve_location_identifier(outcode: str) -> Optional[str]:
     E.g. 'SW20' -> 'OUTCODE^2515'
     Returns None if the lookup fails.
     """
-    url = f"https://los.rightmove.co.uk/typeahead?query={outcode}&limit=5"
+    url = f"{RIGHTMOVE_TYPEAHEAD_URL}?query={outcode}&limit={TYPEAHEAD_LIMIT}"
     try:
         resp = requests.get(url, headers=HEADERS, timeout=10)
         resp.raise_for_status()
@@ -744,7 +746,7 @@ def _resolve_location_identifier(outcode: str) -> Optional[str]:
 # Cache resolved location identifiers to avoid repeated lookups
 _location_id_cache: dict = {}
 
-PAGE_SIZE = 24  # Rightmove returns 24 properties per page
+PAGE_SIZE = RIGHTMOVE_PAGE_SIZE
 
 
 def _fetch_for_sale_page(outcode: str, index: int = 0) -> Optional[list]:
@@ -766,7 +768,7 @@ def _fetch_for_sale_page(outcode: str, index: int = 0) -> Optional[list]:
         return None
 
     url = (
-        f"{BASE_URL}/property-for-sale/find.html"
+        f"{RIGHTMOVE_BASE_URL}/property-for-sale/find.html"
         f"?locationIdentifier={loc_id}"
         f"&radius=0.0"
         f"&_includeSSTC=on"
@@ -807,7 +809,7 @@ def _for_sale_dict_to_property(d: dict, search_postcode: str) -> Optional[Proper
         return None
 
     prop_id = str(d.get("id", ""))
-    prop_url = f"{BASE_URL}/properties/{prop_id}" if prop_id else ""
+    prop_url = f"{RIGHTMOVE_BASE_URL}/properties/{prop_id}" if prop_id else ""
 
     # Extract price
     price_obj = d.get("price", {})

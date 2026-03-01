@@ -125,57 +125,162 @@ Static data (no API calls): **25 UK airports** and **20 major ports** with coord
 
 ## Getting Started
 
-### Prerequisites
+Follow these steps in order. The whole process takes about 5 minutes
+before you can start browsing property data.
 
-- Python 3.9+
-- Node.js 20+ (for frontend development)
-- pip
+### Step 1 &mdash; Prerequisites
 
-### Installation
+Make sure you have installed:
+
+- **Python 3.9+** &mdash; check with `python --version`
+- **pip** &mdash; comes with Python
+- **Node.js 20+** &mdash; only needed if you want the frontend (`node --version`)
+- **Git** &mdash; `git --version`
+
+### Step 2 &mdash; Clone and install dependencies
 
 ```bash
 git clone https://github.com/jacobwright32/uk-house-prices.git
 cd uk-house-prices
 
-# Backend
-pip install -r requirements.txt
+# Create a virtual environment (recommended)
+python -m venv venv
 
-# Frontend (optional — for development)
-cd frontend
-npm install
-cd ..
+# Activate it
+# Linux / macOS:
+source venv/bin/activate
+# Windows (Git Bash):
+source venv/Scripts/activate
+# Windows (cmd):
+venv\Scripts\activate
+
+# Install Python dependencies
+pip install -r requirements.txt
 ```
 
-### Configuration
-
-Copy the example environment file and edit as needed:
+### Step 3 &mdash; Configure environment variables
 
 ```bash
 cp .env.example .env
 ```
 
-All settings have sensible defaults and work out of the box. See
-[Configuration Reference](#configuration-reference) for the full list.
+The defaults work out of the box. The only optional key worth setting up
+front is **EPC** (energy rating data). Register for a free API key at
+<https://epc.opendatacommunities.org/>, then add to `.env`:
 
-### Running the Server
+```
+EPC_API_EMAIL=you@example.com
+EPC_API_KEY=abc123...
+```
+
+See [Configuration Reference](#configuration-reference) for every
+available setting.
+
+### Step 4 &mdash; Start the API server
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-The API is available at `http://localhost:8000`. Interactive Swagger docs
-at `http://localhost:8000/docs`.
+The server starts at **http://localhost:8000**. Open
+**http://localhost:8000/docs** for the interactive Swagger UI.
 
-### Running the Frontend
+On first launch the SQLite database (`uk_house_prices.db`) is created
+automatically &mdash; no manual migration needed.
+
+### Step 5 &mdash; Generate the postcode directory (first time only)
+
+The **area scraper** (`POST /api/v1/scrape/area/{partial}`) needs a
+local list of every UK postcode so it knows which full postcodes exist
+under an outcode like "SW20". Run this once to download and cache them:
+
+```bash
+python scripts/generate_postcodes.py
+```
+
+This fetches all UK postcodes from the ONS ArcGIS service and saves them
+as parquet files under `data/postcodes/` (one file per outcode, e.g.
+`SW20.parquet`). It takes a few minutes and only needs to be done once.
+
+> **Note:** You can skip this step if you only plan to scrape individual
+> postcodes (e.g. `POST /api/v1/scrape/postcode/SW20 8NE`). The postcode
+> directory is only required for area-wide scraping.
+
+### Step 6 &mdash; Scrape your first postcode
+
+The database starts empty. You need to scrape at least one postcode to
+populate it with property data.
+
+**Option A &mdash; via the Swagger UI:**
+
+1. Open http://localhost:8000/docs
+2. Find **POST /api/v1/scrape/postcode/{postcode}**
+3. Click "Try it out", enter a postcode (e.g. `SW20 8NE`), and hit Execute
+
+**Option B &mdash; via curl:**
+
+```bash
+# Scrape a single postcode (fast mode — one request, ~20 properties)
+curl -X POST "http://localhost:8000/api/v1/scrape/postcode/SW20%208NE"
+
+# Scrape with full detail pages (slower — visits each property page)
+curl -X POST "http://localhost:8000/api/v1/scrape/postcode/SW20%208NE?link_count=0&extra_features=true"
+
+# Scrape an entire outcode area (requires Step 5)
+curl -X POST "http://localhost:8000/api/v1/scrape/area/SW20"
+```
+
+**Option C &mdash; via the frontend** (see Step 8):
+
+Type a postcode into the search bar and click "Scrape". The frontend
+calls the same API endpoint.
+
+> **Tip:** Fast mode (the default) extracts basic property info and the
+> latest transaction in a single HTTP request per listing page. Set
+> `link_count=0` and `extra_features=true` to visit each detail page
+> for full sale history, key features, and floorplan URLs.
+
+### Step 7 &mdash; Enrich your data (optional)
+
+Once you have properties in the database, you can enrich them with
+external data:
+
+```bash
+# EPC energy ratings (requires API key from Step 3)
+curl -X POST "http://localhost:8000/api/v1/enrich/epc/SW20%208NE"
+
+# Transport distances (nearest rail, tube, bus, airport, port)
+# First run downloads ~96MB of NaPTAN data — subsequent runs use cache
+curl -X POST "http://localhost:8000/api/v1/enrich/transport/SW20%208NE"
+
+# Crime statistics (5 years of monthly Police API data)
+curl "http://localhost:8000/api/v1/analytics/postcode/SW20%208NE/crime"
+
+# Flood risk assessment
+curl "http://localhost:8000/api/v1/analytics/postcode/SW20%208NE/flood-risk"
+
+# Planning applications nearby
+curl "http://localhost:8000/api/v1/analytics/postcode/SW20%208NE/planning"
+
+# Enrich everything at once (all postcodes in the database)
+curl -X POST "http://localhost:8000/api/v1/enrich/bulk/start"
+```
+
+Or use the Swagger UI at `/docs` to call any enrichment endpoint
+interactively.
+
+### Step 8 &mdash; Start the frontend (optional)
 
 For development with hot reload:
 
 ```bash
 cd frontend
+npm install   # first time only
 npm run dev
 ```
 
-Opens at `http://localhost:5173` with API requests proxied to the backend.
+Opens at **http://localhost:5173** with API requests proxied to the
+backend.
 
 For production, build the frontend and let FastAPI serve it:
 
@@ -186,7 +291,21 @@ cd ..
 uvicorn app.main:app
 ```
 
-The built frontend is served automatically from `frontend/dist/`.
+The built frontend is served automatically from `frontend/dist/` at
+http://localhost:8000.
+
+### Quick-start summary
+
+```bash
+git clone https://github.com/jacobwright32/uk-house-prices.git
+cd uk-house-prices
+python -m venv venv && source venv/bin/activate  # or venv\Scripts\activate on Windows
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app.main:app --reload
+# In another terminal:
+curl -X POST "http://localhost:8000/api/v1/scrape/postcode/SW20%208NE"
+```
 
 ---
 
@@ -342,7 +461,7 @@ All postcode analytics endpoints are under `/api/v1/analytics/postcode/{postcode
 | `GET .../sales-volume` | Number of sales per year |
 | `GET .../summary` | **All of the above in a single call** |
 | `GET .../growth` | Capital growth metrics: CAGR (1/3/5/10yr), volatility, max drawdown, Sharpe ratio, linear forecast with confidence bands |
-| `GET .../crime` | 12-month crime statistics from Police API (pie/bar/trend data) |
+| `GET .../crime` | 5-year monthly crime statistics from Police API (pie/bar/trend data) |
 | `GET .../flood-risk` | Flood zone classification + active warnings from Environment Agency |
 | `GET .../planning` | Nearby planning applications from planning.data.gov.uk |
 
@@ -594,6 +713,7 @@ uk-house-prices/
 ├── app/
 │   ├── main.py              # FastAPI application, middleware, SPA fallback, router mounting
 │   ├── config.py            # Environment-based configuration
+│   ├── constants.py         # Centralised constants (URLs, timeouts, radii, patterns)
 │   ├── database.py          # SQLAlchemy engine, session, auto-migrations
 │   ├── models.py            # Property, Sale, CrimeStats, PlanningApplication ORM models
 │   ├── schemas.py           # Pydantic request/response schemas

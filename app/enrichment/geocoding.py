@@ -8,15 +8,15 @@ from typing import Optional
 
 import httpx
 
-logger = logging.getLogger(__name__)
+from ..constants import GEOCODING_BATCH_TIMEOUT, GEOCODING_SINGLE_TIMEOUT, POSTCODES_IO_URL
 
-POSTCODES_IO_URL = "https://api.postcodes.io/postcodes"
+logger = logging.getLogger(__name__)
 
 
 def geocode_postcode(postcode: str) -> Optional[tuple]:
     """Convert a UK postcode to (lat, lng) via Postcodes.io."""
     try:
-        resp = httpx.get(f"{POSTCODES_IO_URL}/{postcode}", timeout=10)
+        resp = httpx.get(f"{POSTCODES_IO_URL}/{postcode}", timeout=GEOCODING_SINGLE_TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
         if data.get("status") == 200 and data.get("result"):
@@ -45,7 +45,7 @@ def batch_geocode_postcodes(postcodes: list) -> dict:
             resp = httpx.post(
                 POSTCODES_IO_URL,
                 json={"postcodes": chunk},
-                timeout=15,
+                timeout=GEOCODING_BATCH_TIMEOUT,
             )
             resp.raise_for_status()
             data = resp.json()

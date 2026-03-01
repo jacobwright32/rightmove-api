@@ -4,11 +4,7 @@ import re
 from datetime import datetime
 from typing import Optional
 
-# Month abbreviation mapping for date parsing
-_MONTHS = {
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
-}
+from .constants import MONTH_ABBR_MAP
 
 
 def parse_price_to_int(price: str) -> Optional[int]:
@@ -41,7 +37,7 @@ def parse_date_to_iso(date_str: str) -> Optional[str]:
     day = int(match.group(1))
     month_str = match.group(2).lower()[:3]
     year = int(match.group(3))
-    month = _MONTHS.get(month_str)
+    month = MONTH_ABBR_MAP.get(month_str)
     if month is None:
         return None
     try:
