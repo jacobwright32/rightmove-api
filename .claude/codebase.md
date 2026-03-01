@@ -34,7 +34,7 @@ UNIQUE(postcode, reference) | Index: (postcode,fetched_at)
 ## Config (app/config.py)
 All env-driven via python-dotenv + _read_secret() fallback to secrets/ dir.
 DATABASE_URL=sqlite:///./rightmove.db | CORS_ORIGINS=localhost:5173
-SCRAPER_REQUEST_TIMEOUT=30s | SCRAPER_RETRY_ATTEMPTS=3 | SCRAPER_DELAY=0.25s | SCRAPER_FRESHNESS_DAYS=7
+SCRAPER_REQUEST_TIMEOUT=30s | SCRAPER_RETRY_ATTEMPTS=3 | SCRAPER_DELAY=0.25s | SCRAPER_FRESHNESS_DAYS=30
 RATE_LIMIT_SCRAPE=30/min | RATE_LIMIT_DEFAULT=60/min
 EPC_API_EMAIL, EPC_API_KEY (from secrets or env)
 LISTING_FRESHNESS_HOURS=24 | NAPTAN_MAX_AGE_DAYS=90 | CRIME_API_DELAY=0.125s

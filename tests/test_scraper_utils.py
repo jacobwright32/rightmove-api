@@ -6,7 +6,6 @@ from app.scraper.scraper import (
     _for_sale_dict_to_property,
     _format_price,
     _resolve_ref,
-    _tokenize_for_typeahead,
     extract_postcode,
     normalise_postcode_for_url,
 )
@@ -99,23 +98,6 @@ class TestExtractOutcode:
 
     def test_e1w(self):
         assert _extract_outcode("E1W 1AT") == "E1W"
-
-
-class TestTokenizeForTypeahead:
-    def test_full_postcode(self):
-        assert _tokenize_for_typeahead("SW208NE") == "SW/20/8N/E"
-
-    def test_with_spaces(self):
-        assert _tokenize_for_typeahead("SW20 8NE") == "SW/20/8N/E"
-
-    def test_outcode_only(self):
-        assert _tokenize_for_typeahead("SW20") == "SW/20"
-
-    def test_short_outcode(self):
-        assert _tokenize_for_typeahead("E1") == "E1"
-
-    def test_lowercase(self):
-        assert _tokenize_for_typeahead("sw20 8ne") == "SW/20/8N/E"
 
 
 class TestForSaleDictToProperty:

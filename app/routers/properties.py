@@ -17,7 +17,7 @@ _OUTCODE_RE = re.compile(r"^([A-Z]{1,2}\d[A-Z\d]?)\s", re.IGNORECASE)
 router = APIRouter(tags=["properties"])
 
 
-@router.get("/properties", response_model=list[PropertyDetail])
+@router.get("/properties", response_model=list[PropertyDetail], response_model_exclude_none=True)
 def list_properties(
     postcode: Optional[str] = Query(default=None, description="Filter by postcode"),
     property_type: Optional[str] = Query(default=None, description="Filter by property type"),
@@ -55,7 +55,7 @@ def list_properties(
     return query.all()
 
 
-@router.get("/properties/geo", response_model=list[PropertyGeoPoint])
+@router.get("/properties/geo", response_model=list[PropertyGeoPoint], response_model_exclude_none=True)
 def get_properties_geo(
     postcode: Optional[str] = Query(default=None, description="Filter by postcode prefix"),
     limit: int = Query(default=500, ge=1, le=2000),
@@ -141,7 +141,7 @@ def get_properties_geo(
     return result
 
 
-@router.get("/properties/{property_id}", response_model=PropertyDetail)
+@router.get("/properties/{property_id}", response_model=PropertyDetail, response_model_exclude_none=True)
 def get_property(property_id: int, db: Session = Depends(get_db)):
     """Get a single property with its full sale history."""
     prop = db.query(Property).filter(Property.id == property_id).first()
@@ -150,7 +150,7 @@ def get_property(property_id: int, db: Session = Depends(get_db)):
     return prop
 
 
-@router.get("/properties/{property_id}/similar", response_model=list[PropertyDetail])
+@router.get("/properties/{property_id}/similar", response_model=list[PropertyDetail], response_model_exclude_none=True)
 def get_similar_properties(
     property_id: int,
     limit: int = Query(default=5, ge=1, le=20, description="Number of similar properties to return"),

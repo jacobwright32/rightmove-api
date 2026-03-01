@@ -10,6 +10,8 @@ venv/
 dist/
 build/
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 .env
 .idea/
@@ -20,6 +22,7 @@ build/
 # Node
 node_modules/
 frontend/dist/
+frontend/dist_bak/
 *.tsbuildinfo
 
 # Data / exports
@@ -32,6 +35,7 @@ data/
 # OS
 Thumbs.db
 .DS_Store
+nul
 
 # Secrets
 secrets/

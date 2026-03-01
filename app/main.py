@@ -103,7 +103,7 @@ def health_check():
     }
 
 
-@app.get("/")
+@app.get("/api")
 def root():
     return {
         "message": "UK House Prices API",

@@ -9,7 +9,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..address import parse_rightmove_address_key
 from ..config import DATA_DIR, RATE_LIMIT_SCRAPE, SCRAPER_FRESHNESS_DAYS
 from ..database import get_db
 from ..export import save_property_parquet
@@ -125,14 +124,10 @@ def _upsert_property(db: Session, data: PropertyData) -> Property:
 
     norm_ptype = data.property_type.upper() if data.property_type else ""
 
-    addr_key = parse_rightmove_address_key(data.address)
-
     if existing:
         prop = existing
         prop.postcode = data.postcode if data.postcode is not None else prop.postcode
         prop.property_type = norm_ptype if norm_ptype else prop.property_type
-        if addr_key and not prop.address_key:
-            prop.address_key = addr_key
         prop.bedrooms = data.bedrooms if data.bedrooms is not None else prop.bedrooms
         prop.bathrooms = data.bathrooms if data.bathrooms is not None else prop.bathrooms
         prop.extra_features = (
@@ -152,7 +147,6 @@ def _upsert_property(db: Session, data: PropertyData) -> Property:
             extra_features=json.dumps(data.extra_features) if data.extra_features is not None else None,
             floorplan_urls=json.dumps(data.floorplan_urls) if data.floorplan_urls is not None else None,
             url=data.url,
-            address_key=addr_key,
         )
         db.add(prop)
 
@@ -328,32 +322,46 @@ def scrape_area(
     partial_clean = partial.upper().replace("-", "").replace(" ", "")
 
     # Step 1: discover postcodes from local parquet files
-    # Try candidate outcodes from longest to shortest (e.g. "SE17" then "SE1")
-    # because "SE17G" could be outcode SE1 + incode 7G*, not SE17 + G*
     parquet_dir = DATA_DIR / "postcodes"
-    outcode_match = re.match(r"([A-Z]{1,2}\d[A-Z\d]?)", partial_clean)
-    if not outcode_match:
+
+    # Accept letter-only area prefixes (e.g. "SW") or full/partial outcodes (e.g. "SW20", "SE17G")
+    if not re.match(r"[A-Z]{1,2}", partial_clean):
         raise HTTPException(status_code=400, detail=f"Invalid postcode format: '{partial}'")
 
-    longest = outcode_match.group(1)
-    # Build candidates: e.g. for "SE17" try ["SE17", "SE1"]
-    candidates = [longest]
-    if len(longest) > 2:
-        shorter = re.match(r"([A-Z]{1,2}\d)", partial_clean)
-        if shorter and shorter.group(1) != longest:
-            candidates.append(shorter.group(1))
-
     all_postcodes: list[str] = []
-    for outcode in candidates:
-        parquet_path = parquet_dir / f"{outcode}.parquet"
-        if not parquet_path.exists():
-            continue
-        table = pq.read_table(parquet_path, columns=["postcode"])
-        raw = table.column("postcode").to_pylist()
-        matches = sorted(pc for pc in raw if pc.replace(" ", "").startswith(partial_clean))
-        if matches:
-            all_postcodes = matches
-            break
+    letters_only = re.match(r"^[A-Z]{1,2}$", partial_clean)
+
+    if letters_only:
+        # Area prefix like "SW" — glob all matching parquet files (SW1A, SW2, SW20, etc.)
+        matching_files = sorted(parquet_dir.glob(f"{partial_clean}*.parquet"))
+        for pf in matching_files:
+            table = pq.read_table(pf, columns=["postcode"])
+            all_postcodes.extend(table.column("postcode").to_pylist())
+        all_postcodes.sort()
+    else:
+        # Has digits — try candidate outcodes from longest to shortest
+        # e.g. "SE17G" could be outcode SE17 + incode G*, or SE1 + incode 7G*
+        outcode_match = re.match(r"([A-Z]{1,2}\d[A-Z\d]?)", partial_clean)
+        if not outcode_match:
+            raise HTTPException(status_code=400, detail=f"Invalid postcode format: '{partial}'")
+
+        longest = outcode_match.group(1)
+        candidates = [longest]
+        if len(longest) > 2:
+            shorter = re.match(r"([A-Z]{1,2}\d)", partial_clean)
+            if shorter and shorter.group(1) != longest:
+                candidates.append(shorter.group(1))
+
+        for outcode in candidates:
+            parquet_path = parquet_dir / f"{outcode}.parquet"
+            if not parquet_path.exists():
+                continue
+            table = pq.read_table(parquet_path, columns=["postcode"])
+            raw = table.column("postcode").to_pylist()
+            matches = sorted(pc for pc in raw if pc.replace(" ", "").startswith(partial_clean))
+            if matches:
+                all_postcodes = matches
+                break
 
     if not all_postcodes:
         raise HTTPException(
@@ -364,40 +372,50 @@ def scrape_area(
     postcodes = all_postcodes if max_postcodes == 0 else all_postcodes[:max_postcodes]
     logger.info("Area scrape: found %d postcodes for '%s', scraping %d", len(all_postcodes), partial, len(postcodes))
 
-    # --- For-sale mode: single outcode-level scrape (all postcodes share same results) ---
+    # --- For-sale mode: scrape each unique outcode once ---
     if mode == "for_sale":
-        outcode = longest  # e.g. "SW20"
-        logger.info("Area scrape (for_sale): scraping outcode %s once", outcode)
-        try:
-            properties, _ = _scrape_postcode_properties(
-                outcode, mode="for_sale", max_properties=500, pages=pages,
-            )
-            count = 0
-            for prop_data in properties:
-                if prop_data.address:
-                    prop = _upsert_property(db, prop_data)
-                    db.flush()
-                    if save_parquet:
-                        save_property_parquet(prop)
-                    count += 1
-            db.commit()
-            return AreaScrapeResponse(
-                message=f"Scraped {count} for-sale listings for outcode {outcode}",
-                postcodes_scraped=[outcode],
-                postcodes_skipped=[],
-                postcodes_failed=[],
-                total_properties=count,
-            )
-        except Exception as e:
-            logger.error("Error scraping for-sale %s: %s", outcode, e, exc_info=True)
-            db.rollback()
-            return AreaScrapeResponse(
-                message=f"Failed to scrape for-sale listings for {outcode}: {e}",
-                postcodes_scraped=[],
-                postcodes_skipped=[],
-                postcodes_failed=[outcode],
-                total_properties=0,
-            )
+        # Derive unique outcodes from the matched postcodes
+        seen_outcodes: list[str] = []
+        for pc in postcodes:
+            oc = pc.replace(" ", "")[:-3] if len(pc.replace(" ", "")) >= 5 else pc.replace(" ", "")
+            if oc not in seen_outcodes:
+                seen_outcodes.append(oc)
+
+        total_count = 0
+        scraped_ocs: list[str] = []
+        failed_ocs: list[str] = []
+        for outcode in seen_outcodes:
+            logger.info("Area scrape (for_sale): scraping outcode %s", outcode)
+            try:
+                properties, _ = _scrape_postcode_properties(
+                    outcode, mode="for_sale", max_properties=500, pages=pages,
+                )
+                count = 0
+                for prop_data in properties:
+                    if prop_data.address:
+                        prop = _upsert_property(db, prop_data)
+                        db.flush()
+                        if save_parquet:
+                            save_property_parquet(prop)
+                        count += 1
+                db.commit()
+                total_count += count
+                scraped_ocs.append(outcode)
+            except Exception as e:
+                logger.error("Error scraping for-sale %s: %s", outcode, e, exc_info=True)
+                db.rollback()
+                failed_ocs.append(outcode)
+
+        msg = f"Scraped {total_count} for-sale listings across {len(scraped_ocs)} outcodes"
+        if failed_ocs:
+            msg += f" ({len(failed_ocs)} failed)"
+        return AreaScrapeResponse(
+            message=msg,
+            postcodes_scraped=scraped_ocs,
+            postcodes_skipped=[],
+            postcodes_failed=failed_ocs,
+            total_properties=total_count,
+        )
 
     # --- House prices mode: scrape each postcode individually ---
     total = 0

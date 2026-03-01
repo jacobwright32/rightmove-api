@@ -578,7 +578,7 @@ python-dotenv). All values have sensible defaults.
 | `SCRAPER_RETRY_ATTEMPTS` | integer | `3` | Max retry attempts per request |
 | `SCRAPER_RETRY_BACKOFF` | float | `1.0` | Exponential backoff base in seconds |
 | `SCRAPER_DELAY_BETWEEN_REQUESTS` | float | `0.25` | Delay between consecutive requests in seconds |
-| `SCRAPER_FRESHNESS_DAYS` | integer | `7` | Days before a postcode is considered stale |
+| `SCRAPER_FRESHNESS_DAYS` | integer | `30` | Days before a postcode is considered stale |
 | `RATE_LIMIT_SCRAPE` | string | `30/minute` | Rate limit for `/scrape/*` endpoints |
 | `RATE_LIMIT_DEFAULT` | string | `60/minute` | Default rate limit for all other endpoints |
 | `EPC_API_EMAIL` | string | *empty* | EPC Register API email (free registration) |

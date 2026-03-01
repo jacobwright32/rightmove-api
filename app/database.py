@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import DATABASE_URL
@@ -7,6 +7,16 @@ engine = create_engine(
     DATABASE_URL, connect_args={"check_same_thread": False}
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+@event.listens_for(engine, "connect")
+def _set_sqlite_pragmas(dbapi_conn, connection_record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA cache_size=-64000")
+    cursor.execute("PRAGMA temp_store=MEMORY")
+    cursor.close()
 
 
 class Base(DeclarativeBase):
@@ -83,11 +93,6 @@ def _migrate_db():
             "ALTER TABLE properties ADD COLUMN dist_nearest_premium_supermarket_km REAL",
             "ALTER TABLE properties ADD COLUMN dist_nearest_budget_supermarket_km REAL",
             "ALTER TABLE properties ADD COLUMN supermarkets_within_2km INTEGER",
-            # Cross-source deduplication
-            "ALTER TABLE properties ADD COLUMN address_key TEXT",
-            "ALTER TABLE sales ADD COLUMN land_registry_tx_id TEXT",
-            "CREATE INDEX IF NOT EXISTS ix_property_address_key ON properties (address_key)",
-            "CREATE INDEX IF NOT EXISTS ix_sale_land_registry_tx_id ON sales (land_registry_tx_id)",
         ]
         for sql in migrations:
             try:
@@ -95,6 +100,18 @@ def _migrate_db():
                 conn.commit()
             except Exception:
                 conn.rollback()
+
+    # Create indexes that may be missing from existing databases
+    index_stmts = [
+        "CREATE INDEX IF NOT EXISTS ix_sale_property_type ON sales (property_type)",
+        "CREATE INDEX IF NOT EXISTS ix_sale_tenure ON sales (tenure)",
+        "CREATE INDEX IF NOT EXISTS ix_property_listing_status ON properties (listing_status)",
+        "CREATE INDEX IF NOT EXISTS ix_property_lat_lng ON properties (latitude, longitude)",
+    ]
+    with engine.connect() as conn:
+        for sql in index_stmts:
+            conn.execute(sqlalchemy.text(sql))
+        conn.commit()
 
     _backfill_parsed_fields()
 
