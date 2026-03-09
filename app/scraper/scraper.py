@@ -3,7 +3,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
@@ -14,19 +14,21 @@ from ..config import (
     SCRAPER_RETRY_ATTEMPTS,
     SCRAPER_RETRY_BACKOFF,
 )
+from ..constants import (
+    FLOORPLAN_EXTENSIONS,
+    POSTCODE_PATTERN,
+    RIGHTMOVE_BASE_URL,
+    RIGHTMOVE_PAGE_SIZE,
+    RIGHTMOVE_TYPEAHEAD_URL,
+    SCRAPER_USER_AGENT,
+    TURBO_STREAM_NULL,
+    TURBO_STREAM_UNDEFINED,
+    TYPEAHEAD_LIMIT,
+)
 
 logger = logging.getLogger(__name__)
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/123.0.0.0 Safari/537.36"
-    ),
-}
-
-BASE_URL = "https://www.rightmove.co.uk"
-POSTCODE_PATTERN = r"(?:[A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2})"
+HEADERS = {"User-Agent": SCRAPER_USER_AGENT}
 
 
 def _request_with_retry(url: str, **kwargs) -> Optional[requests.Response]:
@@ -44,6 +46,7 @@ def _request_with_retry(url: str, **kwargs) -> Optional[requests.Response]:
                 time.sleep(wait)
                 continue
             resp.raise_for_status()
+            logger.debug("GET %s -> %d (%d bytes, %.2fs)", url, resp.status_code, len(resp.content), resp.elapsed.total_seconds())
             return resp
         except requests.RequestException as e:
             if attempt < SCRAPER_RETRY_ATTEMPTS:
@@ -73,10 +76,14 @@ class PropertyData:
     property_type: str = ""
     bedrooms: int = 0
     bathrooms: int = 0
-    extra_features: List[str] = field(default_factory=list)
-    floorplan_urls: List[str] = field(default_factory=list)
+    extra_features: list[str] = field(default_factory=list)
+    floorplan_urls: list[str] = field(default_factory=list)
     url: str = ""
-    sales: List[SaleRecord] = field(default_factory=list)
+    sales: list[SaleRecord] = field(default_factory=list)
+    # For-sale listing fields (populated in for_sale mode)
+    asking_price: Optional[int] = None
+    asking_price_display: str = ""
+    listing_id: str = ""
 
 
 def extract_postcode(address: str) -> str:
@@ -86,7 +93,7 @@ def extract_postcode(address: str) -> str:
 
 
 def normalise_postcode_for_url(postcode: str) -> str:
-    """Convert a postcode like 'AB10 1AA' or 'AB10-1AA' to 'AB101AA' for Rightmove URLs."""
+    """Convert a postcode like 'AB10 1AA' or 'AB10-1AA' to 'AB101AA' for URL lookups."""
     return re.sub(r"[\s\-]", "", postcode.upper())
 
 
@@ -97,7 +104,7 @@ def normalise_postcode_for_url(postcode: str) -> str:
 def _parse_turbo_stream(html: str) -> Optional[list]:
     """Extract the main data array from React Router's Turbo Stream format.
 
-    Rightmove uses React Router v7 which embeds route loader data in
+    The source site uses React Router v7 which embeds route loader data in
     window.__reactRouterContext.streamController.enqueue() calls. The main
     data chunk is a JSON array (not P-prefixed) with 50+ elements.
     """
@@ -125,14 +132,16 @@ def _parse_turbo_stream(html: str) -> Optional[list]:
                 continue
 
             if isinstance(flat, list) and len(flat) > 50:
+                logger.debug("Turbo stream parsed: %d elements", len(flat))
                 return flat
 
+    logger.debug("No turbo stream found in page")
     return None
 
 
 def _resolve_ref(flat: list, ref_val):
     """Resolve a single Turbo Stream reference value."""
-    if ref_val == -5 or ref_val == -6:
+    if ref_val == TURBO_STREAM_NULL or ref_val == TURBO_STREAM_UNDEFINED:
         return None
     if isinstance(ref_val, bool):
         return ref_val
@@ -176,9 +185,9 @@ def _resolve_list(flat: list, lst: list) -> list:
 # Postcode listing page
 # ---------------------------------------------------------------------------
 
-def _extract_urls_from_stream(flat: list, max_items: int) -> List[str]:
+def _extract_urls_from_stream(flat: list, max_items: int) -> list[str]:
     """Extract property detail URLs from a parsed turbo stream flat array."""
-    detail_urls: List[str] = []
+    detail_urls: list[str] = []
     for i, item in enumerate(flat):
         if item == "properties" and i + 1 < len(flat):
             prop_refs = flat[i + 1]
@@ -191,7 +200,7 @@ def _extract_urls_from_stream(flat: list, max_items: int) -> List[str]:
                     detail_url = prop.get("detailUrl", "")
                     if detail_url:
                         if not detail_url.startswith("http"):
-                            detail_url = BASE_URL + detail_url
+                            detail_url = RIGHTMOVE_BASE_URL + detail_url
                         detail_urls.append(detail_url)
                         if len(detail_urls) >= max_items:
                             break
@@ -201,9 +210,9 @@ def _extract_urls_from_stream(flat: list, max_items: int) -> List[str]:
 
 def _extract_properties_from_stream(
     flat: list, postcode: str, max_items: int,
-) -> List[PropertyData]:
+) -> list[PropertyData]:
     """Extract PropertyData objects from a parsed turbo stream flat array."""
-    properties: List[PropertyData] = []
+    properties: list[PropertyData] = []
     for i, item in enumerate(flat):
         if item == "properties" and i + 1 < len(flat):
             prop_refs = flat[i + 1]
@@ -225,7 +234,7 @@ def _extract_properties_from_stream(
 
 def _fetch_listing_page(normalised: str, page: int) -> Optional[list]:
     """Fetch a single listing page and return the parsed turbo stream data."""
-    url = f"{BASE_URL}/house-prices/{normalised}.html"
+    url = f"{RIGHTMOVE_BASE_URL}/house-prices/{normalised}.html"
     if page > 1:
         url += f"?page={page}"
     logger.info("Fetching listing page: %s", url)
@@ -234,19 +243,22 @@ def _fetch_listing_page(normalised: str, page: int) -> Optional[list]:
     if resp is None:
         return None
 
-    return _parse_turbo_stream(resp.text)
+    result = _parse_turbo_stream(resp.text)
+    if result is None:
+        logger.debug("No turbo stream data in listing page: %s", url)
+    return result
 
 
 def get_postcode_page_urls(
     postcode: str, max_properties: int = 50, pages: int = 1,
-) -> List[str]:
-    """Fetch property detail URLs for a postcode from Rightmove house prices.
+) -> list[str]:
+    """Fetch property detail URLs for a postcode from the house prices site.
 
     Parses the React Router Turbo Stream data embedded in the page HTML
     to extract property detail URLs. Supports multi-page pagination.
     """
     normalised = normalise_postcode_for_url(postcode)
-    all_urls: List[str] = []
+    all_urls: list[str] = []
 
     for page in range(1, pages + 1):
         flat = _fetch_listing_page(normalised, page)
@@ -267,7 +279,7 @@ def get_postcode_page_urls(
 
 def scrape_postcode_from_listing(
     postcode: str, max_properties: int = 50, pages: int = 1,
-) -> List[PropertyData]:
+) -> list[PropertyData]:
     """Scrape property data directly from the postcode listing page.
 
     This extracts basic property info and latest transaction from the listing
@@ -275,7 +287,7 @@ def scrape_postcode_from_listing(
     Supports multi-page pagination.
     """
     normalised = normalise_postcode_for_url(postcode)
-    all_properties: List[PropertyData] = []
+    all_properties: list[PropertyData] = []
 
     for page in range(1, pages + 1):
         flat = _fetch_listing_page(normalised, page)
@@ -286,6 +298,7 @@ def scrape_postcode_from_listing(
         page_props = _extract_properties_from_stream(flat, postcode, remaining)
         if not page_props:
             break
+        logger.debug("Page %d: extracted %d properties for %s", page, len(page_props), postcode)
         all_properties.extend(page_props)
         if len(all_properties) >= max_properties:
             break
@@ -307,7 +320,7 @@ def _listing_dict_to_property(d: dict, postcode: str) -> Optional[PropertyData]:
 
     detail_url = d.get("detailUrl", "")
     if detail_url and not detail_url.startswith("http"):
-        detail_url = BASE_URL + detail_url
+        detail_url = RIGHTMOVE_BASE_URL + detail_url
 
     prop = PropertyData(
         address=address,
@@ -372,11 +385,12 @@ def _format_price(price) -> str:
 def get_single_house_details(
     url: str, extract_floorplan: bool = False,
 ) -> Optional[PropertyData]:
-    """Scrape details for a single property from its Rightmove detail page.
+    """Scrape details for a single property from its detail page.
 
     Uses the HTML table for sale history and Turbo Stream data for property
     attributes. Optionally extracts floorplan image URLs.
     """
+    t0 = time.monotonic()
     logger.info("Scraping property: %s", url)
 
     resp = _request_with_retry(url)
@@ -406,6 +420,7 @@ def get_single_house_details(
     # 5. Property details from dt/dd pairs as fallback
     if not prop.bedrooms and not prop.bathrooms:
         _extract_details_from_dt_dd(soup, prop)
+        logger.debug("Used dt/dd fallback for %s", url)
 
     # 6. Floorplan URLs (optional)
     if extract_floorplan:
@@ -419,17 +434,19 @@ def get_single_house_details(
         logger.warning("Could not extract any data from %s", url)
         return None
 
+    logger.debug("Scraped %s in %.2fs — %d sales, %d features, beds=%d, baths=%d",
+                 url, time.monotonic() - t0, len(prop.sales), len(prop.extra_features), prop.bedrooms, prop.bathrooms)
     return prop
 
 
-def _extract_sales_from_table(soup: BeautifulSoup) -> List[SaleRecord]:
+def _extract_sales_from_table(soup: BeautifulSoup) -> list[SaleRecord]:
     """Extract sale history from the HTML table.
 
-    Rightmove detail pages have tables with either 4 or 5 columns:
+    Detail pages have tables with either 4 or 5 columns:
     5-col: Date sold | Price change % | Price | Property | Tenure
     4-col: Date sold | Price change % | Price | Tenure
     """
-    sales: List[SaleRecord] = []
+    sales: list[SaleRecord] = []
     tables = soup.find_all("table")
     if not tables:
         return sales
@@ -498,9 +515,8 @@ def _extract_detail_from_stream(flat: list, prop: PropertyData) -> None:
             if isinstance(next_val, int) and next_val > 0:
                 prop.bedrooms = next_val
 
-        elif item == "bathrooms" and not prop.bathrooms:
-            if isinstance(next_val, int) and next_val > 0:
-                prop.bathrooms = next_val
+        elif item == "bathrooms" and not prop.bathrooms and isinstance(next_val, int) and next_val > 0:
+            prop.bathrooms = next_val
 
     # If we still don't have sales, try extracting transactions from stream
     if not prop.sales:
@@ -562,43 +578,42 @@ def _extract_details_from_dt_dd(soup: BeautifulSoup, prop: PropertyData) -> None
 # Floorplan extraction
 # ---------------------------------------------------------------------------
 
-def _extract_floorplan_urls_from_stream(flat: Optional[list]) -> List[str]:
+def _extract_floorplan_urls_from_stream(flat: Optional[list]) -> list[str]:
     """Scan turbo stream data for floorplan image URLs."""
     if not flat:
         return []
 
-    urls: List[str] = []
+    urls: list[str] = []
     for i, item in enumerate(flat):
         if not isinstance(item, str):
             continue
         # Look for keys that indicate floorplan data
-        if "floorplan" in item.lower():
+        if "floorplan" in item.lower() and i + 1 < len(flat):
             # The next value might be a URL string, a list of URLs, or an object
-            if i + 1 < len(flat):
-                next_val = flat[i + 1]
-                if isinstance(next_val, str) and (
-                    next_val.startswith("http") or next_val.startswith("/")
-                ):
-                    urls.append(next_val)
-                elif isinstance(next_val, list):
-                    resolved = _resolve_list(flat, next_val)
-                    for v in resolved:
-                        if isinstance(v, str) and (
-                            v.startswith("http") or v.startswith("/")
-                        ):
-                            urls.append(v)
-                        elif isinstance(v, dict):
-                            # Might have url/src keys
-                            for k in ("url", "src", "href", "imageUrl"):
-                                u = v.get(k, "")
-                                if u and isinstance(u, str):
-                                    urls.append(u)
-                elif isinstance(next_val, dict):
-                    resolved = _resolve_object(flat, next_val)
-                    for k in ("url", "src", "href", "imageUrl"):
-                        u = resolved.get(k, "")
-                        if u and isinstance(u, str):
-                            urls.append(u)
+            next_val = flat[i + 1]
+            if isinstance(next_val, str) and (
+                next_val.startswith("http") or next_val.startswith("/")
+            ):
+                urls.append(next_val)
+            elif isinstance(next_val, list):
+                resolved = _resolve_list(flat, next_val)
+                for v in resolved:
+                    if isinstance(v, str) and (
+                        v.startswith("http") or v.startswith("/")
+                    ):
+                        urls.append(v)
+                    elif isinstance(v, dict):
+                        # Might have url/src keys
+                        for k in ("url", "src", "href", "imageUrl"):
+                            u = v.get(k, "")
+                            if u and isinstance(u, str):
+                                urls.append(u)
+            elif isinstance(next_val, dict):
+                resolved = _resolve_object(flat, next_val)
+                for k in ("url", "src", "href", "imageUrl"):
+                    u = resolved.get(k, "")
+                    if u and isinstance(u, str):
+                        urls.append(u)
         # Also catch direct URL strings containing "floorplan"
         if isinstance(item, str) and "floorplan" in item.lower() and (
             item.startswith("http") or item.startswith("/")
@@ -608,9 +623,9 @@ def _extract_floorplan_urls_from_stream(flat: Optional[list]) -> List[str]:
     return urls
 
 
-def _extract_floorplan_urls_from_html(soup: BeautifulSoup) -> List[str]:
+def _extract_floorplan_urls_from_html(soup: BeautifulSoup) -> list[str]:
     """Find floorplan image URLs from HTML img tags and links."""
-    urls: List[str] = []
+    urls: list[str] = []
 
     # Look for img tags with floorplan in alt, class, or data attributes
     for img in soup.find_all("img"):
@@ -618,9 +633,8 @@ def _extract_floorplan_urls_from_html(soup: BeautifulSoup) -> List[str]:
         cls = " ".join(img.get("class") or []).lower()
         src = img.get("src") or ""
 
-        if "floorplan" in alt or "floorplan" in cls or "floorplan" in src.lower():
-            if src:
-                urls.append(src)
+        if ("floorplan" in alt or "floorplan" in cls or "floorplan" in src.lower()) and src:
+            urls.append(src)
 
     # Look for links to floorplan images
     for a_tag in soup.find_all("a", href=True):
@@ -628,7 +642,7 @@ def _extract_floorplan_urls_from_html(soup: BeautifulSoup) -> List[str]:
         text = a_tag.get_text(strip=True).lower()
         if "floorplan" in text or "floorplan" in href.lower():
             # Check if href points to an image
-            if any(href.lower().endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".gif", ".webp")):
+            if any(href.lower().endswith(ext) for ext in FLOORPLAN_EXTENSIONS):
                 urls.append(href)
             # Check for img inside the link
             inner_img = a_tag.find("img")
@@ -640,18 +654,20 @@ def _extract_floorplan_urls_from_html(soup: BeautifulSoup) -> List[str]:
 
 def extract_floorplan_urls(
     soup: BeautifulSoup, flat: Optional[list],
-) -> List[str]:
+) -> list[str]:
     """Extract floorplan URLs from stream data with HTML fallback. Deduplicates."""
-    urls = _extract_floorplan_urls_from_stream(flat)
-    urls.extend(_extract_floorplan_urls_from_html(soup))
+    stream_urls = _extract_floorplan_urls_from_stream(flat)
+    html_urls = _extract_floorplan_urls_from_html(soup)
 
     # Deduplicate while preserving order
     seen = set()
-    unique: List[str] = []
-    for url in urls:
+    unique: list[str] = []
+    for url in stream_urls + html_urls:
         if url not in seen:
             seen.add(url)
             unique.append(url)
+
+    logger.debug("Floorplan URLs found: %d (stream=%d, html=%d)", len(unique), len(stream_urls), len(html_urls))
     return unique
 
 
@@ -665,7 +681,7 @@ def scrape_postcode_with_details(
     pages: int = 1,
     extract_floorplan: bool = False,
     link_count: Optional[int] = None,
-) -> List[PropertyData]:
+) -> list[PropertyData]:
     """Scrape a postcode by visiting individual detail pages for richer data.
 
     Fetches property URLs from listing pages, then visits each detail page.
@@ -676,13 +692,15 @@ def scrape_postcode_with_details(
     if link_count is not None and link_count > 0:
         urls = urls[:link_count]
 
-    properties: List[PropertyData] = []
+    properties: list[PropertyData] = []
     for i, url in enumerate(urls):
         if i > 0 and SCRAPER_DELAY_BETWEEN_REQUESTS > 0:
             time.sleep(SCRAPER_DELAY_BETWEEN_REQUESTS)
         prop = get_single_house_details(url, extract_floorplan=extract_floorplan)
         if prop:
             properties.append(prop)
+        if (i + 1) % 10 == 0 or i == len(urls) - 1:
+            logger.info("Detail scrape progress: %d/%d for %s", i + 1, len(urls), postcode)
 
     logger.info(
         "Scraped %d properties from %d detail pages for postcode %s",
@@ -691,3 +709,207 @@ def scrape_postcode_with_details(
         postcode,
     )
     return properties
+
+
+# ---------------------------------------------------------------------------
+# For-sale listings scraper
+# ---------------------------------------------------------------------------
+
+def _extract_outcode(postcode: str) -> str:
+    """Extract the outcode from a UK postcode.
+
+    Example: 'SW20 8NE' -> 'SW20', 'E1W 1AT' -> 'E1W', 'E1' -> 'E1'
+
+    Uses the space/dash to split if present. Otherwise strips the 3-char
+    incode suffix from full postcodes (5-7 chars without space).
+    """
+    cleaned = postcode.upper().strip()
+    # If there's a space or dash, outcode is the part before it
+    for sep in (" ", "-"):
+        if sep in cleaned:
+            return cleaned.split(sep)[0]
+    # No separator: if it looks like a full postcode, strip the 3-char incode
+    no_space = cleaned.replace(" ", "")
+    if len(no_space) >= 5:
+        return no_space[:-3]
+    return no_space
+
+
+def _resolve_location_identifier(outcode: str) -> Optional[str]:
+    """Look up the Rightmove locationIdentifier for an outcode via typeahead API.
+
+    E.g. 'SW20' -> 'OUTCODE^2515'
+    Returns None if the lookup fails.
+    """
+    url = f"{RIGHTMOVE_TYPEAHEAD_URL}?query={outcode}&limit={TYPEAHEAD_LIMIT}"
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+    except (requests.RequestException, json.JSONDecodeError):
+        logger.warning("Typeahead lookup failed for %s", outcode)
+        return None
+
+    for match in data.get("matches", []):
+        if match.get("type") == "OUTCODE" and match.get("displayName", "").upper() == outcode.upper():
+            return f"OUTCODE^{match['id']}"
+
+    logger.warning("No OUTCODE match found in typeahead for %s", outcode)
+    return None
+
+
+# Cache resolved location identifiers to avoid repeated lookups
+_location_id_cache: dict = {}
+
+PAGE_SIZE = RIGHTMOVE_PAGE_SIZE
+
+
+def _fetch_for_sale_page(outcode: str, index: int = 0) -> Optional[list]:
+    """Fetch a for-sale search page and extract the properties JSON array.
+
+    Uses the /property-for-sale/find.html search endpoint with a
+    locationIdentifier resolved from the typeahead API.
+
+    Returns the properties list or None on failure.
+    """
+    # Resolve locationIdentifier (cached)
+    if outcode not in _location_id_cache:
+        loc_id = _resolve_location_identifier(outcode)
+        _location_id_cache[outcode] = loc_id
+    loc_id = _location_id_cache[outcode]
+
+    if loc_id is None:
+        logger.warning("Cannot search for-sale: no locationIdentifier for %s", outcode)
+        return None
+
+    url = (
+        f"{RIGHTMOVE_BASE_URL}/property-for-sale/find.html"
+        f"?locationIdentifier={loc_id}"
+        f"&radius=0.0"
+        f"&_includeSSTC=on"
+        f"&index={index}"
+        f"&sortType=2"
+        f"&channel=BUY"
+        f"&transactionType=BUY"
+    )
+
+    resp = _request_with_retry(url)
+    if resp is None:
+        return None
+
+    if "page-not-found" in str(resp.url):
+        logger.warning("For-sale page not found for outcode %s", outcode)
+        return None
+
+    # Parse the Next.js JSON blob from the page
+    soup = BeautifulSoup(resp.text, "lxml")
+    for script in soup.select("script"):
+        text = script.string or ""
+        if text.startswith('{"props"'):
+            try:
+                data = json.loads(text)
+                sr = data.get("props", {}).get("pageProps", {}).get("searchResults", {})
+                return sr.get("properties", [])
+            except (json.JSONDecodeError, KeyError, TypeError):
+                logger.warning("Failed to parse Next.js JSON for %s", outcode)
+                return None
+
+    return None
+
+
+def _for_sale_dict_to_property(d: dict, search_postcode: str) -> Optional[PropertyData]:
+    """Convert a for-sale search result dict to PropertyData."""
+    address = d.get("displayAddress", "") or d.get("address", "")
+    if not address:
+        return None
+
+    prop_id = str(d.get("id", ""))
+    prop_url = f"{RIGHTMOVE_BASE_URL}/properties/{prop_id}" if prop_id else ""
+
+    # Extract price
+    price_obj = d.get("price", {})
+    if isinstance(price_obj, dict):
+        asking_price = price_obj.get("amount")
+        display_prices = price_obj.get("displayPrices", [])
+        if display_prices and isinstance(display_prices, list):
+            asking_price_display = display_prices[0].get("displayPrice", "")
+        else:
+            asking_price_display = price_obj.get("displayPrice", "")
+        if not asking_price_display and asking_price:
+            asking_price_display = f"\u00a3{asking_price:,}"
+    else:
+        asking_price = None
+        asking_price_display = ""
+
+    postcode = extract_postcode(address) or search_postcode
+
+    bedrooms = d.get("bedrooms", 0)
+    bathrooms = d.get("bathrooms", 0)
+    property_type = (
+        d.get("propertySubType", "")
+        or d.get("displayPropertyType", "")
+        or d.get("propertyType", "")
+    )
+
+    return PropertyData(
+        address=address,
+        postcode=postcode,
+        property_type=property_type,
+        bedrooms=int(bedrooms) if bedrooms else 0,
+        bathrooms=int(bathrooms) if bathrooms else 0,
+        url=prop_url,
+        asking_price=int(asking_price) if asking_price else None,
+        asking_price_display=asking_price_display,
+        listing_id=prop_id,
+    )
+
+
+def scrape_for_sale_listings(
+    postcode: str, max_properties: int = 500, pages: int = 20,
+) -> list[PropertyData]:
+    """Scrape properties currently listed for sale from search results.
+
+    Uses the outcode (e.g. 'SW20') from the given postcode to search
+    /property-for-sale/find.html with a locationIdentifier resolved from
+    the typeahead API. Supports pagination via ?index=N (24/page).
+    Auto-paginates through all results up to max_properties/pages.
+    """
+    outcode = _extract_outcode(postcode)
+    search_postcode = postcode.upper().strip()
+
+    all_properties: list[PropertyData] = []
+    pages_fetched = 0
+    for page in range(pages):
+        index = page * PAGE_SIZE
+        properties_json = _fetch_for_sale_page(outcode, index=index)
+        pages_fetched += 1
+
+        if properties_json is None:
+            logger.warning("Failed to fetch for-sale page %d for %s", page + 1, outcode)
+            break
+
+        if not properties_json:
+            logger.info("No more for-sale properties on page %d for %s", page + 1, outcode)
+            break
+
+        logger.debug("For-sale page %d: %d properties for %s", page + 1, len(properties_json), outcode)
+
+        for item in properties_json:
+            if not isinstance(item, dict):
+                continue
+            prop = _for_sale_dict_to_property(item, search_postcode)
+            if prop:
+                all_properties.append(prop)
+
+        if len(all_properties) >= max_properties:
+            all_properties = all_properties[:max_properties]
+            break
+
+        if page < pages - 1 and SCRAPER_DELAY_BETWEEN_REQUESTS > 0:
+            time.sleep(SCRAPER_DELAY_BETWEEN_REQUESTS)
+
+    logger.info(
+        "Scraped %d for-sale listings across %d pages for outcode %s",
+        len(all_properties), pages_fetched, outcode,
+    )
+    return all_properties

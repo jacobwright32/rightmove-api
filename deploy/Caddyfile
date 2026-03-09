@@ -1,0 +1,13 @@
+# Rightmove API — Caddy reverse proxy
+#
+# Option A: With a domain (auto-HTTPS via Let's Encrypt)
+# Replace "yourdomain.com" with your actual domain.
+#
+# yourdomain.com {
+#     reverse_proxy localhost:8000
+# }
+#
+# Option B: IP-only (no HTTPS, plain HTTP on port 80)
+:80 {
+    reverse_proxy localhost:8000
+}

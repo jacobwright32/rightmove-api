@@ -1,15 +1,14 @@
 """Shared parquet export logic for saving property sales data."""
 
 import re
-from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from .config import DATA_DIR
+from .constants import OUTCODE_RE
 from .models import Property
-
-OUTCODE_RE = re.compile(r"^([A-Z]{1,2}\d[A-Z\d]?)\s")
-SALES_DATA_DIR = Path(__file__).resolve().parent.parent / "sales_data"
+SALES_DATA_DIR = DATA_DIR / "sales_data"
 
 
 def _safe_filename(address: str) -> str:
