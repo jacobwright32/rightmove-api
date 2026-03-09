@@ -46,6 +46,7 @@ def _request_with_retry(url: str, **kwargs) -> Optional[requests.Response]:
                 time.sleep(wait)
                 continue
             resp.raise_for_status()
+            logger.debug("GET %s -> %d (%d bytes, %.2fs)", url, resp.status_code, len(resp.content), resp.elapsed.total_seconds())
             return resp
         except requests.RequestException as e:
             if attempt < SCRAPER_RETRY_ATTEMPTS:
@@ -131,8 +132,10 @@ def _parse_turbo_stream(html: str) -> Optional[list]:
                 continue
 
             if isinstance(flat, list) and len(flat) > 50:
+                logger.debug("Turbo stream parsed: %d elements", len(flat))
                 return flat
 
+    logger.debug("No turbo stream found in page")
     return None
 
 
@@ -240,7 +243,10 @@ def _fetch_listing_page(normalised: str, page: int) -> Optional[list]:
     if resp is None:
         return None
 
-    return _parse_turbo_stream(resp.text)
+    result = _parse_turbo_stream(resp.text)
+    if result is None:
+        logger.debug("No turbo stream data in listing page: %s", url)
+    return result
 
 
 def get_postcode_page_urls(
@@ -292,6 +298,7 @@ def scrape_postcode_from_listing(
         page_props = _extract_properties_from_stream(flat, postcode, remaining)
         if not page_props:
             break
+        logger.debug("Page %d: extracted %d properties for %s", page, len(page_props), postcode)
         all_properties.extend(page_props)
         if len(all_properties) >= max_properties:
             break
@@ -383,6 +390,7 @@ def get_single_house_details(
     Uses the HTML table for sale history and Turbo Stream data for property
     attributes. Optionally extracts floorplan image URLs.
     """
+    t0 = time.monotonic()
     logger.info("Scraping property: %s", url)
 
     resp = _request_with_retry(url)
@@ -412,6 +420,7 @@ def get_single_house_details(
     # 5. Property details from dt/dd pairs as fallback
     if not prop.bedrooms and not prop.bathrooms:
         _extract_details_from_dt_dd(soup, prop)
+        logger.debug("Used dt/dd fallback for %s", url)
 
     # 6. Floorplan URLs (optional)
     if extract_floorplan:
@@ -425,6 +434,8 @@ def get_single_house_details(
         logger.warning("Could not extract any data from %s", url)
         return None
 
+    logger.debug("Scraped %s in %.2fs — %d sales, %d features, beds=%d, baths=%d",
+                 url, time.monotonic() - t0, len(prop.sales), len(prop.extra_features), prop.bedrooms, prop.bathrooms)
     return prop
 
 
@@ -645,16 +656,18 @@ def extract_floorplan_urls(
     soup: BeautifulSoup, flat: Optional[list],
 ) -> list[str]:
     """Extract floorplan URLs from stream data with HTML fallback. Deduplicates."""
-    urls = _extract_floorplan_urls_from_stream(flat)
-    urls.extend(_extract_floorplan_urls_from_html(soup))
+    stream_urls = _extract_floorplan_urls_from_stream(flat)
+    html_urls = _extract_floorplan_urls_from_html(soup)
 
     # Deduplicate while preserving order
     seen = set()
     unique: list[str] = []
-    for url in urls:
+    for url in stream_urls + html_urls:
         if url not in seen:
             seen.add(url)
             unique.append(url)
+
+    logger.debug("Floorplan URLs found: %d (stream=%d, html=%d)", len(unique), len(stream_urls), len(html_urls))
     return unique
 
 
@@ -686,6 +699,8 @@ def scrape_postcode_with_details(
         prop = get_single_house_details(url, extract_floorplan=extract_floorplan)
         if prop:
             properties.append(prop)
+        if (i + 1) % 10 == 0 or i == len(urls) - 1:
+            logger.info("Detail scrape progress: %d/%d for %s", i + 1, len(urls), postcode)
 
     logger.info(
         "Scraped %d properties from %d detail pages for postcode %s",
@@ -876,6 +891,8 @@ def scrape_for_sale_listings(
         if not properties_json:
             logger.info("No more for-sale properties on page %d for %s", page + 1, outcode)
             break
+
+        logger.debug("For-sale page %d: %d properties for %s", page + 1, len(properties_json), outcode)
 
         for item in properties_json:
             if not isinstance(item, dict):

@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import time
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -121,6 +122,7 @@ def _is_postcode_fresh(db: Session, postcode: str, mode: str = "house_prices") -
 def _upsert_property(db: Session, data: PropertyData) -> Property:
     """Insert or update a property and its sales in the database."""
     existing = db.query(Property).filter(Property.address == data.address).first()
+    logger.debug("%s property: %s", "Updated" if existing else "Inserted", data.address)
 
     norm_ptype = data.property_type.upper() if data.property_type else ""
 
@@ -252,6 +254,7 @@ def scrape_postcode(
                 mode=mode,
             )
 
+    t0 = time.monotonic()
     properties, detail_pages_visited = _scrape_postcode_properties(
         postcode,
         mode=mode,
@@ -278,6 +281,9 @@ def scrape_postcode(
             scraped_count += 1
 
     db.commit()
+
+    elapsed = time.monotonic() - t0
+    logger.info("Postcode %s scraped in %.1fs: %d properties (%s mode)", postcode, elapsed, scraped_count, mode)
 
     label = "for-sale listings" if mode == "for_sale" else "properties"
     return ScrapeResponse(
@@ -418,6 +424,7 @@ def scrape_area(
         )
 
     # --- House prices mode: scrape each postcode individually ---
+    t0 = time.monotonic()
     total = 0
     use_detail_pages = floorplan or extra_features or link_count is not None
     scraped_postcodes = []
@@ -470,6 +477,10 @@ def scrape_area(
             logger.error("Unexpected error scraping %s: %s", pc, e, exc_info=True)
             db.rollback()
             failed_postcodes.append(pc)
+
+    elapsed = time.monotonic() - t0
+    logger.info("Area '%s' completed in %.1fs: %d properties, %d scraped, %d skipped, %d failed",
+                partial, elapsed, total, len(scraped_postcodes), len(skipped_postcodes), len(failed_postcodes))
 
     msg = f"Scraped {total} properties across {len(scraped_postcodes)}/{len(all_postcodes)} postcodes for '{partial}'"
     if skipped_postcodes:
