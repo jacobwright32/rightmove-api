@@ -228,16 +228,22 @@ def _batch_local_enrichments(db: Session, types: list[str]):
     _log(f"Local enrichments: {total} properties need enrichment ({', '.join(active_types)})")
     _status["current_type"] = "local batch"
 
-    # Process in chunks to avoid loading 2.8M objects at once
+    # Process in chunks using offset to avoid re-fetching same rows
     batch_size = 500
     updated_total = 0
-    offset = 0
+    processed = 0
 
     while True:
         if _stop_flag.is_set():
             break
 
-        props = query.limit(batch_size).all()
+        # Re-query each iteration to get fresh un-enriched properties
+        props = (
+            db.query(Property)
+            .filter(or_(*null_filters))
+            .limit(batch_size)
+            .all()
+        )
         if not props:
             break
 
@@ -270,15 +276,15 @@ def _batch_local_enrichments(db: Session, types: list[str]):
             if changed:
                 batch_updated += 1
 
-        if batch_updated > 0:
-            db.commit()
+        db.commit()
+        db.expire_all()  # Clear identity map so next query gets fresh rows
 
         updated_total += batch_updated
-        offset += len(props)
-        _status["current_postcode"] = f"local batch {offset}/{total}"
+        processed += len(props)
+        _status["current_postcode"] = f"local batch {processed}/{total}"
 
-        if (offset % 5000) < batch_size or offset >= total:
-            _log(f"Local enrichments: {offset}/{total} checked, {updated_total} updated")
+        if (processed % 5000) < batch_size or processed >= total:
+            _log(f"Local enrichments: {processed}/{total} checked, {updated_total} updated")
 
         if len(props) < batch_size:
             break
@@ -449,12 +455,13 @@ def _batch_flood_all(db: Session):
 
 
 def _batch_planning_all(db: Session):
-    """Concurrent planning data: 10 postcodes at a time."""
-    from ..enrichment.planning import get_planning_data
+    """Concurrent planning data: 5 postcodes at a time, DB writes on main thread."""
+    from ..enrichment.planning import fetch_planning_applications
+    from ..enrichment.geocoding import geocode_postcode
+    from ..models import PlanningApplication
 
     # Check which postcodes already have planning data
     try:
-        from ..models import PlanningApplication
         cached_pcs = set(
             r[0] for r in
             db.query(PlanningApplication.postcode).distinct().all()
@@ -475,34 +482,26 @@ def _batch_planning_all(db: Session):
         _log("Planning: all postcodes already have data.")
         return
 
-    _log(f"Planning: {len(pc_list)} postcodes to fetch (10 concurrent)")
+    _log(f"Planning: {len(pc_list)} postcodes to fetch (5 concurrent)")
     total_apps = 0
 
-    def _fetch_planning(postcode):
-        try:
-            # Each thread needs its own DB session
-            thread_db = SessionLocal()
-            try:
-                result = get_planning_data(thread_db, postcode)
-                return postcode, result
-            finally:
-                thread_db.close()
-        except Exception:
-            return postcode, None
-
-    for i in range(0, len(pc_list), 10):
+    # Use the per-postcode fallback which handles its own DB session
+    for i in range(0, len(pc_list), 5):
         if _stop_flag.is_set():
             break
 
-        chunk = pc_list[i:i + 10]
-        with ThreadPoolExecutor(max_workers=10) as pool:
-            futs = {pool.submit(_fetch_planning, pc): pc for pc in chunk}
-            for fut in as_completed(futs):
-                postcode, result = fut.result()
-                if result:
-                    total_apps += result.get("total_count", 0)
+        chunk = pc_list[i:i + 5]
+        for pc in chunk:
+            if _stop_flag.is_set():
+                break
+            try:
+                result = _enrich_planning(db, pc, 0.0)
+                if "apps_" in result:
+                    total_apps += int(result.split("_")[1])
+            except Exception:
+                _status["errors"] += 1
 
-        done = min(i + 10, len(pc_list))
+        done = min(i + 5, len(pc_list))
         _status["current_postcode"] = f"planning {done}/{len(pc_list)}"
         if (done % 100) == 0 or done == len(pc_list):
             _log(f"Planning: {done}/{len(pc_list)} postcodes, {total_apps} applications")
@@ -511,14 +510,11 @@ def _batch_planning_all(db: Session):
 
 
 def _batch_crime_all(db: Session):
-    """Concurrent crime data: 5 postcodes at a time, each with concurrent month fetching."""
-    from ..enrichment.crime import get_crime_summary
+    """Sequential crime data with no extra delay (crime.py has its own 0.125s delays)."""
+    from datetime import timedelta
 
     # Find postcodes without recent crime data
-    recent_pcs = set()
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None)
-    from datetime import timedelta
-    cutoff = cutoff - timedelta(days=30)
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
 
     recent_rows = (
         db.query(CrimeStats.postcode)
@@ -541,34 +537,21 @@ def _batch_crime_all(db: Session):
         _log("Crime: all postcodes already have recent data.")
         return
 
-    _log(f"Crime: {len(pc_list)} postcodes to fetch (5 concurrent)")
+    _log(f"Crime: {len(pc_list)} postcodes to fetch (sequential, no extra delay)")
     total_crimes = 0
 
-    def _fetch_crime(postcode):
-        thread_db = SessionLocal()
-        try:
-            result = get_crime_summary(thread_db, postcode)
-            return postcode, result
-        except Exception as e:
-            return postcode, {"error": str(e)}
-        finally:
-            thread_db.close()
-
-    for i in range(0, len(pc_list), 5):
+    for i, pc in enumerate(pc_list):
         if _stop_flag.is_set():
             break
 
-        chunk = pc_list[i:i + 5]
-        with ThreadPoolExecutor(max_workers=5) as pool:
-            futs = {pool.submit(_fetch_crime, pc): pc for pc in chunk}
-            for fut in as_completed(futs):
-                postcode, result = fut.result()
-                if result and "error" not in result:
-                    total_crimes += result.get("total_crimes", 0)
-                elif result and "error" in result:
-                    _status["errors"] += 1
+        try:
+            result = _enrich_crime(db, pc, 0.0)
+            if result.startswith("crimes_"):
+                total_crimes += int(result.split("_")[1])
+        except Exception:
+            _status["errors"] += 1
 
-        done = min(i + 5, len(pc_list))
+        done = i + 1
         _status["current_postcode"] = f"crime {done}/{len(pc_list)}"
         if (done % 50) == 0 or done == len(pc_list):
             _log(f"Crime: {done}/{len(pc_list)} postcodes, {total_crimes} total crimes")
