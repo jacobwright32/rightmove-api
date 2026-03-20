@@ -238,4 +238,16 @@ FEATURE_PARSER_KEYS = [
     "swimming_pool", "air_conditioning", "solar_panels", "loft",
     "entrance_hall", "white_goods", "bay_window", "distance_to_station",
     "intercom", "split_level",
+    # v2 features
+    "cellar", "roof_terrace", "high_ceilings", "open_plan", "gated",
+    "purpose_built", "refurbished", "duplex", "penthouse", "own_front_door",
+    "private_entrance", "bike_storage", "cul_de_sac", "conservation_area",
+    "annexe", "views", "underground_parking", "allocated_parking",
+    "garden_facing", "property_era", "condition", "kitchen_type",
+    "listed_building",
+    # v3 features
+    "extended", "outbuilding", "potential_to_extend",
+    "walk_in_wardrobe", "wet_room", "integrated_appliances",
+    "side_access", "video_entry", "separate_living_room",
+    "laminate_flooring",
 ]

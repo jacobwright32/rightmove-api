@@ -71,8 +71,8 @@ export default function SearchBar({ onSearch, disabled }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const normalised = normalisePostcode(input);
-    if (normalised.length < 2) {
-      setValidationError("Enter at least 2 characters (e.g. SW, SW20, or SW20 8NY)");
+    if (normalised.length < 1) {
+      setValidationError("Enter a postcode or area (e.g. E, SW, SW20, or SW20 8NY)");
       return;
     }
     setValidationError(null);

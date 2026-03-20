@@ -2,14 +2,16 @@ import json
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Optional
 
-import requests
 from bs4 import BeautifulSoup
+from scrapling import Fetcher
 
 from ..config import (
     SCRAPER_DELAY_BETWEEN_REQUESTS,
+    SCRAPER_MAX_WORKERS,
     SCRAPER_REQUEST_TIMEOUT,
     SCRAPER_RETRY_ATTEMPTS,
     SCRAPER_RETRY_BACKOFF,
@@ -30,15 +32,50 @@ logger = logging.getLogger(__name__)
 
 HEADERS = {"User-Agent": SCRAPER_USER_AGENT}
 
+_fetcher = Fetcher()
 
-def _request_with_retry(url: str, **kwargs) -> Optional[requests.Response]:
-    """Make an HTTP GET request with exponential backoff retry logic."""
-    kwargs.setdefault("headers", HEADERS)
-    kwargs.setdefault("timeout", SCRAPER_REQUEST_TIMEOUT)
+# Detail page pool — shared across all postcode scrapes to avoid nested pool overhead
+_detail_pool = ThreadPoolExecutor(max_workers=SCRAPER_MAX_WORKERS)
+
+
+class _FetcherResponse:
+    """Thin wrapper that normalises a scrapling response to match the interface
+    used by the rest of this module (``status_code``, ``text``, ``content``,
+    ``url``)."""
+
+    def __init__(self, scrapling_resp):
+        self._resp = scrapling_resp
+        self.status_code: int = scrapling_resp.status
+        self.url: str = str(scrapling_resp.url) if hasattr(scrapling_resp, "url") else ""
+        self.text: str = str(scrapling_resp.html_content)
+        self.content: bytes = self.text.encode("utf-8")
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code} for {self.url}")
+
+
+def _request_with_retry(url: str, **kwargs) -> Optional[_FetcherResponse]:
+    """Make an HTTP GET request with exponential backoff retry logic.
+
+    Uses scrapling's Fetcher for TLS fingerprint impersonation and connection
+    reuse.  The returned object exposes ``.status_code``, ``.text``,
+    ``.content``, and ``.url`` like a ``requests.Response``.
+    """
+    timeout = kwargs.pop("timeout", SCRAPER_REQUEST_TIMEOUT)
 
     for attempt in range(1, SCRAPER_RETRY_ATTEMPTS + 1):
         try:
-            resp = requests.get(url, **kwargs)
+            t_start = time.monotonic()
+            raw = _fetcher.get(
+                url,
+                headers=HEADERS,
+                timeout=timeout,
+                follow_redirects=True,
+            )
+            resp = _FetcherResponse(raw)
+            elapsed = time.monotonic() - t_start
+
             if resp.status_code == 429:
                 wait = SCRAPER_RETRY_BACKOFF * (2 ** (attempt - 1))
                 logger.warning("Rate limited (429) on %s, waiting %.1fs (attempt %d/%d)",
@@ -46,9 +83,9 @@ def _request_with_retry(url: str, **kwargs) -> Optional[requests.Response]:
                 time.sleep(wait)
                 continue
             resp.raise_for_status()
-            logger.debug("GET %s -> %d (%d bytes, %.2fs)", url, resp.status_code, len(resp.content), resp.elapsed.total_seconds())
+            logger.debug("GET %s -> %d (%d bytes, %.2fs)", url, resp.status_code, len(resp.content), elapsed)
             return resp
-        except requests.RequestException as e:
+        except Exception as e:
             if attempt < SCRAPER_RETRY_ATTEMPTS:
                 wait = SCRAPER_RETRY_BACKOFF * (2 ** (attempt - 1))
                 logger.warning("Request failed for %s: %s. Retrying in %.1fs (attempt %d/%d)",
@@ -684,8 +721,8 @@ def scrape_postcode_with_details(
 ) -> list[PropertyData]:
     """Scrape a postcode by visiting individual detail pages for richer data.
 
-    Fetches property URLs from listing pages, then visits each detail page.
-    Use this when floorplan extraction or full detail data is needed.
+    Fetches property URLs from listing pages, then visits each detail page
+    concurrently using the shared thread pool.
     """
     urls = get_postcode_page_urls(postcode, max_properties=max_properties, pages=pages)
 
@@ -693,14 +730,17 @@ def scrape_postcode_with_details(
         urls = urls[:link_count]
 
     properties: list[PropertyData] = []
-    for i, url in enumerate(urls):
-        if i > 0 and SCRAPER_DELAY_BETWEEN_REQUESTS > 0:
-            time.sleep(SCRAPER_DELAY_BETWEEN_REQUESTS)
-        prop = get_single_house_details(url, extract_floorplan=extract_floorplan)
-        if prop:
-            properties.append(prop)
-        if (i + 1) % 10 == 0 or i == len(urls) - 1:
-            logger.info("Detail scrape progress: %d/%d for %s", i + 1, len(urls), postcode)
+    futures = {
+        _detail_pool.submit(get_single_house_details, url, extract_floorplan): url
+        for url in urls
+    }
+    for future in as_completed(futures):
+        try:
+            prop = future.result()
+            if prop:
+                properties.append(prop)
+        except Exception as e:
+            logger.warning("Detail page failed for %s: %s", futures[future], e)
 
     logger.info(
         "Scraped %d properties from %d detail pages for postcode %s",
@@ -743,10 +783,11 @@ def _resolve_location_identifier(outcode: str) -> Optional[str]:
     """
     url = f"{RIGHTMOVE_TYPEAHEAD_URL}?query={outcode}&limit={TYPEAHEAD_LIMIT}"
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=10)
+        raw = _fetcher.get(url, headers=HEADERS, timeout=10, follow_redirects=True)
+        resp = _FetcherResponse(raw)
         resp.raise_for_status()
-        data = resp.json()
-    except (requests.RequestException, json.JSONDecodeError):
+        data = json.loads(resp.text)
+    except (json.JSONDecodeError, Exception):
         logger.warning("Typeahead lookup failed for %s", outcode)
         return None
 

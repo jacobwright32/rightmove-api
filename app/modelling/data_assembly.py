@@ -33,6 +33,8 @@ _CATEGORICAL_FEATURES = {
     "nearest_gp_name", "nearest_hospital_name",
     "nearest_supermarket_name", "nearest_supermarket_brand",
     "nearest_park_name", "nearest_green_space_name",
+    # v2 parsed categorical features
+    "garden_facing", "property_era", "condition", "kitchen_type",
 }
 
 # Numeric features from parsed extras

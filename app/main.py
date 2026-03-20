@@ -13,14 +13,19 @@ from .database import Base, _migrate_db, engine
 from .rate_limit import limiter
 from .routers import analytics, enrichment, modelling, properties, scraper
 
+_log_file = os.path.join(os.path.dirname(__file__), "..", "app.log")
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(_log_file, encoding="utf-8"),
+    ],
 )
 
-# Migrate existing databases, then create any new tables
-_migrate_db()
+# Create tables first (no-op if they exist), then run migrations
 Base.metadata.create_all(bind=engine)
+_migrate_db()
 
 app = FastAPI(
     title="UK House Prices API",

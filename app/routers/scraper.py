@@ -2,10 +2,10 @@ import json
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 from urllib.parse import urlparse
 
-import requests as req_lib
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -17,9 +17,13 @@ from ..models import Property, Sale
 from ..parsing import parse_date_to_iso, parse_price_to_int
 from ..rate_limit import limiter
 from ..schemas import AreaScrapeResponse, ScrapePropertyResponse, ScrapeResponse, ScrapeUrlRequest
+from ..config import SCRAPER_MAX_WORKERS as _MW
 from ..scraper.scraper import (
     PropertyData,
+    _detail_pool,
+    get_postcode_page_urls,
     get_single_house_details,
+    normalise_postcode_for_url,
     scrape_for_sale_listings,
     scrape_postcode_from_listing,
     scrape_postcode_with_details,
@@ -323,8 +327,6 @@ def scrape_area(
 
     import pyarrow.parquet as pq
 
-    from ..scraper.scraper import normalise_postcode_for_url
-
     partial_clean = partial.upper().replace("-", "").replace(" ", "")
 
     # Step 1: discover postcodes from local parquet files
@@ -423,60 +425,142 @@ def scrape_area(
             total_properties=total_count,
         )
 
-    # --- House prices mode: scrape each postcode individually ---
+    # --- House prices mode: per-outcode phased approach ---
+    # Groups postcodes by outcode (e.g. E1, E2, SW1, SW20), then for each:
+    #   Phase 1: Collect detail URLs (fast, listing pages only)
+    #   Phase 2: Blast detail pages concurrently with the full pool
+    # This gives DB writes after each outcode instead of waiting for everything.
     t0 = time.monotonic()
     total = 0
     use_detail_pages = floorplan or extra_features or link_count is not None
-    scraped_postcodes = []
-    skipped_postcodes = []
-    failed_postcodes = []
+    scraped_postcodes: list[str] = []
+    skipped_postcodes: list[str] = []
+    failed_postcodes: list[str] = []
 
-    for i, pc in enumerate(postcodes):
-        # Check freshness before scraping
-        if skip_existing and not force:
-            is_fresh, prop_count = _is_postcode_fresh(db, pc, mode)
-            if is_fresh:
-                logger.info("Area scrape: [%d/%d] skipping %s (%d properties, fresh data)", i + 1, len(postcodes), pc, prop_count)
-                skipped_postcodes.append(pc)
-                continue
+    # Group postcodes by outcode (e.g. "SW20 8NE" -> "SW20", "E1 6AA" -> "E1")
+    outcode_groups: dict[str, list[str]] = {}
+    for pc in postcodes:
+        clean = pc.replace(" ", "")
+        oc = clean[:-3] if len(clean) >= 5 else clean
+        outcode_groups.setdefault(oc, []).append(pc)
 
-        pc_norm = normalise_postcode_for_url(pc)
-        logger.info("Area scrape: [%d/%d] scraping %s", i + 1, len(postcodes), pc)
-        try:
-            max_props = 500 if (link_count == 0 and use_detail_pages) else 50
-            lc = link_count if use_detail_pages else None
-            properties, _ = _scrape_postcode_properties(
-                pc_norm,
-                mode=mode,
-                max_properties=max_props,
-                pages=pages,
-                link_count=lc,
-                floorplan=floorplan,
-            )
+    sorted_outcodes = sorted(outcode_groups.keys())
+    logger.info("Area scrape: %d outcodes to process for '%s'", len(sorted_outcodes), partial)
 
-            count = 0
-            for prop_data in properties:
-                if prop_data.address:
-                    prop = _upsert_property(db, prop_data)
-                    db.flush()
-                    if save_parquet:
-                        save_property_parquet(prop)
-                    count += 1
-            db.commit()
-            total += count
-            scraped_postcodes.append(pc)
-        except req_lib.RequestException as e:
-            logger.warning("Network error scraping %s: %s", pc, e)
-            db.rollback()
-            failed_postcodes.append(pc)
-        except (ValueError, KeyError) as e:
-            logger.warning("Parse error scraping %s: %s", pc, e)
-            db.rollback()
-            failed_postcodes.append(pc)
-        except Exception as e:
-            logger.error("Unexpected error scraping %s: %s", pc, e, exc_info=True)
-            db.rollback()
-            failed_postcodes.append(pc)
+    for oc_idx, outcode in enumerate(sorted_outcodes, 1):
+        oc_postcodes = outcode_groups[outcode]
+
+        # Filter fresh/stale for this outcode
+        oc_to_scrape: list[str] = []
+        for pc in oc_postcodes:
+            if skip_existing and not force:
+                is_fresh, prop_count = _is_postcode_fresh(db, pc, mode)
+                if is_fresh:
+                    skipped_postcodes.append(pc)
+                    continue
+            oc_to_scrape.append(pc)
+
+        if not oc_to_scrape:
+            logger.info("Outcode %s: all %d postcodes fresh, skipping (%d/%d outcodes)",
+                         outcode, len(oc_postcodes), oc_idx, len(sorted_outcodes))
+            continue
+
+        if not use_detail_pages:
+            # Fast path: listing data only
+            def _scrape_listing(pc: str) -> tuple[str, list]:
+                pc_norm = normalise_postcode_for_url(pc)
+                props = scrape_postcode_from_listing(pc_norm, max_properties=50, pages=pages)
+                return pc, props
+
+            with ThreadPoolExecutor(max_workers=min(10, _MW)) as listing_pool:
+                futs = {listing_pool.submit(_scrape_listing, pc): pc for pc in oc_to_scrape}
+                for fut in as_completed(futs):
+                    pc = futs[fut]
+                    try:
+                        pc, properties = fut.result()
+                        count = 0
+                        for prop_data in properties:
+                            if prop_data.address:
+                                _upsert_property(db, prop_data)
+                                count += 1
+                        db.commit()
+                        total += count
+                        scraped_postcodes.append(pc)
+                    except Exception as e:
+                        logger.error("Error scraping %s: %s", pc, e, exc_info=True)
+                        db.rollback()
+                        failed_postcodes.append(pc)
+
+            logger.info("Outcode %s: %d properties (%d/%d outcodes, %d total)",
+                         outcode, total, oc_idx, len(sorted_outcodes), total)
+        else:
+            # Phase 1: Collect URLs for this outcode
+            url_to_pc: dict[str, str] = {}
+
+            def _collect_urls(pc: str) -> tuple[str, list[str]]:
+                pc_norm = normalise_postcode_for_url(pc)
+                max_props = 500 if link_count == 0 else 50
+                urls = get_postcode_page_urls(pc_norm, max_properties=max_props, pages=pages)
+                if link_count is not None and link_count > 0:
+                    urls = urls[:link_count]
+                return pc, urls
+
+            with ThreadPoolExecutor(max_workers=min(10, _MW)) as url_pool:
+                url_futs = {url_pool.submit(_collect_urls, pc): pc for pc in oc_to_scrape}
+                for fut in as_completed(url_futs):
+                    pc = url_futs[fut]
+                    try:
+                        pc, urls = fut.result()
+                        if urls:
+                            for u in urls:
+                                url_to_pc[u] = pc
+                        else:
+                            scraped_postcodes.append(pc)
+                    except Exception as e:
+                        logger.error("Phase 1 %s: error for %s: %s", outcode, pc, e)
+                        failed_postcodes.append(pc)
+
+            logger.info("Outcode %s Phase 1: %d URLs from %d postcodes (%d/%d outcodes)",
+                         outcode, len(url_to_pc), len(oc_to_scrape), oc_idx, len(sorted_outcodes))
+
+            # Phase 2: Blast detail pages for this outcode
+            detail_futs = {
+                _detail_pool.submit(get_single_house_details, url, floorplan): url
+                for url in url_to_pc
+            }
+            batch_count = 0
+            oc_count = 0
+            for fut in as_completed(detail_futs):
+                url = detail_futs[fut]
+                try:
+                    prop = fut.result()
+                    if prop and prop.address:
+                        try:
+                            db_prop = _upsert_property(db, prop)
+                            if save_parquet:
+                                save_property_parquet(db_prop)
+                            total += 1
+                            oc_count += 1
+                            batch_count += 1
+                            if batch_count >= 50:
+                                db.commit()
+                                batch_count = 0
+                        except Exception as e:
+                            logger.error("DB upsert failed for %s: %s", prop.address, e)
+                            db.rollback()
+                except Exception as e:
+                    logger.warning("Detail page failed for %s: %s", url, e)
+
+            if batch_count > 0:
+                db.commit()
+
+            # Mark this outcode's postcodes as scraped
+            for pc in oc_to_scrape:
+                if pc not in failed_postcodes and pc not in scraped_postcodes:
+                    scraped_postcodes.append(pc)
+
+            logger.info("Outcode %s Phase 2: %d properties saved (%d/%d outcodes, %d total)",
+                         outcode, oc_count, oc_idx, len(sorted_outcodes), total)
 
     elapsed = time.monotonic() - t0
     logger.info("Area '%s' completed in %.1fs: %d properties, %d scraped, %d skipped, %d failed",
