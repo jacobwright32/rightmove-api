@@ -65,6 +65,7 @@ def _log(msg: str):
 
 
 def _enrich_geocode(db: Session, postcode: str, delay: float) -> str:
+    """Single-postcode geocode fallback (used in per-postcode loop)."""
     from ..enrichment.geocoding import geocode_postcode
 
     needs = (
@@ -76,21 +77,71 @@ def _enrich_geocode(db: Session, postcode: str, delay: float) -> str:
         return "already_geocoded"
 
     coords = geocode_postcode(postcode)
-    time.sleep(delay)
     if not coords:
         return "geocode_failed"
 
     lat, lng = coords
-    props = (
+    updated = (
         db.query(Property)
         .filter(Property.postcode == postcode, Property.latitude.is_(None))
+        .update({Property.latitude: lat, Property.longitude: lng})
+    )
+    db.commit()
+    return f"geocoded_{updated}"
+
+
+def _batch_geocode_all(db: Session):
+    """Fast bulk geocoding: 1000 postcodes per round, 10 concurrent API calls.
+
+    Postcodes.io is free with no rate limits. All properties in the same
+    postcode share identical coordinates, so one API call covers hundreds
+    of properties. We fire 10 concurrent batch requests (100 each = 1000
+    postcodes per round) for maximum throughput.
+    """
+    from ..enrichment.geocoding import batch_geocode_postcodes
+
+    # Find all postcodes that have at least one un-geocoded property
+    need_postcodes = (
+        db.query(Property.postcode)
+        .filter(Property.postcode.isnot(None), Property.latitude.is_(None))
+        .distinct()
         .all()
     )
-    for p in props:
-        p.latitude = lat
-        p.longitude = lng
-    db.commit()
-    return f"geocoded_{len(props)}"
+    pc_list = [r[0] for r in need_postcodes]
+
+    if not pc_list:
+        _log("Geocoding: all postcodes already geocoded.")
+        return
+
+    _log(f"Geocoding: {len(pc_list)} postcodes need coordinates (batch mode, 10 concurrent)")
+    total_updated = 0
+    # Process 1000 postcodes per round (10 concurrent requests of 100 each)
+    round_size = 1000
+
+    for i in range(0, len(pc_list), round_size):
+        if _stop_flag.is_set():
+            break
+
+        chunk = pc_list[i:i + round_size]
+        coords = batch_geocode_postcodes(chunk, concurrent=True)
+
+        for pc, (lat, lng) in coords.items():
+            updated = (
+                db.query(Property)
+                .filter(Property.postcode == pc, Property.latitude.is_(None))
+                .update({Property.latitude: lat, Property.longitude: lng})
+            )
+            total_updated += updated
+
+        if coords:
+            db.commit()
+
+        done = min(i + round_size, len(pc_list))
+        _status["current_postcode"] = f"geocode batch {done}/{len(pc_list)}"
+        if (done % 5000) == 0 or done == len(pc_list):
+            _log(f"Geocoding: {done}/{len(pc_list)} postcodes, {total_updated} properties updated")
+
+    _log(f"Geocoding complete: {total_updated} properties updated across {len(pc_list)} postcodes")
 
 
 def _enrich_transport(db: Session, postcode: str, delay: float) -> str:
@@ -385,6 +436,14 @@ def _run(types: list[str], delay: float):
             from ..enrichment.transport import _init_trees
             _init_trees()
             _log("NaPTAN ready.")
+
+        # Fast batch geocoding pass (100 postcodes per API call, no delay)
+        if "geocode" in types:
+            _batch_geocode_all(db)
+            types = [t for t in types if t != "geocode"]
+            if not types:
+                # Geocoding was the only type — fall through to finally
+                return
 
         # Get all postcodes ordered by property count desc
         postcodes = (
