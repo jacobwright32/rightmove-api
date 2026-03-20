@@ -23,6 +23,8 @@ import type {
   PostcodeGrowthResponse,
   PostcodePredictionResponse,
   PostcodeStatus,
+  PostcodeSummary,
+  OutcodeSummary,
   PropertyBrief,
   PropertyDetail,
   PropertyListingResponse,
@@ -117,6 +119,16 @@ export async function getProperties(
 
 export async function getMarketOverview(): Promise<MarketOverview> {
   const res = await api.get<MarketOverview>("/analytics/market-overview");
+  return res.data;
+}
+
+export async function getScrapedPostcodes(): Promise<PostcodeSummary[]> {
+  const res = await api.get<PostcodeSummary[]>("/postcodes");
+  return res.data;
+}
+
+export async function getOutcodeSummaries(): Promise<OutcodeSummary[]> {
+  const res = await api.get<OutcodeSummary[]>("/outcodes");
   return res.data;
 }
 

@@ -103,10 +103,20 @@ def _migrate_db():
 
     # Create indexes that may be missing from existing databases
     index_stmts = [
+        # Sale indexes
         "CREATE INDEX IF NOT EXISTS ix_sale_property_type ON sales (property_type)",
         "CREATE INDEX IF NOT EXISTS ix_sale_tenure ON sales (tenure)",
+        "CREATE INDEX IF NOT EXISTS ix_sale_property_date ON sales (property_id, date_sold_iso)",
+        "CREATE INDEX IF NOT EXISTS ix_sale_property_price ON sales (property_id, price_numeric)",
+        "CREATE INDEX IF NOT EXISTS ix_sale_date_price ON sales (date_sold_iso, price_numeric)",
+        # Property indexes
         "CREATE INDEX IF NOT EXISTS ix_property_listing_status ON properties (listing_status)",
         "CREATE INDEX IF NOT EXISTS ix_property_lat_lng ON properties (latitude, longitude)",
+        "CREATE INDEX IF NOT EXISTS ix_property_postcode_created ON properties (postcode, created_at)",
+        "CREATE INDEX IF NOT EXISTS ix_property_type_bedrooms ON properties (property_type, bedrooms)",
+        "CREATE INDEX IF NOT EXISTS ix_property_updated_at ON properties (updated_at)",
+        "CREATE INDEX IF NOT EXISTS ix_property_postcode_listing ON properties (postcode, listing_status)",
+        "CREATE INDEX IF NOT EXISTS ix_property_postcode_updated ON properties (postcode, updated_at)",
     ]
     with engine.connect() as conn:
         for sql in index_stmts:

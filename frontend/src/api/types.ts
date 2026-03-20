@@ -117,6 +117,22 @@ export interface PostcodeStatus {
   last_updated: string | null;
 }
 
+export interface PostcodeSummary {
+  postcode: string;
+  property_count: number;
+  sale_count: number;
+  last_updated: string | null;
+}
+
+export interface OutcodeSummary {
+  outcode: string;
+  total_postcodes: number;
+  scraped_postcodes: number;
+  property_count: number;
+  sale_count: number;
+  last_updated: string | null;
+}
+
 // Analytics types
 
 export interface PriceTrendPoint {

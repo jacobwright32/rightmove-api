@@ -113,6 +113,9 @@ class Property(Base):
         Index("ix_property_type_bedrooms", "property_type", "bedrooms"),
         Index("ix_property_listing_status", "listing_status"),
         Index("ix_property_lat_lng", "latitude", "longitude"),
+        Index("ix_property_updated_at", "updated_at"),
+        Index("ix_property_postcode_listing", "postcode", "listing_status"),
+        Index("ix_property_postcode_updated", "postcode", "updated_at"),
     )
 
     sales = relationship("Sale", back_populates="property", cascade="all, delete-orphan")

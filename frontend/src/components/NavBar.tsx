@@ -11,6 +11,7 @@ const links = [
   { to: "/map", label: "Map" },
   { to: "/model", label: "Model" },
   { to: "/enrich", label: "Enrich" },
+  { to: "/scraped", label: "Scraped" },
 ];
 
 export default function NavBar() {

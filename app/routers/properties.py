@@ -9,7 +9,7 @@ from ..database import get_db
 from ..enrichment.geocoding import batch_geocode_postcodes
 from ..export import SALES_DATA_DIR, save_property_parquet
 from ..models import Property, Sale
-from ..schemas import ExportResponse, PostcodeStatus, PostcodeSummary, PropertyDetail, PropertyGeoPoint
+from ..schemas import ExportResponse, OutcodeSummary, PostcodeStatus, PostcodeSummary, PropertyDetail, PropertyGeoPoint
 from ..scraper.scraper import scrape_postcode_from_listing
 
 router = APIRouter(tags=["properties"])
@@ -298,18 +298,104 @@ def suggest_postcodes(partial: str, db: Session = Depends(get_db)):
 
 @router.get("/postcodes", response_model=list[PostcodeSummary])
 def list_postcodes(db: Session = Depends(get_db)):
-    """List all scraped postcodes with property counts."""
+    """List all scraped postcodes with property counts, sale counts, and last update time."""
     results = (
-        db.query(Property.postcode, func.count(Property.id).label("property_count"))
+        db.query(
+            Property.postcode,
+            func.count(Property.id).label("property_count"),
+            func.count(Sale.id).label("sale_count"),
+            func.max(Property.updated_at).label("last_updated"),
+        )
+        .outerjoin(Sale, Sale.property_id == Property.id)
         .filter(Property.postcode.isnot(None))
         .group_by(Property.postcode)
         .order_by(func.count(Property.id).desc())
         .all()
     )
     return [
-        PostcodeSummary(postcode=row.postcode, property_count=row.property_count)
+        PostcodeSummary(
+            postcode=row.postcode,
+            property_count=row.property_count,
+            sale_count=row.sale_count,
+            last_updated=row.last_updated,
+        )
         for row in results
     ]
+
+
+@router.get("/outcodes", response_model=list[OutcodeSummary])
+def list_outcodes(db: Session = Depends(get_db)):
+    """List outcodes with scraped vs total postcode counts.
+
+    Reads ONS parquet files for total postcodes per outcode and compares
+    against what has been scraped in the database.
+    """
+    import re
+    from pathlib import Path
+    import pyarrow.parquet as pq
+    from ..config import DATA_DIR
+
+    parquet_dir = DATA_DIR / "postcodes"
+
+    # 1. Get total postcodes per outcode from parquet files
+    outcode_total: dict[str, int] = {}
+    if parquet_dir.exists():
+        for f in parquet_dir.glob("*.parquet"):
+            outcode = f.stem  # e.g. "SW20"
+            try:
+                table = pq.read_table(f, columns=["postcode"])
+                outcode_total[outcode] = len(table)
+            except Exception:
+                pass
+
+    # 2. Get scraped data grouped by outcode from DB
+    rows = (
+        db.query(
+            Property.postcode,
+            func.count(Property.id).label("property_count"),
+            func.count(Sale.id).label("sale_count"),
+            func.max(Property.updated_at).label("last_updated"),
+        )
+        .outerjoin(Sale, Sale.property_id == Property.id)
+        .filter(Property.postcode.isnot(None))
+        .group_by(Property.postcode)
+        .all()
+    )
+
+    # Group DB postcodes by outcode
+    outcode_data: dict[str, dict] = {}
+    for row in rows:
+        clean = row.postcode.replace(" ", "")
+        oc = clean[:-3] if len(clean) >= 5 else clean
+        if oc not in outcode_data:
+            outcode_data[oc] = {
+                "scraped_pcs": set(),
+                "property_count": 0,
+                "sale_count": 0,
+                "last_updated": None,
+            }
+        d = outcode_data[oc]
+        d["scraped_pcs"].add(row.postcode)
+        d["property_count"] += row.property_count
+        d["sale_count"] += row.sale_count
+        if row.last_updated and (d["last_updated"] is None or row.last_updated > d["last_updated"]):
+            d["last_updated"] = row.last_updated
+
+    # 3. Merge: only include outcodes that have parquet data OR scraped data
+    all_outcodes = set(outcode_total.keys()) | set(outcode_data.keys())
+    result = []
+    for oc in sorted(all_outcodes):
+        d = outcode_data.get(oc, {})
+        result.append(OutcodeSummary(
+            outcode=oc,
+            total_postcodes=outcode_total.get(oc, 0),
+            scraped_postcodes=len(d.get("scraped_pcs", set())),
+            property_count=d.get("property_count", 0),
+            sale_count=d.get("sale_count", 0),
+            last_updated=d.get("last_updated"),
+        ))
+
+    return result
 
 
 @router.post("/export/{postcode}", response_model=ExportResponse)

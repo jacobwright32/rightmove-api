@@ -140,6 +140,17 @@ class ScrapePropertyResponse(BaseModel):
 class PostcodeSummary(BaseModel):
     postcode: str
     property_count: int
+    sale_count: int = 0
+    last_updated: Optional[datetime] = None
+
+
+class OutcodeSummary(BaseModel):
+    outcode: str
+    total_postcodes: int
+    scraped_postcodes: int
+    property_count: int
+    sale_count: int
+    last_updated: Optional[datetime] = None
 
 
 # --- Postcode status ---
