@@ -433,7 +433,10 @@ def parse_distance_to_station(features: list[str]) -> Optional[float]:
         # "0.2 Miles to Raynes Park Station", "0.4 Miles From..."
         m = re.search(r"([\d.]+)\s*mile", f, re.I)
         if m and re.search(r"station", f, re.I):
-            return float(m.group(1))
+            try:
+                return float(m.group(1).rstrip("."))
+            except ValueError:
+                continue
     return None
 
 
