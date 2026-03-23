@@ -250,8 +250,11 @@ def parse_sq_ft(features: list[str]) -> Optional[int]:
     for f in features:
         m = re.search(r"([\d,]+(?:\.\d+)?)\s*sq\s*\.?\s*m\b", f, re.I)
         if m:
-            sqm = float(m.group(1).replace(",", ""))
-            return int(round(sqm * 10.764))
+            try:
+                sqm = float(m.group(1).replace(",", ""))
+                return int(round(sqm * 10.764))
+            except ValueError:
+                continue
     return None
 
 
