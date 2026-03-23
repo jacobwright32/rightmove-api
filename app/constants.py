@@ -250,4 +250,18 @@ FEATURE_PARSER_KEYS = [
     "walk_in_wardrobe", "wet_room", "integrated_appliances",
     "side_access", "video_entry", "separate_living_room",
     "laminate_flooring",
+    # v4 features
+    "corner_plot", "end_terrace", "mid_terrace", "bungalow",
+    "double_garage", "integral_garage", "through_lounge",
+    "breakfast_kitchen", "rear_garden", "front_garden",
+    "mature_garden", "family_bathroom", "guest_wc",
+    "dressing_room", "snug", "porch", "orangery", "pantry",
+    "boot_room", "games_room", "cinema_room",
+    "reception_hall", "garage_conversion",
+    "needs_modernisation", "vacant_possession",
+    "original_features", "period_conversion",
+    "countryside_views", "sea_views", "acre_plot",
+    "alarm_system", "electric_gates", "stables",
+    "hot_tub", "sauna", "wine_cellar",
+    "underfloor_heating", "first_time_buy",
 ]

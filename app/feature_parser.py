@@ -784,6 +784,283 @@ def parse_has_laminate_flooring(features: list[str]) -> Optional[bool]:
     return None
 
 
+# ── NEW v4 parsers ─────────────────────────────────────────────────────────
+
+
+def parse_corner_plot(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"corner\s*(plot|position|site)", f, re.I):
+            return True
+    return None
+
+
+def parse_end_terrace(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"end\s*(of\s*)?terrac", f, re.I):
+            return True
+    return None
+
+
+def parse_mid_terrace(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"mid[\s-]*terrac", f, re.I):
+            return True
+    return None
+
+
+def parse_bungalow(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"\bbungalow\b", f, re.I):
+            return True
+    return None
+
+
+def parse_double_garage(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"double\s*garage", f, re.I):
+            return True
+    return None
+
+
+def parse_integral_garage(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"integral\s*garage", f, re.I):
+            return True
+    return None
+
+
+def parse_through_lounge(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"through\s*(lounge|reception|living)", f, re.I):
+            return True
+    return None
+
+
+def parse_breakfast_kitchen(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"breakfast\s*(kitchen|room|bar)|breakfasting\s*kitchen", f, re.I):
+            return True
+    return None
+
+
+def parse_rear_garden(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(rear|back)\s*garden", f, re.I):
+            return True
+    return None
+
+
+def parse_front_garden(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"front\s*garden", f, re.I):
+            return True
+    return None
+
+
+def parse_mature_garden(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(mature|established|well[\s-]*stocked)\s*garden", f, re.I):
+            return True
+    return None
+
+
+def parse_family_bathroom(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"family\s*bathroom", f, re.I):
+            return True
+    return None
+
+
+def parse_guest_wc(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"guest\s*(wc|w/c|toilet|cloakroom)", f, re.I):
+            return True
+    return None
+
+
+def parse_dressing_room(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"dressing\s*room", f, re.I):
+            return True
+    return None
+
+
+def parse_snug(features: list[str]) -> Optional[bool]:
+    for f in features:
+        low = f.lower().strip()
+        if low == "snug" or re.search(r"\bsnug\b", low):
+            return True
+    return None
+
+
+def parse_porch(features: list[str]) -> Optional[bool]:
+    for f in features:
+        low = f.lower().strip()
+        if low == "porch" or re.search(r"\bporch\b", low):
+            return True
+    return None
+
+
+def parse_orangery(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"\borangery\b", f, re.I):
+            return True
+    return None
+
+
+def parse_pantry(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"\bpantry\b", f, re.I):
+            return True
+    return None
+
+
+def parse_boot_room(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"boot\s*room", f, re.I):
+            return True
+    return None
+
+
+def parse_games_room(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(games?|play|hobby)\s*room", f, re.I):
+            return True
+    return None
+
+
+def parse_cinema_room(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"cinema\s*room|home\s*cinema|media\s*room|home\s*theatre", f, re.I):
+            return True
+    return None
+
+
+def parse_reception_hall(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"reception\s*hall", f, re.I):
+            return True
+    return None
+
+
+def parse_garage_conversion(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"garage\s*conversion|converted\s*garage", f, re.I):
+            return True
+    return None
+
+
+def parse_needs_modernisation(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(need|in need|require).*(modernis|updat|renovat|refurb)", f, re.I):
+            return True
+    return None
+
+
+def parse_vacant_possession(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"vacant\s*possession", f, re.I):
+            return True
+    return None
+
+
+def parse_original_features(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"original\s*features|retain.*original", f, re.I):
+            return True
+    return None
+
+
+def parse_period_conversion(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"period\s*conversion|converted\s*(period|victorian|georgian|edwardian)", f, re.I):
+            return True
+    return None
+
+
+def parse_countryside_views(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(countryside|rural|field|valley|hill|rolling)\s*view", f, re.I):
+            return True
+    return None
+
+
+def parse_sea_views(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(sea|ocean|coast|beach|harbour|harbor)\s*view", f, re.I):
+            return True
+    return None
+
+
+def parse_acre_plot(features: list[str]) -> Optional[float]:
+    for f in features:
+        m = re.search(r"(\d+\.?\d*)\s*acre", f, re.I)
+        if m:
+            try:
+                return float(m.group(1))
+            except ValueError:
+                continue
+        if re.search(r"\bacreage\b", f, re.I):
+            return 1.0  # unspecified acreage
+    return None
+
+
+def parse_alarm_system(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(burglar|security|intruder)\s*alarm|alarm\s*system", f, re.I):
+            return True
+    return None
+
+
+def parse_electric_gates(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"electric\s*gates?", f, re.I):
+            return True
+    return None
+
+
+def parse_stables(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"\bstables?\b|equestrian", f, re.I):
+            return True
+    return None
+
+
+def parse_hot_tub(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"hot\s*tub|jacuzzi", f, re.I):
+            return True
+    return None
+
+
+def parse_sauna(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"\bsauna\b", f, re.I):
+            return True
+    return None
+
+
+def parse_wine_cellar(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"wine\s*(cellar|room|store)", f, re.I):
+            return True
+    return None
+
+
+def parse_underfloor_heating(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"underfloor\s*heat", f, re.I):
+            return True
+    return None
+
+
+def parse_first_time_buy(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"first\s*time\s*buy", f, re.I):
+            return True
+    return None
+
+
 # ── convenience: parse all fields at once ───────────────────────────────────
 
 
@@ -881,4 +1158,43 @@ def parse_all_features(raw: Optional[str]) -> dict:
         "video_entry": parse_has_video_entry(features),
         "separate_living_room": parse_has_separate_living_room(features),
         "laminate_flooring": parse_has_laminate_flooring(features),
+        # v4 features
+        "corner_plot": parse_corner_plot(features),
+        "end_terrace": parse_end_terrace(features),
+        "mid_terrace": parse_mid_terrace(features),
+        "bungalow": parse_bungalow(features),
+        "double_garage": parse_double_garage(features),
+        "integral_garage": parse_integral_garage(features),
+        "through_lounge": parse_through_lounge(features),
+        "breakfast_kitchen": parse_breakfast_kitchen(features),
+        "rear_garden": parse_rear_garden(features),
+        "front_garden": parse_front_garden(features),
+        "mature_garden": parse_mature_garden(features),
+        "family_bathroom": parse_family_bathroom(features),
+        "guest_wc": parse_guest_wc(features),
+        "dressing_room": parse_dressing_room(features),
+        "snug": parse_snug(features),
+        "porch": parse_porch(features),
+        "orangery": parse_orangery(features),
+        "pantry": parse_pantry(features),
+        "boot_room": parse_boot_room(features),
+        "games_room": parse_games_room(features),
+        "cinema_room": parse_cinema_room(features),
+        "reception_hall": parse_reception_hall(features),
+        "garage_conversion": parse_garage_conversion(features),
+        "needs_modernisation": parse_needs_modernisation(features),
+        "vacant_possession": parse_vacant_possession(features),
+        "original_features": parse_original_features(features),
+        "period_conversion": parse_period_conversion(features),
+        "countryside_views": parse_countryside_views(features),
+        "sea_views": parse_sea_views(features),
+        "acre_plot": parse_acre_plot(features),
+        "alarm_system": parse_alarm_system(features),
+        "electric_gates": parse_electric_gates(features),
+        "stables": parse_stables(features),
+        "hot_tub": parse_hot_tub(features),
+        "sauna": parse_sauna(features),
+        "wine_cellar": parse_wine_cellar(features),
+        "underfloor_heating": parse_underfloor_heating(features),
+        "first_time_buy": parse_first_time_buy(features),
     }
