@@ -40,7 +40,7 @@ _CATEGORICAL_FEATURES = {
 # Numeric features from parsed extras
 _NUMERIC_PARSED = {
     "lease_years", "receptions", "sq_ft", "service_charge",
-    "ground_rent", "distance_to_station",
+    "ground_rent", "distance_to_station", "acre_plot",
 }
 
 # Boolean features from parsed extras (everything in FEATURE_PARSER_KEYS that isn't
