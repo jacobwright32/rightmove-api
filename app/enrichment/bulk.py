@@ -1148,6 +1148,18 @@ def get_coverage() -> dict:
                 "total": total,
                 "note": f"{_pc_count(Property.dist_nearest_green_space_km)} postcodes",
             },
+            {
+                "name": "Pubs",
+                "filled": _count(Property.dist_nearest_pub_km),
+                "total": total,
+                "note": f"{_pc_count(Property.dist_nearest_pub_km)} postcodes",
+            },
+            {
+                "name": "Gyms",
+                "filled": _count(Property.dist_nearest_gym_km),
+                "total": total,
+                "note": f"{_pc_count(Property.dist_nearest_gym_km)} postcodes",
+            },
         ]
 
         return {

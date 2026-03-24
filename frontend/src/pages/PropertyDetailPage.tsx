@@ -23,6 +23,8 @@ import HealthcareSection from "../components/HealthcareSection";
 import IMDSection from "../components/IMDSection";
 import SchoolsSection from "../components/SchoolsSection";
 import GreenSpacesSection from "../components/GreenSpacesSection";
+import GymsSection from "../components/GymsSection";
+import PubsSection from "../components/PubsSection";
 import SupermarketsSection from "../components/SupermarketsSection";
 import TransportSection from "../components/TransportSection";
 import SaleHistoryTable from "../components/SaleHistoryTable";
@@ -417,6 +419,20 @@ export default function PropertyDetailPage() {
       {property.postcode && (
         <div className="mb-6">
           <GreenSpacesSection property={property} onRefresh={setProperty} />
+        </div>
+      )}
+
+      {/* Pubs */}
+      {property.postcode && (
+        <div className="mb-6">
+          <PubsSection property={property} onRefresh={setProperty} />
+        </div>
+      )}
+
+      {/* Gyms */}
+      {property.postcode && (
+        <div className="mb-6">
+          <GymsSection property={property} onRefresh={setProperty} />
         </div>
       )}
 

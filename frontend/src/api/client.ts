@@ -9,9 +9,11 @@ import type {
   EPCEnrichmentResponse,
   FloodRiskResponse,
   GreenSpacesEnrichmentResponse,
+  GymsEnrichmentResponse,
   GrowthLeaderboardEntry,
   HealthcareEnrichmentResponse,
   IMDEnrichmentResponse,
+  PubsEnrichmentResponse,
   SchoolsEnrichmentResponse,
   SupermarketsEnrichmentResponse,
   PropertyGeoPoint,
@@ -301,6 +303,24 @@ export async function enrichGreenSpaces(
 ): Promise<GreenSpacesEnrichmentResponse> {
   const res = await api.post<GreenSpacesEnrichmentResponse>(
     `/enrich/green-spaces/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichPubs(
+  postcode: string
+): Promise<PubsEnrichmentResponse> {
+  const res = await api.post<PubsEnrichmentResponse>(
+    `/enrich/pubs/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichGyms(
+  postcode: string
+): Promise<GymsEnrichmentResponse> {
+  const res = await api.post<GymsEnrichmentResponse>(
+    `/enrich/gyms/${encodeURIComponent(postcode)}`
   );
   return res.data;
 }

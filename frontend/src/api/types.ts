@@ -80,6 +80,14 @@ export interface PropertyBrief {
   dist_nearest_premium_supermarket_km: number | null;
   dist_nearest_budget_supermarket_km: number | null;
   supermarkets_within_2km: number | null;
+  // Pubs
+  dist_nearest_pub_km: number | null;
+  nearest_pub_name: string | null;
+  pubs_within_1km: number | null;
+  // Gyms
+  dist_nearest_gym_km: number | null;
+  nearest_gym_name: string | null;
+  gyms_within_2km: number | null;
   // Green Spaces
   dist_nearest_park_km: number | null;
   nearest_park_name: string | null;
@@ -591,6 +599,18 @@ export interface SupermarketsEnrichmentResponse {
 }
 
 export interface GreenSpacesEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
+}
+
+export interface PubsEnrichmentResponse {
+  message: string;
+  properties_updated: number;
+  properties_skipped: number;
+}
+
+export interface GymsEnrichmentResponse {
   message: string;
   properties_updated: number;
   properties_skipped: number;
