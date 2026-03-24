@@ -66,6 +66,8 @@ GREENSPACE_URL = (
     "?area=GB&format=GeoPackage&redirect"
 )
 
+OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+
 RIGHTMOVE_BASE_URL = "https://www.rightmove.co.uk"
 
 RIGHTMOVE_TYPEAHEAD_URL = "https://los.rightmove.co.uk/typeahead"
@@ -88,6 +90,7 @@ SUPERMARKETS_TIMEOUT = 300
 PLANNING_TIMEOUT = 15
 HEALTHCARE_TIMEOUT = 120
 GREENSPACE_TIMEOUT = 600
+OVERPASS_TIMEOUT = 600
 
 
 # ── Search Radii & Thresholds ───────────────────────────────────────────────
@@ -99,6 +102,8 @@ SCHOOL_SECONDARY_RADIUS_KM = 3.0    # secondary schools within
 SUPERMARKET_RADIUS_KM = 2.0         # supermarkets within
 GP_RADIUS_KM = 2.0                  # GP practices within
 GREEN_SPACE_RADIUS_KM = 1.0         # green spaces within
+PUBS_RADIUS_KM = 1.0                # pubs within
+GYMS_RADIUS_KM = 2.0                # gyms within
 FLOOD_WARNINGS_DIST_KM = "5"        # EA warnings search (string for API param)
 FLOOD_AREAS_DIST_KM = "1"           # EA flood areas search (string for API param)
 

@@ -508,6 +508,7 @@ class TrainRequest(BaseModel):
     split_params: dict = {}
     hyperparameters: Optional[dict] = None
     log_transform: bool = False
+    max_train_rows: Optional[int] = None
 
 
 class ModelMetrics(BaseModel):
@@ -594,6 +595,18 @@ class SupermarketsEnrichmentResponse(BaseModel):
 
 
 class GreenSpacesEnrichmentResponse(BaseModel):
+    message: str
+    properties_updated: int
+    properties_skipped: int
+
+
+class PubsEnrichmentResponse(BaseModel):
+    message: str
+    properties_updated: int
+    properties_skipped: int
+
+
+class GymsEnrichmentResponse(BaseModel):
     message: str
     properties_updated: int
     properties_skipped: int

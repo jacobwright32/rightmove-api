@@ -330,11 +330,70 @@ export async function getModelFeatures(): Promise<AvailableFeaturesResponse> {
   return res.data;
 }
 
+export interface TrainProgress {
+  progress: number;  // 0–1
+  detail: string;
+}
+
 export async function trainModel(
-  request: TrainRequest
+  request: TrainRequest,
+  onProgress?: (p: TrainProgress) => void,
 ): Promise<TrainResponse> {
-  const res = await api.post<TrainResponse>("/model/train", request);
-  return res.data;
+  const resp = await fetch("/api/v1/model/train", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+
+  if (!resp.ok && resp.headers.get("content-type")?.includes("application/json")) {
+    const err = await resp.json();
+    throw { response: { data: err } };
+  }
+  if (!resp.ok) {
+    throw { response: { data: { detail: `HTTP ${resp.status}` } } };
+  }
+
+  const reader = resp.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: TrainResponse | null = null;
+  let sseError: string | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // Parse SSE events from buffer
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop()!; // keep incomplete chunk
+
+    for (const part of parts) {
+      let event = "message";
+      let data = "";
+      for (const line of part.split("\n")) {
+        if (line.startsWith("event: ")) event = line.slice(7);
+        else if (line.startsWith("data: ")) data = line.slice(6);
+      }
+      if (!data) continue;
+
+      if (event === "progress" && onProgress) {
+        onProgress(JSON.parse(data));
+      } else if (event === "result") {
+        result = JSON.parse(data);
+      } else if (event === "error") {
+        sseError = JSON.parse(data).detail;
+      }
+    }
+  }
+
+  if (sseError) {
+    throw { response: { data: { detail: sseError } } };
+  }
+  if (!result) {
+    throw { response: { data: { detail: "No result received from server" } } };
+  }
+  return result;
 }
 
 export async function predictProperty(

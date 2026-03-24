@@ -19,6 +19,8 @@ from ..enrichment.listing import check_property_listing, enrich_postcode_listing
 from ..enrichment.planning import get_planning_data
 from ..enrichment.schools import enrich_postcode_schools
 from ..enrichment.green_spaces import enrich_postcode_green_spaces
+from ..enrichment.gyms import enrich_postcode_gyms
+from ..enrichment.pubs import enrich_postcode_pubs
 from ..enrichment.supermarkets import enrich_postcode_supermarkets
 from ..enrichment.transport import enrich_postcode_transport
 from ..models import Property
@@ -28,11 +30,13 @@ from ..schemas import (
     EPCEnrichmentResponse,
     FloodRiskResponse,
     GreenSpacesEnrichmentResponse,
+    GymsEnrichmentResponse,
     HealthcareEnrichmentResponse,
     IMDEnrichmentResponse,
     ListingEnrichmentResponse,
     PlanningResponse,
     PropertyListingResponse,
+    PubsEnrichmentResponse,
     SchoolsEnrichmentResponse,
     SupermarketsEnrichmentResponse,
     TransportEnrichmentResponse,
@@ -222,6 +226,54 @@ def enrich_green_spaces(postcode: str, db: Session = Depends(get_db)):
 
     result = enrich_postcode_green_spaces(db, clean)
     return GreenSpacesEnrichmentResponse(
+        message=result["message"],
+        properties_updated=result["properties_updated"],
+        properties_skipped=result["properties_skipped"],
+    )
+
+
+@router.post("/pubs/{postcode}", response_model=PubsEnrichmentResponse)
+def enrich_pubs(postcode: str, db: Session = Depends(get_db)):
+    """Enrich properties with nearest pub distances.
+
+    Downloads UK pub data from OpenStreetMap on first call.
+    Uses cKDTree for O(log n) nearest-neighbour lookups.
+    Properties need lat/lng — those without are skipped.
+    """
+    clean = postcode.upper().strip()
+    props = db.query(Property).filter(Property.postcode == clean).all()
+    if not props:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No properties found for postcode {clean}. Scrape first.",
+        )
+
+    result = enrich_postcode_pubs(db, clean)
+    return PubsEnrichmentResponse(
+        message=result["message"],
+        properties_updated=result["properties_updated"],
+        properties_skipped=result["properties_skipped"],
+    )
+
+
+@router.post("/gyms/{postcode}", response_model=GymsEnrichmentResponse)
+def enrich_gyms(postcode: str, db: Session = Depends(get_db)):
+    """Enrich properties with nearest gym/fitness centre distances.
+
+    Downloads UK gym data from OpenStreetMap on first call.
+    Uses cKDTree for O(log n) nearest-neighbour lookups.
+    Properties need lat/lng — those without are skipped.
+    """
+    clean = postcode.upper().strip()
+    props = db.query(Property).filter(Property.postcode == clean).all()
+    if not props:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No properties found for postcode {clean}. Scrape first.",
+        )
+
+    result = enrich_postcode_gyms(db, clean)
+    return GymsEnrichmentResponse(
         message=result["message"],
         properties_updated=result["properties_updated"],
         properties_skipped=result["properties_skipped"],

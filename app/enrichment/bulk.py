@@ -30,10 +30,10 @@ logger = logging.getLogger(__name__)
 ALL_TYPES = [
     "geocode", "transport", "epc", "crime", "flood", "planning",
     "imd", "broadband", "schools", "healthcare", "supermarkets",
-    "green_spaces",
+    "green_spaces", "pubs", "gyms",
 ]
 
-LOCAL_TYPES = {"transport", "imd", "broadband", "schools", "healthcare", "supermarkets", "green_spaces"}
+LOCAL_TYPES = {"transport", "imd", "broadband", "schools", "healthcare", "supermarkets", "green_spaces", "pubs", "gyms"}
 API_TYPES = {"epc", "crime", "flood", "planning"}
 
 
@@ -175,6 +175,22 @@ def _batch_local_enrichments(db: Session, types: list[str]):
             inits["green_spaces"] = compute_green_space_distances
         _log("Green spaces data ready.")
 
+    if "pubs" in requested_local:
+        _log("Loading pubs data (OSM)...")
+        from ..enrichment.pubs import _init_trees as init_pubs
+        if init_pubs():
+            from ..enrichment.pubs import compute_pub_distances
+            inits["pubs"] = compute_pub_distances
+        _log("Pubs data ready.")
+
+    if "gyms" in requested_local:
+        _log("Loading gyms data (OSM)...")
+        from ..enrichment.gyms import _init_trees as init_gyms
+        if init_gyms():
+            from ..enrichment.gyms import compute_gym_distances
+            inits["gyms"] = compute_gym_distances
+        _log("Gyms data ready.")
+
     if "imd" in requested_local:
         _log("Loading IMD data...")
         from ..enrichment.imd import _ensure_data as init_imd, get_imd_for_postcode
@@ -200,12 +216,14 @@ def _batch_local_enrichments(db: Session, types: list[str]):
         "healthcare": Property.dist_nearest_gp_km,
         "supermarkets": Property.dist_nearest_supermarket_km,
         "green_spaces": Property.dist_nearest_green_space_km,
+        "pubs": Property.dist_nearest_pub_km,
+        "gyms": Property.dist_nearest_gym_km,
         "imd": Property.imd_decile,
         "broadband": Property.broadband_median_speed,
     }
 
     # Types that need lat/lng vs postcode
-    needs_coords = {"transport", "schools", "healthcare", "supermarkets", "green_spaces"}
+    needs_coords = {"transport", "schools", "healthcare", "supermarkets", "green_spaces", "pubs", "gyms"}
     needs_postcode = {"imd", "broadband"}
 
     # ── Query properties that need at least one enrichment ──

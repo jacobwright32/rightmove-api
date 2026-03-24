@@ -97,3 +97,11 @@ SUPERMARKETS_MAX_AGE_DAYS: int = int(os.getenv("SUPERMARKETS_MAX_AGE_DAYS", "180
 # Green Spaces (OS Open Greenspace)
 GREENSPACE_CACHE_PATH: Path = DATA_DIR / "os_greenspace.parquet"
 GREENSPACE_MAX_AGE_DAYS: int = int(os.getenv("GREENSPACE_MAX_AGE_DAYS", "180"))
+
+# Pubs (OpenStreetMap)
+PUBS_CACHE_PATH: Path = DATA_DIR / "osm_pubs.parquet"
+PUBS_MAX_AGE_DAYS: int = int(os.getenv("PUBS_MAX_AGE_DAYS", "180"))
+
+# Gyms (OpenStreetMap)
+GYMS_CACHE_PATH: Path = DATA_DIR / "osm_gyms.parquet"
+GYMS_MAX_AGE_DAYS: int = int(os.getenv("GYMS_MAX_AGE_DAYS", "180"))

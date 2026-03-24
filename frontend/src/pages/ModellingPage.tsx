@@ -9,7 +9,7 @@ import {
   YAxis,
 } from "recharts";
 import Plot from "react-plotly.js";
-import { getModelFeatures, predictPostcode, predictProperty, trainModel } from "../api/client";
+import { getModelFeatures, predictPostcode, predictProperty, trainModel, type TrainProgress } from "../api/client";
 import type {
   AvailableFeaturesResponse,
   FeatureImportance,
@@ -47,6 +47,7 @@ export default function ModellingPage() {
   const [splitStrategy, setSplitStrategy] = useState("random");
   const [testRatio, setTestRatio] = useState(0.2);
   const [cutoffDate, setCutoffDate] = useState("2024-01-01");
+  const [maxTrainRows, setMaxTrainRows] = useState<number | null>(null);
   const [selectedFeatures, setSelectedFeatures] = useState<Set<string>>(new Set());
 
   // Log transform
@@ -62,6 +63,7 @@ export default function ModellingPage() {
 
   // Training state
   const [training, setTraining] = useState(false);
+  const [trainProgress, setTrainProgress] = useState<TrainProgress | null>(null);
   const [trainError, setTrainError] = useState("");
   const [result, setResult] = useState<TrainResponse | null>(null);
 
@@ -122,6 +124,7 @@ export default function ModellingPage() {
 
   const handleTrain = useCallback(async () => {
     setTraining(true);
+    setTrainProgress(null);
     setTrainError("");
     setResult(null);
     setPrediction(null);
@@ -135,6 +138,7 @@ export default function ModellingPage() {
           ? { cutoff_date: cutoffDate }
           : { test_ratio: testRatio },
         log_transform: logTransform,
+        max_train_rows: maxTrainRows,
       };
       if (customHyperparams) {
         const hp: Record<string, unknown> = {
@@ -149,14 +153,14 @@ export default function ModellingPage() {
         }
         req.hyperparameters = hp;
       }
-      const resp = await trainModel(req);
+      const resp = await trainModel(req, setTrainProgress);
       setResult(resp);
     } catch (e: any) {
       setTrainError(e?.response?.data?.detail || "Training failed");
     } finally {
       setTraining(false);
     }
-  }, [target, selectedFeatures, modelType, splitStrategy, cutoffDate, testRatio, logTransform, customHyperparams, learningRate, nEstimators, numLeaves, linearTree, maxDepth]);
+  }, [target, selectedFeatures, modelType, splitStrategy, cutoffDate, testRatio, logTransform, customHyperparams, learningRate, nEstimators, numLeaves, linearTree, maxDepth, maxTrainRows]);
 
   const handlePredict = useCallback(async () => {
     if (!result || !predictId) return;
@@ -314,6 +318,33 @@ export default function ModellingPage() {
                 />
               </div>
             )}
+            <div className="mt-3">
+              <label className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={maxTrainRows !== null}
+                  onChange={(e) => setMaxTrainRows(e.target.checked ? 500000 : null)}
+                  className="accent-blue-600"
+                />
+                Limit train size
+              </label>
+              {maxTrainRows !== null && (
+                <div className="mt-1">
+                  <input
+                    type="number"
+                    min={1000}
+                    step={10000}
+                    value={maxTrainRows}
+                    onChange={(e) => setMaxTrainRows(Number(e.target.value) || null)}
+                    className="block w-full rounded border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    placeholder="e.g. 500000"
+                  />
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                    Randomly samples N rows from the training set after split
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Log transform + Hyperparameters */}
@@ -483,12 +514,24 @@ export default function ModellingPage() {
           )}
 
           {training && (
-            <div className="flex items-center justify-center py-20 text-gray-500">
-              <svg className="mr-3 h-5 w-5 animate-spin" viewBox="0 0 24 24">
+            <div className="flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white py-16 dark:border-gray-700 dark:bg-gray-800">
+              <svg className="mb-4 h-6 w-6 animate-spin text-blue-600" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Training model...
+              {/* Progress bar */}
+              <div className="mb-2 w-64 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                <div
+                  className="h-2.5 rounded-full bg-blue-600 transition-all duration-300 ease-out"
+                  style={{ width: `${Math.round((trainProgress?.progress ?? 0) * 100)}%` }}
+                />
+              </div>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {Math.round((trainProgress?.progress ?? 0) * 100)}%
+              </p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {trainProgress?.detail || "Starting..."}
+              </p>
             </div>
           )}
 

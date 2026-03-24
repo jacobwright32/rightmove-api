@@ -473,6 +473,7 @@ export interface TrainRequest {
   split_params: Record<string, string | number>;
   hyperparameters?: Record<string, unknown>;
   log_transform?: boolean;
+  max_train_rows?: number | null;
 }
 
 export interface ModelMetrics {

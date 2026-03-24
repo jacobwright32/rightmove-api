@@ -95,6 +95,14 @@ class Property(Base):
     dist_nearest_premium_supermarket_km = Column(Float, nullable=True)  # Waitrose/M&S
     dist_nearest_budget_supermarket_km = Column(Float, nullable=True)  # Aldi/Lidl
     supermarkets_within_2km = Column(Integer, nullable=True)
+    # Pubs (OpenStreetMap) — populated via /enrich/pubs endpoint
+    dist_nearest_pub_km = Column(Float, nullable=True)
+    nearest_pub_name = Column(String, nullable=True)
+    pubs_within_1km = Column(Integer, nullable=True)
+    # Gyms (OpenStreetMap) — populated via /enrich/gyms endpoint
+    dist_nearest_gym_km = Column(Float, nullable=True)
+    nearest_gym_name = Column(String, nullable=True)
+    gyms_within_2km = Column(Integer, nullable=True)
     # Green Spaces (OS Open Greenspace) — populated via /enrich/green-spaces endpoint
     dist_nearest_park_km = Column(Float, nullable=True)
     nearest_park_name = Column(String, nullable=True)
