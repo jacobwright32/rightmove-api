@@ -837,6 +837,36 @@ def _enrich_green_spaces(db: Session, postcode: str, delay: float) -> str:
     return f"updated_{result['properties_updated']}"
 
 
+def _enrich_pubs(db: Session, postcode: str, delay: float) -> str:
+    from ..enrichment.pubs import enrich_postcode_pubs
+
+    has = (
+        db.query(Property)
+        .filter(Property.postcode == postcode, Property.dist_nearest_pub_km.isnot(None))
+        .count()
+    )
+    if has > 0:
+        return "already_enriched"
+
+    result = enrich_postcode_pubs(db, postcode)
+    return f"updated_{result['properties_updated']}"
+
+
+def _enrich_gyms(db: Session, postcode: str, delay: float) -> str:
+    from ..enrichment.gyms import enrich_postcode_gyms
+
+    has = (
+        db.query(Property)
+        .filter(Property.postcode == postcode, Property.dist_nearest_gym_km.isnot(None))
+        .count()
+    )
+    if has > 0:
+        return "already_enriched"
+
+    result = enrich_postcode_gyms(db, postcode)
+    return f"updated_{result['properties_updated']}"
+
+
 _FNS = {
     "geocode": _enrich_geocode,
     "transport": _enrich_transport,
@@ -850,6 +880,8 @@ _FNS = {
     "healthcare": _enrich_healthcare,
     "supermarkets": _enrich_supermarkets,
     "green_spaces": _enrich_green_spaces,
+    "pubs": _enrich_pubs,
+    "gyms": _enrich_gyms,
 }
 
 # Batch functions for types that support fast bulk processing
