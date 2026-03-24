@@ -94,6 +94,7 @@ def _init_trees() -> bool:
             data = resp.json()
         except Exception:
             logger.exception("Failed to download gym data from Overpass API")
+            _initialized = False  # Allow retry on next call
             return False
 
         # Parse elements
@@ -122,6 +123,7 @@ def _init_trees() -> bool:
 
     except Exception:
         logger.exception("Failed to load gym data")
+        _initialized = False  # Allow retry on next call
         return False
 
 
