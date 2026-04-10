@@ -197,6 +197,66 @@ _Researched 2026-02-10. Each task has full implementation details so it can be p
 
 ---
 
+---
+
+## Session 7 — Dashboard Performance Optimization
+
+### Phase 1: Backend Query Fixes (Highest Impact)
+
+#### Step 1: Postcode Index Fix (CRITICAL — 10-100x faster queries)
+- [ ] Add `postcode_clean` column to Property model (`app/models.py`)
+- [ ] Add migration backfill: `UPDATE properties SET postcode_clean = REPLACE(UPPER(postcode), ' ', '')`
+- [ ] Add index `ix_property_postcode_clean`
+- [ ] Replace all `func.replace(func.upper(...)).like(...)` in `app/routers/properties.py` (5 occurrences)
+- [ ] Replace same pattern in `app/routers/analytics.py`
+- [ ] Populate `postcode_clean` on property create/update in scraper
+- [ ] Verify: `pytest tests/ -x -q` + EXPLAIN QUERY PLAN shows index usage
+
+#### Step 2: Async Crime Fetching (no more 60s blocking)
+- [ ] Split `get_crime_summary()` into cached-return + background fetch
+- [ ] Add `fetching: bool` field to crime response schema
+- [ ] Use FastAPI `BackgroundTasks` for 60-month fetch
+- [ ] Update `CrimeSection.tsx` to poll when `fetching: true`
+- [ ] Fix threshold off-by-one (line 145: `>` → `>=`)
+- [ ] Verify: property page loads without crime blocking
+
+#### Step 3: Server Cache Tuning
+- [ ] Increase market-overview TTL: 300s → 1800s
+- [ ] Increase housing-insights TTL: 120s → 600s
+- [ ] Add 10-min TTL cache for per-postcode summary
+- [ ] Add cache invalidation hook after scraper inserts
+- [ ] Verify: repeat page loads are instant
+
+### Phase 2: Frontend Caching (High Impact)
+
+#### Step 4: TanStack Query
+- [ ] Install `@tanstack/react-query`
+- [ ] Add QueryClientProvider in `main.tsx` (staleTime: 5min, gcTime: 30min)
+- [ ] Create query hooks (`usePropertyQuery`, `useSimilarQuery`, etc.)
+- [ ] Convert PropertyDetailPage to query hooks
+- [ ] Convert MarketOverviewPage
+- [ ] Convert section components (Crime, Growth, Listing, FloodRisk)
+- [ ] Verify: `npm run build` + navigation caching works
+
+#### Step 5: LazySection Expansion
+- [ ] Wrap GrowthSection in LazySection
+- [ ] Verify: initial page load fires only 2-3 API calls
+
+### Phase 3: Query Optimization (Medium Impact)
+
+#### Step 6: Similar Properties Query Optimization
+- [ ] Scope subquery to target outcode + property type (not all 5.5M sales)
+- [ ] Use `postcode_clean` for prefix match
+- [ ] Verify: similar properties loads in <200ms
+
+#### Step 7: Async Listing Status
+- [ ] Return stale cached data immediately with `stale: true`
+- [ ] Background refresh via BackgroundTasks
+- [ ] Frontend shows stale data with "Refreshing..." badge
+- [ ] Verify: listing section loads instantly
+
+---
+
 ## Remaining Backlog
 - [ ] PDF Report Export (weasyprint + matplotlib)
 - [ ] Stamp Duty & Mortgage Calculators (pure frontend)

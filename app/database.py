@@ -20,6 +20,7 @@ def _set_sqlite_pragmas(dbapi_conn, connection_record):
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.execute("PRAGMA cache_size=-64000")
     cursor.execute("PRAGMA temp_store=MEMORY")
+    cursor.execute("PRAGMA case_sensitive_like=ON")
     cursor.close()
 
 
@@ -97,6 +98,8 @@ def _migrate_db():
             "ALTER TABLE properties ADD COLUMN dist_nearest_premium_supermarket_km REAL",
             "ALTER TABLE properties ADD COLUMN dist_nearest_budget_supermarket_km REAL",
             "ALTER TABLE properties ADD COLUMN supermarkets_within_2km INTEGER",
+            # Postcode clean column for fast index-based lookups
+            "ALTER TABLE properties ADD COLUMN postcode_clean TEXT",
         ]
         for sql in migrations:
             try:
@@ -121,6 +124,7 @@ def _migrate_db():
         "CREATE INDEX IF NOT EXISTS ix_property_updated_at ON properties (updated_at)",
         "CREATE INDEX IF NOT EXISTS ix_property_postcode_listing ON properties (postcode, listing_status)",
         "CREATE INDEX IF NOT EXISTS ix_property_postcode_updated ON properties (postcode, updated_at)",
+        "CREATE INDEX IF NOT EXISTS ix_property_postcode_clean ON properties (postcode_clean)",
     ]
     with engine.connect() as conn:
         for sql in index_stmts:
@@ -128,6 +132,7 @@ def _migrate_db():
         conn.commit()
 
     _backfill_parsed_fields()
+    _backfill_postcode_clean()
 
 
 def _backfill_parsed_fields():
@@ -159,6 +164,19 @@ def _backfill_parsed_fields():
                 {"price": price_numeric, "date": date_iso, "id": row[0]},
             )
         conn.commit()
+
+
+def _backfill_postcode_clean():
+    """Populate postcode_clean column for existing properties."""
+    import sqlalchemy
+
+    with engine.connect() as conn:
+        result = conn.execute(sqlalchemy.text(
+            "UPDATE properties SET postcode_clean = REPLACE(UPPER(postcode), ' ', '') "
+            "WHERE postcode_clean IS NULL AND postcode IS NOT NULL"
+        ))
+        if result.rowcount:
+            conn.commit()
 
 
 def get_db():

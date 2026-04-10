@@ -110,7 +110,10 @@
       "Bash(grep:*)",
       "Bash(python3:*)",
       "Bash(wmic:*)",
-      "Bash(wmic process:*)"
+      "Bash(wmic process:*)",
+      "Bash(git merge:*)",
+      "Bash(sqlite3 /c/dev/rightmove-api/uk_house_prices.db '.schema properties')",
+      "Bash(sqlite3 /c/dev/rightmove-api/uk_house_prices.db \"SELECT COUNT\\(*\\), COUNT\\(broadband_median_speed\\) FROM properties;\")"
     ]
   }
 }

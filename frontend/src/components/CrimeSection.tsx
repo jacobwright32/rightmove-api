@@ -59,24 +59,38 @@ export default function CrimeSection({ postcode }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
     setLoading(true);
     setError(null);
 
-    getCrimeData(postcode)
-      .then((res) => {
-        if (!cancelled) setData(res);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load crime data");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const fetchData = () => {
+      getCrimeData(postcode)
+        .then((res) => {
+          if (cancelled) return;
+          setData(res);
+          setLoading(false);
+          // Poll if backend is still fetching
+          if (res.fetching) {
+            pollTimer = setTimeout(fetchData, 4000);
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setError(err instanceof Error ? err.message : "Failed to load crime data");
+            setLoading(false);
+          }
+        });
+    };
 
-    return () => { cancelled = true; };
+    fetchData();
+
+    return () => {
+      cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
   }, [postcode]);
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="rounded-lg border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-200">
@@ -137,6 +151,12 @@ export default function CrimeSection({ postcode }: Props) {
           <span className="text-xs">({data.months_covered} months)</span>
           {data.cached && (
             <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs dark:bg-gray-700">cached</span>
+          )}
+          {data.fetching && (
+            <span className="flex items-center gap-1 rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+              <span className="inline-block h-2 w-2 animate-spin rounded-full border border-blue-500 border-t-transparent" />
+              refreshing
+            </span>
           )}
         </div>
       </div>

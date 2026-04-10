@@ -29,7 +29,6 @@ def _ensure_data() -> bool:
     if _initialized:
         return _pc_to_broadband is not None
 
-    _initialized = True
     cache_path = config.BROADBAND_CACHE_PATH
 
     try:
@@ -44,6 +43,7 @@ def _ensure_data() -> bool:
             if age_days < config.BROADBAND_MAX_AGE_DAYS:
                 df = pd.read_parquet(str(cache_path))
                 _load_dict(df)
+                _initialized = True
                 logger.info(
                     "Broadband loaded from cache: %d postcodes",
                     len(_pc_to_broadband),
@@ -81,11 +81,14 @@ def _ensure_data() -> bool:
         pc_col = None
         median_col = None
         conn_cols = {}  # speed_threshold -> column_name
+        fttp_col = None
         for col, cl in col_lower.items():
             if cl in ("postcode", "pcds", "pcd"):
                 pc_col = col
             elif "median" in cl and "download" in cl and "speed" in cl:
                 median_col = col
+            elif "fttp" in cl or ("full fibre" in cl and ("%" in cl or "pct" in cl or "proportion" in cl)):
+                fttp_col = col
             elif cl.startswith("number of connections"):
                 if ">= 300" in cl:
                     conn_cols["ufbb"] = col
@@ -125,17 +128,21 @@ def _ensure_data() -> bool:
                 ufbb_count = df[conn_cols["ufbb"]].fillna(0)
                 out["broadband_ultrafast_pct"] = (ufbb_count / total.replace(0, float("nan")) * 100).round(1)
 
+        if fttp_col:
+            out["broadband_full_fibre_pct"] = pd.to_numeric(df[fttp_col], errors="coerce").round(1)
+
         df = out
 
         # Drop rows without postcode
         df = df.dropna(subset=["postcode"])
 
         # Cache as parquet
-        config.NAPTAN_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
         df.to_parquet(str(cache_path), index=False)
         logger.info("Broadband cached: %d postcodes", len(df))
 
         _load_dict(df)
+        _initialized = True
         return True
 
     except Exception:

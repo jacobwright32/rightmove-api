@@ -142,7 +142,7 @@ def get_crime_summary(
         time.sleep(CRIME_API_DELAY)
 
     # If >50% of months had API failures, don't cache — data is unreliable
-    if api_failures > CRIME_FETCH_MONTHS * CRIME_FAILURE_THRESHOLD:
+    if api_failures >= CRIME_FETCH_MONTHS * CRIME_FAILURE_THRESHOLD:
         logger.warning(
             "Crime fetch for %s: %d/%d months had API failures, not caching",
             clean, api_failures, CRIME_FETCH_MONTHS,

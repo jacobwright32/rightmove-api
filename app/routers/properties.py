@@ -31,7 +31,7 @@ def list_properties(
 
     if postcode:
         pc = postcode.upper().replace("-", "").replace(" ", "")
-        query = query.filter(func.replace(func.upper(Property.postcode), " ", "").like(f"%{pc}%"))
+        query = query.filter(Property.postcode_clean.like(f"{pc}%"))
     if property_type:
         query = query.filter(Property.property_type.ilike(f"%{property_type}%"))
     if min_bedrooms is not None:
@@ -70,7 +70,7 @@ def get_properties_geo(
 
     if postcode:
         pc = postcode.upper().replace("-", "").replace(" ", "")
-        query = query.filter(func.replace(func.upper(Property.postcode), " ", "").like(f"%{pc}%"))
+        query = query.filter(Property.postcode_clean.like(f"{pc}%"))
 
     props = query.limit(limit).all()
     if not props:
@@ -142,7 +142,7 @@ def get_properties_geo(
 @router.get("/properties/{property_id}", response_model=PropertyDetail, response_model_exclude_none=True)
 def get_property(property_id: int, db: Session = Depends(get_db)):
     """Get a single property with its full sale history."""
-    prop = db.query(Property).filter(Property.id == property_id).first()
+    prop = db.query(Property).options(joinedload(Property.sales)).filter(Property.id == property_id).first()
     if not prop:
         raise HTTPException(status_code=404, detail="Property not found")
     return prop
@@ -196,14 +196,24 @@ def get_similar_properties(
     # 4. Build query for similar properties
     target_type = (target.property_type or "").strip()
     target_beds = target.bedrooms
+    outcode_prefix = target_outcode.replace(" ", "")
 
-    # Subquery: latest sale price per property
+    # Subquery: IDs of properties in the same outcode (scoped to reduce work)
+    outcode_ids = (
+        db.query(Property.id)
+        .filter(Property.postcode_clean.like(f"{outcode_prefix}%"))
+        .filter(Property.id != target.id)
+        .subquery()
+    )
+
+    # Subquery: latest sale price per property (scoped to outcode only)
     latest_sale_sub = (
         db.query(
             Sale.property_id,
             func.max(Sale.date_sold_iso).label("max_date"),
         )
         .filter(Sale.price_numeric.isnot(None))
+        .filter(Sale.property_id.in_(db.query(outcode_ids.c.id)))
         .group_by(Sale.property_id)
         .subquery()
     )
@@ -226,11 +236,6 @@ def get_similar_properties(
         .options(joinedload(Property.sales))
         .join(latest_price_sub, Property.id == latest_price_sub.c.property_id)
         .filter(Property.id != target.id)
-    )
-
-    # Same outcode prefix
-    query = query.filter(
-        func.upper(Property.postcode).like(f"{target_outcode} %")
     )
 
     # Property type match (case-insensitive)
@@ -256,7 +261,7 @@ def get_similar_properties(
 def get_postcode_status(postcode: str, db: Session = Depends(get_db)):
     """Check if we have data for a postcode, with property count and last update time."""
     postcode_clean = postcode.upper().replace("-", "").replace(" ", "")
-    props = db.query(Property).filter(func.replace(func.upper(Property.postcode), " ", "").like(f"%{postcode_clean}%")).all()
+    props = db.query(Property).filter(Property.postcode_clean == postcode_clean).all()
     if not props:
         return PostcodeStatus(has_data=False, property_count=0, last_updated=None)
     last_updated = max((p.updated_at or p.created_at) for p in props if p.updated_at or p.created_at)
@@ -276,7 +281,7 @@ def suggest_postcodes(partial: str, db: Session = Depends(get_db)):
         db.query(Property.postcode)
         .filter(
             Property.postcode.isnot(None),
-            func.replace(func.upper(Property.postcode), " ", "").like(f"{partial_clean}%"),
+            Property.postcode_clean.like(f"{partial_clean}%"),
         )
         .distinct()
         .all()
@@ -409,7 +414,7 @@ def export_sales_data(postcode: str, db: Session = Depends(get_db)):
     props = (
         db.query(Property)
         .options(joinedload(Property.sales))
-        .filter(func.replace(func.upper(Property.postcode), " ", "").like(f"%{pc_clean}%"))
+        .filter(Property.postcode_clean == pc_clean)
         .all()
     )
 

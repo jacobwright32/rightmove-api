@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   CartesianGrid,
@@ -9,8 +9,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { enrichEPC, getProperty, getSimilarProperties } from "../api/client";
-import type { PropertyBrief, PropertyDetail } from "../api/types";
+import { useQueryClient } from "@tanstack/react-query";
+import { enrichEPC, getProperty } from "../api/client";
+import { usePropertyQuery, useSimilarQuery } from "../hooks/useQueries";
+import type { PropertyDetail } from "../api/types";
 import CrimeSection from "../components/CrimeSection";
 import EPCBadge from "../components/EPCBadge";
 import FloodRiskBadge from "../components/FloodRiskBadge";
@@ -27,6 +29,7 @@ import GymsSection from "../components/GymsSection";
 import PubsSection from "../components/PubsSection";
 import SupermarketsSection from "../components/SupermarketsSection";
 import TransportSection from "../components/TransportSection";
+import LazySection from "../components/LazySection";
 import SaleHistoryTable from "../components/SaleHistoryTable";
 import { useDarkMode } from "../hooks/useDarkMode";
 import { getChartColors } from "../utils/chartTheme";
@@ -44,10 +47,17 @@ function parseJsonArray(raw: string | null): string[] {
 
 export default function PropertyDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [property, setProperty] = useState<PropertyDetail | null>(null);
-  const [similar, setSimilar] = useState<PropertyBrief[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const numId = Number(id) || 0;
+  const queryClient = useQueryClient();
+
+  const { data: property, isLoading: loading, error: propError } = usePropertyQuery(numId);
+  const { data: similar = [] } = useSimilarQuery(numId);
+  const error = propError ? (propError instanceof Error ? propError.message : "Property not found") : null;
+
+  const setProperty = (updated: PropertyDetail) => {
+    queryClient.setQueryData(["property", numId], updated);
+  };
+
   const [epcLoading, setEpcLoading] = useState(false);
   const [epcMessage, setEpcMessage] = useState<string | null>(null);
   const dark = useDarkMode();
@@ -60,8 +70,7 @@ export default function PropertyDetailPage() {
     try {
       const result = await enrichEPC(property.postcode);
       setEpcMessage(result.message);
-      // Refresh property data to show new EPC fields
-      const updated = await getProperty(Number(id));
+      const updated = await getProperty(numId);
       setProperty(updated);
     } catch (err) {
       setEpcMessage(err instanceof Error ? err.message : "Failed to fetch EPC data");
@@ -69,31 +78,6 @@ export default function PropertyDetailPage() {
       setEpcLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-    setLoading(true);
-
-    Promise.all([
-      getProperty(Number(id)),
-      getSimilarProperties(Number(id)).catch(() => [] as PropertyBrief[]),
-    ])
-      .then(([prop, sim]) => {
-        if (!cancelled) {
-          setProperty(prop);
-          setSimilar(sim);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Property not found");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [id]);
 
   if (loading) {
     return (
@@ -362,14 +346,18 @@ export default function PropertyDetailPage() {
       {/* Capital growth */}
       {property.postcode && (
         <div className="mb-6">
-          <GrowthSection postcode={property.postcode} />
+          <LazySection>
+            <GrowthSection postcode={property.postcode} />
+          </LazySection>
         </div>
       )}
 
       {/* Flood risk */}
       {property.postcode && (
         <div className="mb-6">
-          <FloodRiskSection postcode={property.postcode} />
+          <LazySection>
+            <FloodRiskSection postcode={property.postcode} />
+          </LazySection>
         </div>
       )}
 
@@ -439,14 +427,18 @@ export default function PropertyDetailPage() {
       {/* Planning applications */}
       {property.postcode && (
         <div className="mb-6">
-          <PlanningSection postcode={property.postcode} />
+          <LazySection>
+            <PlanningSection postcode={property.postcode} />
+          </LazySection>
         </div>
       )}
 
       {/* Crime statistics */}
       {property.postcode && (
         <div className="mb-6">
-          <CrimeSection postcode={property.postcode} />
+          <LazySection>
+            <CrimeSection postcode={property.postcode} />
+          </LazySection>
         </div>
       )}
 

@@ -11,6 +11,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy import event as sa_event
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -22,6 +23,7 @@ class Property(Base):
     id = Column(Integer, primary_key=True, index=True)
     address = Column(String, unique=True, nullable=False)
     postcode = Column(String, index=True)
+    postcode_clean = Column(String, index=True, nullable=True)  # UPPER, no spaces — for fast lookups
     property_type = Column(String)
     bedrooms = Column(Integer)
     bathrooms = Column(Integer)
@@ -127,6 +129,12 @@ class Property(Base):
     )
 
     sales = relationship("Sale", back_populates="property", cascade="all, delete-orphan")
+
+
+@sa_event.listens_for(Property.postcode, "set")
+def _auto_postcode_clean(target, value, _oldvalue, _initiator):
+    """Auto-populate postcode_clean whenever postcode is set."""
+    target.postcode_clean = value.upper().replace(" ", "") if value else None
 
 
 class Sale(Base):

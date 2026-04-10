@@ -95,6 +95,14 @@ class PropertyBrief(BaseModel):
     dist_nearest_green_space_km: Optional[float] = None
     nearest_green_space_name: Optional[str] = None
     green_spaces_within_1km: Optional[int] = None
+    # Pubs (OpenStreetMap)
+    dist_nearest_pub_km: Optional[float] = None
+    nearest_pub_name: Optional[str] = None
+    pubs_within_1km: Optional[int] = None
+    # Gyms (OpenStreetMap)
+    dist_nearest_gym_km: Optional[float] = None
+    nearest_gym_name: Optional[str] = None
+    gyms_within_2km: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -477,6 +485,7 @@ class CrimeSummaryResponse(BaseModel):
     total_crimes: int = 0
     months_covered: int = 0
     cached: bool = False
+    fetching: bool = False
 
 
 # --- Modelling schemas ---

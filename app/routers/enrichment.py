@@ -4,10 +4,12 @@ import logging
 import re
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+import threading
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import SessionLocal, get_db
 from ..enrichment.broadband import enrich_postcode_broadband
 from ..enrichment.bulk import get_coverage, get_status, start, stop
 from ..enrichment.crime import get_crime_summary
@@ -460,27 +462,93 @@ def enrich_listing(postcode: str, db: Session = Depends(get_db)):
 crime_router = APIRouter(tags=["analytics"])
 
 
+_crime_fetching: set[str] = set()  # postcodes currently being fetched
+_crime_lock = threading.Lock()
+
+
+def _fetch_crime_background(postcode: str):
+    """Background worker: fetch crime data and store in DB."""
+    db = SessionLocal()
+    try:
+        get_crime_summary(db, postcode)
+    except Exception:
+        logger.exception("Background crime fetch failed for %s", postcode)
+    finally:
+        db.close()
+        with _crime_lock:
+            _crime_fetching.discard(postcode)
+
+
 @crime_router.get(
     "/analytics/postcode/{postcode}/crime",
     response_model=CrimeSummaryResponse,
 )
-def get_postcode_crime(postcode: str, db: Session = Depends(get_db)):
+def get_postcode_crime(
+    postcode: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """Get crime statistics for a postcode area.
 
     Uses the free UK Police API (no auth required).
-    Results are cached for 30 days.
+    Returns cached data instantly. If no cache exists, returns empty
+    with fetching=true and fetches in background.
     """
     clean = postcode.upper().strip()
-    summary = get_crime_summary(db, clean)
 
-    return CrimeSummaryResponse(
-        postcode=clean,
-        categories=summary["categories"],
-        monthly_trend=summary["monthly_trend"],
-        total_crimes=summary["total_crimes"],
-        months_covered=summary["months_covered"],
-        cached=summary["cached"],
+    # Try to serve from cache first (fast path)
+    from ..enrichment.crime import get_crime_summary
+    from ..constants import CRIME_CACHE_DAYS
+    from datetime import datetime, timedelta, timezone
+    from ..models import CrimeStats
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=CRIME_CACHE_DAYS)
+    cached = (
+        db.query(CrimeStats)
+        .filter(CrimeStats.postcode == clean)
+        .order_by(CrimeStats.fetched_at.desc())
+        .first()
     )
+
+    if cached and cached.fetched_at and cached.fetched_at.replace(tzinfo=timezone.utc) >= cutoff:
+        # Fresh cache — serve immediately
+        from ..enrichment.crime import _build_summary
+        all_stats = db.query(CrimeStats).filter(CrimeStats.postcode == clean).all()
+        summary = _build_summary(all_stats, cached=True)
+        return CrimeSummaryResponse(
+            postcode=clean,
+            categories=summary["categories"],
+            monthly_trend=summary["monthly_trend"],
+            total_crimes=summary["total_crimes"],
+            months_covered=summary["months_covered"],
+            cached=True,
+        )
+
+    # No fresh cache — check if already fetching
+    with _crime_lock:
+        already_fetching = clean in _crime_fetching
+        if not already_fetching:
+            _crime_fetching.add(clean)
+
+    if not already_fetching:
+        background_tasks.add_task(_fetch_crime_background, clean)
+
+    # Return stale data if available, otherwise empty
+    if cached:
+        from ..enrichment.crime import _build_summary
+        all_stats = db.query(CrimeStats).filter(CrimeStats.postcode == clean).all()
+        summary = _build_summary(all_stats, cached=True)
+        return CrimeSummaryResponse(
+            postcode=clean,
+            categories=summary["categories"],
+            monthly_trend=summary["monthly_trend"],
+            total_crimes=summary["total_crimes"],
+            months_covered=summary["months_covered"],
+            cached=True,
+            fetching=True,
+        )
+
+    return CrimeSummaryResponse(postcode=clean, fetching=True)
 
 
 # ── Bulk enrichment endpoints ──────────────────────────────────────

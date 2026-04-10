@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -11,39 +10,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { getGrowthLeaderboard, getMarketOverview } from "../api/client";
-import type { GrowthLeaderboardEntry, MarketOverview } from "../api/types";
 import StatCard from "../components/StatCard";
 import { useDarkMode } from "../hooks/useDarkMode";
+import { useMarketOverview, useGrowthLeaderboard } from "../hooks/useQueries";
 import { getChartColors } from "../utils/chartTheme";
 import { formatPrice, formatPriceFull } from "../utils/formatting";
 
 export default function MarketOverviewPage() {
-  const [data, setData] = useState<MarketOverview | null>(null);
-  const [leaderboard, setLeaderboard] = useState<GrowthLeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading: loading, error: queryError } = useMarketOverview();
+  const { data: leaderboard = [] } = useGrowthLeaderboard(20, 5);
+  const error = queryError ? (queryError instanceof Error ? queryError.message : "Failed to load") : null;
   const dark = useDarkMode();
   const colors = getChartColors(dark);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    Promise.all([
-      getMarketOverview(),
-      getGrowthLeaderboard(20, 5).catch(() => [] as GrowthLeaderboardEntry[]),
-    ])
-      .then(([d, lb]) => {
-        if (!cancelled) { setData(d); setLeaderboard(lb); }
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, []);
 
   if (loading) {
     return (

@@ -451,6 +451,7 @@ export interface CrimeSummaryResponse {
   total_crimes: number;
   months_covered: number;
   cached: boolean;
+  fetching: boolean;
 }
 
 // Modelling

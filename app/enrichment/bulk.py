@@ -203,7 +203,9 @@ def _batch_local_enrichments(db: Session, types: list[str]):
         from ..enrichment.broadband import _ensure_data as init_broadband, get_broadband_for_postcode
         if init_broadband():
             inits["broadband"] = get_broadband_for_postcode
-        _log("Broadband data ready.")
+            _log("Broadband data ready.")
+        else:
+            _log("WARNING: Broadband data failed to load.")
 
     if not inits:
         _log("No local enrichment data available.")

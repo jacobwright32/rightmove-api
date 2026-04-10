@@ -59,7 +59,7 @@ def _cache_set(key, value):
 @router.get("/market-overview", response_model=MarketOverview)
 def get_market_overview(db: Session = Depends(get_db)):
     """Database-wide aggregated statistics across all properties and sales."""
-    cached = _cache_get("market_overview", 300)  # 5 min TTL
+    cached = _cache_get("market_overview", 1800)  # 30 min TTL
     if cached is not None:
         return cached
     # 1. Count distinct postcodes, properties, sales
@@ -289,7 +289,7 @@ def get_housing_insights(
     scatter, heatmap, KPIs, and investment deals."""
     # Cache key based on all filter params
     cache_key = f"insights:{property_type}:{min_bedrooms}:{max_bedrooms}:{min_bathrooms}:{max_bathrooms}:{min_price}:{max_price}:{postcode_prefix}:{tenure}:{epc_rating}:{has_garden}:{has_parking}:{chain_free}:{has_listing}"
-    cached = _cache_get(cache_key, 120)  # 2 min TTL
+    cached = _cache_get(cache_key, 600)  # 10 min TTL
     if cached is not None:
         return cached
 
@@ -1069,7 +1069,7 @@ def _get_sales_for_postcode(db: Session, postcode: str):
     return (
         db.query(Sale, Property)
         .join(Property, Sale.property_id == Property.id)
-        .filter(func.replace(func.upper(Property.postcode), " ", "").like(f"%{postcode_clean}%"))
+        .filter(Property.postcode_clean == postcode_clean)
         .all()
     )
 
