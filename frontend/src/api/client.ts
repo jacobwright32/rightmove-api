@@ -1,10 +1,40 @@
 import axios from "axios";
 import type {
   AreaScrapeResponse,
+  AvailableFeaturesResponse,
+  BroadbandEnrichmentResponse,
+  BulkEnrichmentStatus,
+  CoverageResponse,
+  CrimeSummaryResponse,
+  EPCEnrichmentResponse,
+  FloodRiskResponse,
+  GreenSpacesEnrichmentResponse,
+  GymsEnrichmentResponse,
+  GrowthLeaderboardEntry,
+  HealthcareEnrichmentResponse,
+  IMDEnrichmentResponse,
+  PubsEnrichmentResponse,
+  SchoolsEnrichmentResponse,
+  SupermarketsEnrichmentResponse,
+  PropertyGeoPoint,
+  HousingInsightsFilters,
+  HousingInsightsResponse,
+  MarketOverview,
+  PlanningResponse,
   PostcodeAnalytics,
+  PostcodeGrowthResponse,
+  PostcodePredictionResponse,
   PostcodeStatus,
+  PostcodeSummary,
+  OutcodeSummary,
+  PropertyBrief,
   PropertyDetail,
+  PropertyListingResponse,
   ScrapeResponse,
+  SinglePredictionResponse,
+  TrainRequest,
+  TrainResponse,
+  TransportEnrichmentResponse,
 } from "./types";
 
 const api = axios.create({ baseURL: "/api/v1" });
@@ -20,14 +50,17 @@ export async function checkPostcodeStatus(
 
 export async function scrapePostcode(
   postcode: string,
-  opts?: { pages?: number; linkCount?: number; floorplan?: boolean; extraFeatures?: boolean; saveParquet?: boolean }
+  opts?: { pages?: number; linkCount?: number; floorplan?: boolean; extraFeatures?: boolean; saveParquet?: boolean; skipExisting?: boolean; force?: boolean; mode?: string }
 ): Promise<ScrapeResponse> {
-  const params: Record<string, number | boolean> = {};
+  const params: Record<string, number | boolean | string> = {};
   if (opts?.pages) params.pages = opts.pages;
   if (opts?.linkCount !== undefined) params.link_count = opts.linkCount;
   if (opts?.floorplan) params.floorplan = true;
   if (opts?.extraFeatures) params.extra_features = true;
   if (opts?.saveParquet) params.save_parquet = true;
+  if (opts?.skipExisting === false) params.skip_existing = false;
+  if (opts?.force) params.force = true;
+  if (opts?.mode) params.mode = opts.mode;
   const res = await api.post<ScrapeResponse>(
     `/scrape/postcode/${encodeURIComponent(postcode)}`,
     null,
@@ -47,15 +80,18 @@ export async function getAnalytics(
 
 export async function scrapeArea(
   partial: string,
-  opts?: { pages?: number; linkCount?: number; maxPostcodes?: number; floorplan?: boolean; extraFeatures?: boolean; saveParquet?: boolean }
+  opts?: { pages?: number; linkCount?: number; maxPostcodes?: number; floorplan?: boolean; extraFeatures?: boolean; saveParquet?: boolean; skipExisting?: boolean; force?: boolean; mode?: string }
 ): Promise<AreaScrapeResponse> {
-  const params: Record<string, number | boolean> = {};
+  const params: Record<string, number | boolean | string> = {};
   if (opts?.pages) params.pages = opts.pages;
   if (opts?.linkCount !== undefined) params.link_count = opts.linkCount;
   if (opts?.maxPostcodes !== undefined) params.max_postcodes = opts.maxPostcodes;
   if (opts?.floorplan) params.floorplan = true;
   if (opts?.extraFeatures) params.extra_features = true;
   if (opts?.saveParquet) params.save_parquet = true;
+  if (opts?.skipExisting === false) params.skip_existing = false;
+  if (opts?.force) params.force = true;
+  if (opts?.mode) params.mode = opts.mode;
   const res = await api.post<AreaScrapeResponse>(
     `/scrape/area/${encodeURIComponent(partial)}`,
     null,
@@ -74,10 +110,41 @@ export async function suggestPostcodes(
 }
 
 export async function getProperties(
-  postcode: string
+  postcode: string,
+  opts?: { listingOnly?: boolean }
 ): Promise<PropertyDetail[]> {
-  const res = await api.get<PropertyDetail[]>("/properties", {
-    params: { postcode, limit: 0 },
+  const params: Record<string, string | number | boolean> = { postcode, limit: 500 };
+  if (opts?.listingOnly !== undefined) params.listing_only = opts.listingOnly;
+  const res = await api.get<PropertyDetail[]>("/properties", { params });
+  return res.data;
+}
+
+export async function getMarketOverview(): Promise<MarketOverview> {
+  const res = await api.get<MarketOverview>("/analytics/market-overview");
+  return res.data;
+}
+
+export async function getScrapedPostcodes(): Promise<PostcodeSummary[]> {
+  const res = await api.get<PostcodeSummary[]>("/postcodes");
+  return res.data;
+}
+
+export async function getOutcodeSummaries(): Promise<OutcodeSummary[]> {
+  const res = await api.get<OutcodeSummary[]>("/outcodes");
+  return res.data;
+}
+
+export async function getProperty(id: number): Promise<PropertyDetail> {
+  const res = await api.get<PropertyDetail>(`/properties/${id}`);
+  return res.data;
+}
+
+export async function getSimilarProperties(
+  id: number,
+  limit = 5
+): Promise<PropertyBrief[]> {
+  const res = await api.get<PropertyBrief[]>(`/properties/${id}/similar`, {
+    params: { limit },
   });
   return res.data;
 }
@@ -95,5 +162,329 @@ export async function exportSalesData(
   const res = await api.post<ExportResponse>(
     `/export/${encodeURIComponent(postcode)}`
   );
+  return res.data;
+}
+
+export async function getHousingInsights(
+  filters: HousingInsightsFilters = {}
+): Promise<HousingInsightsResponse> {
+  const params: Record<string, string | number | boolean> = {};
+  if (filters.property_type) params.property_type = filters.property_type;
+  if (filters.min_bedrooms !== undefined) params.min_bedrooms = filters.min_bedrooms;
+  if (filters.max_bedrooms !== undefined) params.max_bedrooms = filters.max_bedrooms;
+  if (filters.min_bathrooms !== undefined) params.min_bathrooms = filters.min_bathrooms;
+  if (filters.max_bathrooms !== undefined) params.max_bathrooms = filters.max_bathrooms;
+  if (filters.min_price !== undefined) params.min_price = filters.min_price;
+  if (filters.max_price !== undefined) params.max_price = filters.max_price;
+  if (filters.postcode_prefix) params.postcode_prefix = filters.postcode_prefix;
+  if (filters.tenure) params.tenure = filters.tenure;
+  if (filters.epc_rating) params.epc_rating = filters.epc_rating;
+  if (filters.has_garden !== undefined) params.has_garden = filters.has_garden;
+  if (filters.has_parking !== undefined) params.has_parking = filters.has_parking;
+  if (filters.chain_free !== undefined) params.chain_free = filters.chain_free;
+  if (filters.has_listing !== undefined) params.has_listing = filters.has_listing;
+  const res = await api.get<HousingInsightsResponse>("/analytics/housing-insights", { params });
+  return res.data;
+}
+
+export async function enrichEPC(
+  postcode: string
+): Promise<EPCEnrichmentResponse> {
+  const res = await api.post<EPCEnrichmentResponse>(
+    `/enrich/epc/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function getPropertiesGeo(
+  postcode?: string,
+  limit = 500,
+): Promise<PropertyGeoPoint[]> {
+  const params: Record<string, string | number> = { limit };
+  if (postcode) params.postcode = postcode;
+  const res = await api.get<PropertyGeoPoint[]>("/properties/geo", { params });
+  return res.data;
+}
+
+export async function getFloodRisk(
+  postcode: string,
+): Promise<FloodRiskResponse> {
+  const res = await api.get<FloodRiskResponse>(
+    `/analytics/postcode/${encodeURIComponent(postcode)}/flood-risk`
+  );
+  return res.data;
+}
+
+export async function getGrowthData(
+  postcode: string,
+): Promise<PostcodeGrowthResponse> {
+  const res = await api.get<PostcodeGrowthResponse>(
+    `/analytics/postcode/${encodeURIComponent(postcode)}/growth`
+  );
+  return res.data;
+}
+
+export async function getGrowthLeaderboard(
+  limit = 20,
+  period = 5,
+): Promise<GrowthLeaderboardEntry[]> {
+  const res = await api.get<GrowthLeaderboardEntry[]>(
+    "/analytics/growth-leaderboard",
+    { params: { limit, period } }
+  );
+  return res.data;
+}
+
+export async function getPlanningApplications(
+  postcode: string
+): Promise<PlanningResponse> {
+  const res = await api.get<PlanningResponse>(
+    `/analytics/postcode/${encodeURIComponent(postcode)}/planning`
+  );
+  return res.data;
+}
+
+export async function getPropertyListing(
+  propertyId: number,
+): Promise<PropertyListingResponse> {
+  const res = await api.get<PropertyListingResponse>(
+    `/properties/${propertyId}/listing`
+  );
+  return res.data;
+}
+
+export async function enrichBroadband(
+  postcode: string
+): Promise<BroadbandEnrichmentResponse> {
+  const res = await api.post<BroadbandEnrichmentResponse>(
+    `/enrich/broadband/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichIMD(
+  postcode: string
+): Promise<IMDEnrichmentResponse> {
+  const res = await api.post<IMDEnrichmentResponse>(
+    `/enrich/imd/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichHealthcare(
+  postcode: string
+): Promise<HealthcareEnrichmentResponse> {
+  const res = await api.post<HealthcareEnrichmentResponse>(
+    `/enrich/healthcare/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichSchools(
+  postcode: string
+): Promise<SchoolsEnrichmentResponse> {
+  const res = await api.post<SchoolsEnrichmentResponse>(
+    `/enrich/schools/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichSupermarkets(
+  postcode: string
+): Promise<SupermarketsEnrichmentResponse> {
+  const res = await api.post<SupermarketsEnrichmentResponse>(
+    `/enrich/supermarkets/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichGreenSpaces(
+  postcode: string
+): Promise<GreenSpacesEnrichmentResponse> {
+  const res = await api.post<GreenSpacesEnrichmentResponse>(
+    `/enrich/green-spaces/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichPubs(
+  postcode: string
+): Promise<PubsEnrichmentResponse> {
+  const res = await api.post<PubsEnrichmentResponse>(
+    `/enrich/pubs/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichGyms(
+  postcode: string
+): Promise<GymsEnrichmentResponse> {
+  const res = await api.post<GymsEnrichmentResponse>(
+    `/enrich/gyms/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function enrichTransport(
+  postcode: string
+): Promise<TransportEnrichmentResponse> {
+  const res = await api.post<TransportEnrichmentResponse>(
+    `/enrich/transport/${encodeURIComponent(postcode)}`
+  );
+  return res.data;
+}
+
+export async function getCrimeData(
+  postcode: string
+): Promise<CrimeSummaryResponse> {
+  const res = await api.get<CrimeSummaryResponse>(
+    `/analytics/postcode/${encodeURIComponent(postcode)}/crime`
+  );
+  return res.data;
+}
+
+// Modelling
+
+export async function getModelFeatures(): Promise<AvailableFeaturesResponse> {
+  const res = await api.get<AvailableFeaturesResponse>("/model/features");
+  return res.data;
+}
+
+export interface TrainProgress {
+  progress: number;  // 0–1
+  detail: string;
+}
+
+export async function trainModel(
+  request: TrainRequest,
+  onProgress?: (p: TrainProgress) => void,
+): Promise<TrainResponse> {
+  const resp = await fetch("/api/v1/model/train", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+
+  if (!resp.ok && resp.headers.get("content-type")?.includes("application/json")) {
+    const err = await resp.json();
+    throw { response: { data: err } };
+  }
+  if (!resp.ok) {
+    throw { response: { data: { detail: `HTTP ${resp.status}` } } };
+  }
+
+  const reader = resp.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: TrainResponse | null = null;
+  let sseError: string | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // Parse SSE events from buffer
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop()!; // keep incomplete chunk
+
+    for (const part of parts) {
+      let event = "message";
+      let data = "";
+      for (const line of part.split("\n")) {
+        if (line.startsWith("event: ")) event = line.slice(7);
+        else if (line.startsWith("data: ")) data = line.slice(6);
+      }
+      if (!data) continue;
+
+      if (event === "progress" && onProgress) {
+        onProgress(JSON.parse(data));
+      } else if (event === "result") {
+        result = JSON.parse(data);
+      } else if (event === "error") {
+        sseError = JSON.parse(data).detail;
+      }
+    }
+  }
+
+  if (sseError) {
+    throw { response: { data: { detail: sseError } } };
+  }
+  if (!result) {
+    throw { response: { data: { detail: "No result received from server" } } };
+  }
+  return result;
+}
+
+export async function predictProperty(
+  modelId: string,
+  propertyId: number,
+  predictionDate?: string
+): Promise<SinglePredictionResponse> {
+  const params: Record<string, unknown> = { property_id: propertyId };
+  if (predictionDate) params.prediction_date = predictionDate;
+  const res = await api.get<SinglePredictionResponse>(
+    `/model/${modelId}/predict`,
+    { params }
+  );
+  return res.data;
+}
+
+// Bulk Enrichment
+
+export async function getBulkCoverage(): Promise<CoverageResponse> {
+  const res = await api.get<CoverageResponse>("/enrich/bulk/coverage");
+  return res.data;
+}
+
+export async function getBulkStatus(): Promise<BulkEnrichmentStatus> {
+  const res = await api.get<BulkEnrichmentStatus>("/enrich/bulk/status");
+  return res.data;
+}
+
+export async function startBulkEnrichment(
+  types?: string[],
+  delay = 3.0
+): Promise<BulkEnrichmentStatus> {
+  const params: Record<string, string | number> = { delay };
+  if (types && types.length > 0) params.types = types.join(",");
+  const res = await api.post<BulkEnrichmentStatus>(
+    "/enrich/bulk/start",
+    null,
+    { params }
+  );
+  return res.data;
+}
+
+export async function stopBulkEnrichment(): Promise<BulkEnrichmentStatus> {
+  const res = await api.post<BulkEnrichmentStatus>("/enrich/bulk/stop");
+  return res.data;
+}
+
+export async function predictPostcode(
+  modelId: string,
+  postcode: string,
+  predictionDate?: string,
+  limit?: number
+): Promise<PostcodePredictionResponse> {
+  const params: Record<string, unknown> = { postcode };
+  if (predictionDate) params.prediction_date = predictionDate;
+  if (limit) params.limit = limit;
+  const res = await api.get<PostcodePredictionResponse>(
+    `/model/${modelId}/predict-postcode`,
+    { params }
+  );
+  return res.data;
+}
+
+// Admin
+
+export async function resetDatabase(): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>("/admin/reset-database");
+  return res.data;
+}
+
+export async function shutdownServer(): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>("/admin/shutdown");
   return res.data;
 }

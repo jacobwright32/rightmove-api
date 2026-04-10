@@ -3,7 +3,7 @@ line-length = 120
 
 [lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
-ignore = ["E501"]
+ignore = ["E501", "B008"]
 
 [lint.per-file-ignores]
 "tests/*" = ["B", "SIM"]

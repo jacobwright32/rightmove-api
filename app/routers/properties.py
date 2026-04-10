@@ -1,24 +1,27 @@
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from ..constants import OUTCODE_RE
 from ..database import get_db
+from ..enrichment.geocoding import batch_geocode_postcodes
 from ..export import SALES_DATA_DIR, save_property_parquet
-from ..models import Property
-from ..schemas import ExportResponse, PostcodeSummary, PostcodeStatus, PropertyBrief, PropertyDetail
-from ..scraper.rightmove import scrape_postcode_from_listing
+from ..models import Property, Sale
+from ..schemas import ExportResponse, OutcodeSummary, PostcodeStatus, PostcodeSummary, PropertyDetail, PropertyGeoPoint
+from ..scraper.scraper import scrape_postcode_from_listing
 
 router = APIRouter(tags=["properties"])
 
 
-@router.get("/properties", response_model=List[PropertyDetail])
+@router.get("/properties", response_model=list[PropertyDetail], response_model_exclude_none=True)
 def list_properties(
     postcode: Optional[str] = Query(default=None, description="Filter by postcode"),
     property_type: Optional[str] = Query(default=None, description="Filter by property type"),
     min_bedrooms: Optional[int] = Query(default=None, ge=0, description="Minimum bedrooms"),
     max_bedrooms: Optional[int] = Query(default=None, ge=0, description="Maximum bedrooms"),
+    listing_only: Optional[bool] = Query(default=None, description="True=only for-sale listings, False=only properties with sales"),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=0, ge=0, description="Max properties to return (0 = all)"),
     db: Session = Depends(get_db),
@@ -28,7 +31,7 @@ def list_properties(
 
     if postcode:
         pc = postcode.upper().replace("-", "").replace(" ", "")
-        query = query.filter(func.replace(func.upper(Property.postcode), " ", "").like(f"%{pc}%"))
+        query = query.filter(Property.postcode_clean.like(f"{pc}%"))
     if property_type:
         query = query.filter(Property.property_type.ilike(f"%{property_type}%"))
     if min_bedrooms is not None:
@@ -36,37 +39,240 @@ def list_properties(
     if max_bedrooms is not None:
         query = query.filter(Property.bedrooms <= max_bedrooms)
 
+    # Separate listing-only properties from sale-history properties
+    if listing_only is True:
+        query = query.filter(Property.listing_status == "for_sale")
+    elif listing_only is False:
+        query = query.filter(
+            (Property.listing_status.is_(None)) | (Property.listing_status != "for_sale")
+        )
+
     query = query.order_by(Property.created_at.desc()).offset(skip)
     if limit > 0:
         query = query.limit(limit)
     return query.all()
 
 
-@router.get("/properties/{property_id}", response_model=PropertyDetail)
+@router.get("/properties/geo", response_model=list[PropertyGeoPoint], response_model_exclude_none=True)
+def get_properties_geo(
+    postcode: Optional[str] = Query(default=None, description="Filter by postcode prefix"),
+    limit: int = Query(default=500, ge=1, le=2000),
+    db: Session = Depends(get_db),
+):
+    """Return properties with lat/lng coordinates for map display.
+
+    Batch geocodes postcodes via Postcodes.io if coordinates are missing.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    query = db.query(Property).filter(Property.postcode.isnot(None))
+
+    if postcode:
+        pc = postcode.upper().replace("-", "").replace(" ", "")
+        query = query.filter(Property.postcode_clean.like(f"{pc}%"))
+
+    props = query.limit(limit).all()
+    if not props:
+        return []
+
+    # Find postcodes that need geocoding
+    needs_geocoding = set()
+    for p in props:
+        if p.latitude is None and p.postcode:
+            needs_geocoding.add(p.postcode)
+
+    # Batch geocode missing postcodes
+    if needs_geocoding:
+        coords = batch_geocode_postcodes(list(needs_geocoding))
+        for p in props:
+            if p.latitude is None and p.postcode and p.postcode in coords:
+                lat, lng = coords[p.postcode]
+                p.latitude = lat
+                p.longitude = lng
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.warning("Failed to save geocoded coordinates")
+
+    # Single query: latest sale price per property (avoids N+1)
+    prop_ids = [p.id for p in props if p.latitude is not None]
+    latest_sale_sub = (
+        db.query(
+            Sale.property_id,
+            func.max(Sale.date_sold_iso).label("max_date"),
+        )
+        .filter(Sale.property_id.in_(prop_ids), Sale.price_numeric.isnot(None))
+        .group_by(Sale.property_id)
+        .subquery()
+    )
+    price_rows = (
+        db.query(Sale.property_id, Sale.price_numeric)
+        .join(
+            latest_sale_sub,
+            (Sale.property_id == latest_sale_sub.c.property_id)
+            & (Sale.date_sold_iso == latest_sale_sub.c.max_date),
+        )
+        .filter(Sale.price_numeric.isnot(None))
+        .all()
+    )
+    price_map = {row[0]: row[1] for row in price_rows}
+
+    result = []
+    for p in props:
+        if p.latitude is None or p.longitude is None:
+            continue
+        result.append(PropertyGeoPoint(
+            id=p.id,
+            address=p.address,
+            postcode=p.postcode,
+            latitude=p.latitude,
+            longitude=p.longitude,
+            latest_price=price_map.get(p.id),
+            property_type=p.property_type,
+            bedrooms=p.bedrooms,
+            epc_rating=p.epc_rating,
+            flood_risk_level=p.flood_risk_level,
+        ))
+
+    return result
+
+
+@router.get("/properties/{property_id}", response_model=PropertyDetail, response_model_exclude_none=True)
 def get_property(property_id: int, db: Session = Depends(get_db)):
     """Get a single property with its full sale history."""
-    prop = db.query(Property).filter(Property.id == property_id).first()
+    prop = db.query(Property).options(joinedload(Property.sales)).filter(Property.id == property_id).first()
     if not prop:
         raise HTTPException(status_code=404, detail="Property not found")
     return prop
+
+
+@router.get("/properties/{property_id}/similar", response_model=list[PropertyDetail], response_model_exclude_none=True)
+def get_similar_properties(
+    property_id: int,
+    limit: int = Query(default=5, ge=1, le=20, description="Number of similar properties to return"),
+    db: Session = Depends(get_db),
+):
+    """Find properties similar to the target based on type, bedrooms, and location."""
+    # 1. Fetch target property
+    target = (
+        db.query(Property)
+        .options(joinedload(Property.sales))
+        .filter(Property.id == property_id)
+        .first()
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    # 2. Get target's latest sale price_numeric
+    target_latest_sale = (
+        db.query(Sale)
+        .filter(Sale.property_id == target.id, Sale.price_numeric.isnot(None))
+        .order_by(Sale.date_sold_iso.desc())
+        .first()
+    )
+    if not target_latest_sale:
+        raise HTTPException(
+            status_code=404,
+            detail="Target property has no sales with price data",
+        )
+    target_price = target_latest_sale.price_numeric
+
+    # 3. Extract outcode from postcode (e.g. "SW20" from "SW20 8NE")
+    if not target.postcode:
+        raise HTTPException(
+            status_code=404,
+            detail="Target property has no postcode",
+        )
+    outcode_match = OUTCODE_RE.match(target.postcode.strip())
+    if not outcode_match:
+        raise HTTPException(
+            status_code=404,
+            detail="Could not extract outcode from target postcode",
+        )
+    target_outcode = outcode_match.group(1).upper()
+
+    # 4. Build query for similar properties
+    target_type = (target.property_type or "").strip()
+    target_beds = target.bedrooms
+    outcode_prefix = target_outcode.replace(" ", "")
+
+    # Subquery: IDs of properties in the same outcode (scoped to reduce work)
+    outcode_ids = (
+        db.query(Property.id)
+        .filter(Property.postcode_clean.like(f"{outcode_prefix}%"))
+        .filter(Property.id != target.id)
+        .subquery()
+    )
+
+    # Subquery: latest sale price per property (scoped to outcode only)
+    latest_sale_sub = (
+        db.query(
+            Sale.property_id,
+            func.max(Sale.date_sold_iso).label("max_date"),
+        )
+        .filter(Sale.price_numeric.isnot(None))
+        .filter(Sale.property_id.in_(db.query(outcode_ids.c.id)))
+        .group_by(Sale.property_id)
+        .subquery()
+    )
+    latest_price_sub = (
+        db.query(
+            Sale.property_id,
+            Sale.price_numeric.label("latest_price"),
+        )
+        .join(
+            latest_sale_sub,
+            (Sale.property_id == latest_sale_sub.c.property_id)
+            & (Sale.date_sold_iso == latest_sale_sub.c.max_date),
+        )
+        .filter(Sale.price_numeric.isnot(None))
+        .subquery()
+    )
+
+    query = (
+        db.query(Property)
+        .options(joinedload(Property.sales))
+        .join(latest_price_sub, Property.id == latest_price_sub.c.property_id)
+        .filter(Property.id != target.id)
+    )
+
+    # Property type match (case-insensitive)
+    if target_type:
+        query = query.filter(func.upper(Property.property_type) == target_type.upper())
+
+    # Bedrooms within +/- 1
+    if target_beds is not None:
+        query = query.filter(
+            Property.bedrooms >= target_beds - 1,
+            Property.bedrooms <= target_beds + 1,
+        )
+
+    # Order by price proximity and limit
+    query = query.order_by(func.abs(latest_price_sub.c.latest_price - target_price))
+    query = query.limit(limit)
+
+    results = query.all()
+    return results
 
 
 @router.get("/properties/postcode/{postcode}/status", response_model=PostcodeStatus)
 def get_postcode_status(postcode: str, db: Session = Depends(get_db)):
     """Check if we have data for a postcode, with property count and last update time."""
     postcode_clean = postcode.upper().replace("-", "").replace(" ", "")
-    props = db.query(Property).filter(func.replace(func.upper(Property.postcode), " ", "").like(f"%{postcode_clean}%")).all()
+    props = db.query(Property).filter(Property.postcode_clean == postcode_clean).all()
     if not props:
         return PostcodeStatus(has_data=False, property_count=0, last_updated=None)
     last_updated = max((p.updated_at or p.created_at) for p in props if p.updated_at or p.created_at)
     return PostcodeStatus(has_data=True, property_count=len(props), last_updated=last_updated)
 
 
-@router.get("/postcodes/suggest/{partial}", response_model=List[str])
+@router.get("/postcodes/suggest/{partial}", response_model=list[str])
 def suggest_postcodes(partial: str, db: Session = Depends(get_db)):
     """Suggest full postcodes for a partial input like 'SW20 8'.
 
-    Checks the local DB first, then scrapes Rightmove for more matches.
+    Checks the local DB first, then scrapes the source site for more matches.
     """
     partial_clean = partial.upper().replace("-", "").replace(" ", "")
 
@@ -75,7 +281,7 @@ def suggest_postcodes(partial: str, db: Session = Depends(get_db)):
         db.query(Property.postcode)
         .filter(
             Property.postcode.isnot(None),
-            func.replace(func.upper(Property.postcode), " ", "").like(f"{partial_clean}%"),
+            Property.postcode_clean.like(f"{partial_clean}%"),
         )
         .distinct()
         .all()
@@ -95,20 +301,106 @@ def suggest_postcodes(partial: str, db: Session = Depends(get_db)):
     return sorted(found)
 
 
-@router.get("/postcodes", response_model=List[PostcodeSummary])
+@router.get("/postcodes", response_model=list[PostcodeSummary])
 def list_postcodes(db: Session = Depends(get_db)):
-    """List all scraped postcodes with property counts."""
+    """List all scraped postcodes with property counts, sale counts, and last update time."""
     results = (
-        db.query(Property.postcode, func.count(Property.id).label("property_count"))
+        db.query(
+            Property.postcode,
+            func.count(Property.id).label("property_count"),
+            func.count(Sale.id).label("sale_count"),
+            func.max(Property.updated_at).label("last_updated"),
+        )
+        .outerjoin(Sale, Sale.property_id == Property.id)
         .filter(Property.postcode.isnot(None))
         .group_by(Property.postcode)
         .order_by(func.count(Property.id).desc())
         .all()
     )
     return [
-        PostcodeSummary(postcode=row.postcode, property_count=row.property_count)
+        PostcodeSummary(
+            postcode=row.postcode,
+            property_count=row.property_count,
+            sale_count=row.sale_count,
+            last_updated=row.last_updated,
+        )
         for row in results
     ]
+
+
+@router.get("/outcodes", response_model=list[OutcodeSummary])
+def list_outcodes(db: Session = Depends(get_db)):
+    """List outcodes with scraped vs total postcode counts.
+
+    Reads ONS parquet files for total postcodes per outcode and compares
+    against what has been scraped in the database.
+    """
+    import re
+    from pathlib import Path
+    import pyarrow.parquet as pq
+    from ..config import DATA_DIR
+
+    parquet_dir = DATA_DIR / "postcodes"
+
+    # 1. Get total postcodes per outcode from parquet files
+    outcode_total: dict[str, int] = {}
+    if parquet_dir.exists():
+        for f in parquet_dir.glob("*.parquet"):
+            outcode = f.stem  # e.g. "SW20"
+            try:
+                table = pq.read_table(f, columns=["postcode"])
+                outcode_total[outcode] = len(table)
+            except Exception:
+                pass
+
+    # 2. Get scraped data grouped by outcode from DB
+    rows = (
+        db.query(
+            Property.postcode,
+            func.count(Property.id).label("property_count"),
+            func.count(Sale.id).label("sale_count"),
+            func.max(Property.updated_at).label("last_updated"),
+        )
+        .outerjoin(Sale, Sale.property_id == Property.id)
+        .filter(Property.postcode.isnot(None))
+        .group_by(Property.postcode)
+        .all()
+    )
+
+    # Group DB postcodes by outcode
+    outcode_data: dict[str, dict] = {}
+    for row in rows:
+        clean = row.postcode.replace(" ", "")
+        oc = clean[:-3] if len(clean) >= 5 else clean
+        if oc not in outcode_data:
+            outcode_data[oc] = {
+                "scraped_pcs": set(),
+                "property_count": 0,
+                "sale_count": 0,
+                "last_updated": None,
+            }
+        d = outcode_data[oc]
+        d["scraped_pcs"].add(row.postcode)
+        d["property_count"] += row.property_count
+        d["sale_count"] += row.sale_count
+        if row.last_updated and (d["last_updated"] is None or row.last_updated > d["last_updated"]):
+            d["last_updated"] = row.last_updated
+
+    # 3. Merge: only include outcodes that have parquet data OR scraped data
+    all_outcodes = set(outcode_total.keys()) | set(outcode_data.keys())
+    result = []
+    for oc in sorted(all_outcodes):
+        d = outcode_data.get(oc, {})
+        result.append(OutcodeSummary(
+            outcode=oc,
+            total_postcodes=outcode_total.get(oc, 0),
+            scraped_postcodes=len(d.get("scraped_pcs", set())),
+            property_count=d.get("property_count", 0),
+            sale_count=d.get("sale_count", 0),
+            last_updated=d.get("last_updated"),
+        ))
+
+    return result
 
 
 @router.post("/export/{postcode}", response_model=ExportResponse)
@@ -122,7 +414,7 @@ def export_sales_data(postcode: str, db: Session = Depends(get_db)):
     props = (
         db.query(Property)
         .options(joinedload(Property.sales))
-        .filter(func.replace(func.upper(Property.postcode), " ", "").like(f"%{pc_clean}%"))
+        .filter(Property.postcode_clean == pc_clean)
         .all()
     )
 

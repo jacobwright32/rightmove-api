@@ -10,6 +10,8 @@ venv/
 dist/
 build/
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 .env
 .idea/
@@ -20,16 +22,23 @@ build/
 # Node
 node_modules/
 frontend/dist/
+frontend/dist_bak/
+*.tsbuildinfo
 
 # Data / exports
 *.parquet
 sales_data/
-rightmove_export.csv
+uk_house_prices_export.csv
 data/postcodes/
+data/
 
 # OS
 Thumbs.db
 .DS_Store
+nul
+
+# Secrets
+secrets/
 
 # Testing
 .pytest_cache/

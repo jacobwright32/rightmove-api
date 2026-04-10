@@ -1,4 +1,4 @@
-"""Shared test fixtures for the Rightmove API test suite."""
+"""Shared test fixtures for the UK House Prices API test suite."""
 
 import pytest
 from sqlalchemy import create_engine

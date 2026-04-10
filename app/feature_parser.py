@@ -1,22 +1,18 @@
-"""Parse structured fields from Rightmove extra_features JSON arrays."""
+"""Parse structured fields from extra_features JSON arrays."""
 
 import json
 import re
-from typing import List, Optional, Tuple
+from typing import Optional
 
-# ── word-to-number mapping ──────────────────────────────────────────────────
-_WORD_NUM = {
-    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
-    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
-}
+from .constants import FEATURE_PARSER_KEYS, WORD_TO_NUMBER
 
 _NUM_RE = re.compile(r"(\d+|one|two|three|four|five|six|seven|eight|nine|ten)", re.I)
 
 
 def _to_int(s: str) -> Optional[int]:
     low = s.lower()
-    if low in _WORD_NUM:
-        return _WORD_NUM[low]
+    if low in WORD_TO_NUMBER:
+        return WORD_TO_NUMBER[low]
     try:
         return int(s)
     except ValueError:
@@ -25,16 +21,16 @@ def _to_int(s: str) -> Optional[int]:
 
 # ── public parsers ──────────────────────────────────────────────────────────
 
-def parse_epc_rating(features: List[str]) -> Optional[str]:
+def parse_epc_rating(features: list[str]) -> Optional[str]:
     """Extract EPC rating letter (A-G) from features list."""
     for f in features:
-        m = re.search(r"(?:epc|energy).*?([A-G])\b", f, re.I)
+        m = re.search(r"(?:epc|energy)\b.*\b([A-G])\b", f, re.I)
         if m:
             return m.group(1).upper()
     return None
 
 
-def parse_council_tax_band(features: List[str]) -> Optional[str]:
+def parse_council_tax_band(features: list[str]) -> Optional[str]:
     """Extract council tax band letter (A-H)."""
     for f in features:
         m = re.search(r"council\s*tax.*?band\s*[-:.]?\s*([A-H])\b", f, re.I)
@@ -43,18 +39,21 @@ def parse_council_tax_band(features: List[str]) -> Optional[str]:
     return None
 
 
-def parse_chain_free(features: List[str]) -> Optional[bool]:
+def parse_chain_free(features: list[str]) -> Optional[bool]:
     """Determine if chain-free. Returns True/False/None."""
     for f in features:
         low = f.lower()
-        if any(kw in low for kw in ("no onward chain", "chain free", "no chain")):
+        if any(kw in low for kw in (
+            "no onward chain", "chain free", "no chain",
+            "no forward chain", "chain-free",
+        )):
             return True
         if "end of chain" in low:
             return False
     return None
 
 
-def parse_parking(features: List[str]) -> Optional[str]:
+def parse_parking(features: list[str]) -> Optional[str]:
     """Categorise parking type."""
     for f in features:
         low = f.lower()
@@ -69,15 +68,18 @@ def parse_parking(features: List[str]) -> Optional[str]:
     return None
 
 
-def parse_garden(features: List[str]) -> Optional[str]:
+def parse_garden(features: list[str]) -> Optional[str]:
     """Categorise garden/outdoor space type."""
     for f in features:
         low = f.lower()
         if "balcony" in low:
             return "Balcony"
-        if "terrace" in low and "terrace" not in low.split()[0:1]:
-            if "roof" in low or "communal" in low or "private" in low or low.strip().endswith("terrace"):
-                return "Terrace"
+        if (
+            "terrace" in low
+            and "terrace" not in low.split()[0:1]
+            and ("roof" in low or "communal" in low or "private" in low or low.strip().endswith("terrace"))
+        ):
+            return "Terrace"
         if "communal" in low and "garden" in low:
             return "Communal Garden"
         if "private" in low and "garden" in low:
@@ -89,7 +91,7 @@ def parse_garden(features: List[str]) -> Optional[str]:
     return None
 
 
-def parse_heating(features: List[str]) -> Optional[str]:
+def parse_heating(features: list[str]) -> Optional[str]:
     """Categorise heating type."""
     for f in features:
         low = f.lower()
@@ -106,7 +108,7 @@ def parse_heating(features: List[str]) -> Optional[str]:
     return None
 
 
-def parse_double_glazed(features: List[str]) -> Optional[bool]:
+def parse_double_glazed(features: list[str]) -> Optional[bool]:
     """Check if double glazed."""
     for f in features:
         if re.search(r"double\s*glaz", f, re.I):
@@ -114,7 +116,7 @@ def parse_double_glazed(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_lease(features: List[str]) -> Tuple[Optional[str], Optional[int]]:
+def parse_lease(features: list[str]) -> tuple[Optional[str], Optional[int]]:
     """Extract lease type and years remaining."""
     lease_type = None
     lease_years = None
@@ -144,7 +146,7 @@ def parse_lease(features: List[str]) -> Tuple[Optional[str], Optional[int]]:
     return lease_type, lease_years
 
 
-def parse_receptions(features: List[str]) -> Optional[int]:
+def parse_receptions(features: list[str]) -> Optional[int]:
     """Extract number of reception rooms."""
     for f in features:
         low = f.lower()
@@ -160,22 +162,22 @@ def parse_receptions(features: List[str]) -> Optional[int]:
 
 # ── NEW parsers ─────────────────────────────────────────────────────────────
 
-def parse_furnished(features: List[str]) -> Optional[str]:
+def parse_furnished(features: list[str]) -> Optional[str]:
     """Extract furnished status: Furnished / Unfurnished / Part Furnished / None."""
     for f in features:
         low = f.lower().strip().rstrip(".")
-        if "unfurnished" in low and "furnished" in low:
-            return "Flexible"
         if "part furnished" in low or "part-furnished" in low:
             return "Part Furnished"
-        if low in ("unfurnished", "unfurnished."):
+        if low == "unfurnished":
             return "Unfurnished"
         if low == "furnished":
             return "Furnished"
+        if "unfurnished" in low and "furnished" in low.replace("unfurnished", ""):
+            return "Flexible"
     return None
 
 
-def parse_period_property(features: List[str]) -> Optional[bool]:
+def parse_period_property(features: list[str]) -> Optional[bool]:
     """Check if property has period features."""
     for f in features:
         if re.search(r"period\s*(features|property|house|home|character)", f, re.I):
@@ -183,7 +185,7 @@ def parse_period_property(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_utility_room(features: List[str]) -> Optional[bool]:
+def parse_has_utility_room(features: list[str]) -> Optional[bool]:
     """Check for utility room."""
     for f in features:
         if re.search(r"utility\s*room", f, re.I):
@@ -191,7 +193,7 @@ def parse_has_utility_room(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_conservatory(features: List[str]) -> Optional[bool]:
+def parse_has_conservatory(features: list[str]) -> Optional[bool]:
     """Check for conservatory."""
     for f in features:
         if "conservatory" in f.lower():
@@ -199,7 +201,7 @@ def parse_has_conservatory(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_ensuite(features: List[str]) -> Optional[bool]:
+def parse_has_ensuite(features: list[str]) -> Optional[bool]:
     """Check for en-suite bathroom."""
     for f in features:
         if re.search(r"en[\s-]?suite", f, re.I):
@@ -207,7 +209,7 @@ def parse_has_ensuite(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_cloakroom(features: List[str]) -> Optional[bool]:
+def parse_has_cloakroom(features: list[str]) -> Optional[bool]:
     """Check for downstairs cloakroom/WC."""
     for f in features:
         low = f.lower()
@@ -216,34 +218,47 @@ def parse_has_cloakroom(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_floor_level(features: List[str]) -> Optional[str]:
+def parse_floor_level(features: list[str]) -> Optional[str]:
     """Extract floor level for flats/maisonettes."""
     for f in features:
         low = f.lower()
-        if "ground floor" in low:
+        if "ground floor" in low or "lower ground" in low:
             return "Ground"
         if "first floor" in low:
             return "First"
         if "second floor" in low:
             return "Second"
+        if "third floor" in low or "3rd floor" in low:
+            return "Third"
+        if re.search(r"(fourth|4th|fifth|5th|sixth|6th|seventh|7th|eighth|8th|ninth|9th|tenth|10th|\d+th)\s*floor", low):
+            return "Upper"
         if "top floor" in low:
             return "Top"
-        if "basement" in low or "lower ground" in low:
+        if "basement" in low:
             return "Basement"
     return None
 
 
-def parse_sq_ft(features: List[str]) -> Optional[int]:
-    """Extract approximate square footage."""
+def parse_sq_ft(features: list[str]) -> Optional[int]:
+    """Extract approximate square footage (also converts sq m to sq ft)."""
     for f in features:
         # "Over 700sq ft", "797 Sq Ft", "3000 Sq Ft Plus", "1,200 sq ft"
         m = re.search(r"([\d,]+)\s*sq\s*\.?\s*ft", f, re.I)
         if m:
             return int(m.group(1).replace(",", ""))
+    # Fallback: convert square metres to square feet
+    for f in features:
+        m = re.search(r"([\d,]+(?:\.\d+)?)\s*sq\s*\.?\s*m\b", f, re.I)
+        if m:
+            try:
+                sqm = float(m.group(1).replace(",", ""))
+                return int(round(sqm * 10.764))
+            except ValueError:
+                continue
     return None
 
 
-def parse_service_charge(features: List[str]) -> Optional[int]:
+def parse_service_charge(features: list[str]) -> Optional[int]:
     """Extract annual service charge in pounds."""
     for f in features:
         # "Service Charge - £1,165 per annum", "Service Charge - £249.70 PA"
@@ -253,7 +268,7 @@ def parse_service_charge(features: List[str]) -> Optional[int]:
     return None
 
 
-def parse_ground_rent(features: List[str]) -> Optional[int]:
+def parse_ground_rent(features: list[str]) -> Optional[int]:
     """Extract annual ground rent in pounds."""
     for f in features:
         m = re.search(r"ground\s*rent.*?[\u00a3$]([\d,]+(?:\.\d+)?)", f, re.I)
@@ -262,7 +277,7 @@ def parse_ground_rent(features: List[str]) -> Optional[int]:
     return None
 
 
-def parse_has_wooden_floors(features: List[str]) -> Optional[bool]:
+def parse_has_wooden_floors(features: list[str]) -> Optional[bool]:
     """Check for wooden/hardwood flooring."""
     for f in features:
         if re.search(r"wood(?:en)?\s*floor", f, re.I) or re.search(r"hardwood\s*floor", f, re.I):
@@ -270,7 +285,7 @@ def parse_has_wooden_floors(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_gym(features: List[str]) -> Optional[bool]:
+def parse_has_gym(features: list[str]) -> Optional[bool]:
     """Check for gym (residents/communal)."""
     for f in features:
         if re.search(r"\bgym\b", f, re.I):
@@ -278,7 +293,7 @@ def parse_has_gym(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_lift(features: List[str]) -> Optional[bool]:
+def parse_has_lift(features: list[str]) -> Optional[bool]:
     """Check for lift/elevator."""
     for f in features:
         low = f.lower().strip()
@@ -287,7 +302,7 @@ def parse_has_lift(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_dining_room(features: List[str]) -> Optional[bool]:
+def parse_has_dining_room(features: list[str]) -> Optional[bool]:
     """Check for separate dining room."""
     for f in features:
         if re.search(r"\bdining\s*room\b", f, re.I):
@@ -295,7 +310,7 @@ def parse_has_dining_room(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_ev_charger(features: List[str]) -> Optional[bool]:
+def parse_has_ev_charger(features: list[str]) -> Optional[bool]:
     """Check for EV charger / charging point."""
     for f in features:
         if re.search(r"\bev\s*charg|charging\s*point", f, re.I):
@@ -303,7 +318,7 @@ def parse_has_ev_charger(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_fireplace(features: List[str]) -> Optional[bool]:
+def parse_has_fireplace(features: list[str]) -> Optional[bool]:
     """Check for fireplace/log burner."""
     for f in features:
         if re.search(r"fireplace|log\s*burner|wood\s*burner|open\s*fire|wood burning stove", f, re.I):
@@ -311,7 +326,7 @@ def parse_has_fireplace(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_study(features: List[str]) -> Optional[bool]:
+def parse_has_study(features: list[str]) -> Optional[bool]:
     """Check for study/home office."""
     for f in features:
         low = f.lower().strip()
@@ -324,7 +339,7 @@ def parse_has_study(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_shower_room(features: List[str]) -> Optional[bool]:
+def parse_has_shower_room(features: list[str]) -> Optional[bool]:
     """Check for separate shower room (distinct from bathroom)."""
     for f in features:
         if re.search(r"shower\s*room", f, re.I):
@@ -332,7 +347,7 @@ def parse_has_shower_room(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_fitted_wardrobes(features: List[str]) -> Optional[bool]:
+def parse_has_fitted_wardrobes(features: list[str]) -> Optional[bool]:
     """Check for fitted/built-in wardrobes."""
     for f in features:
         if re.search(r"fitted\s*wardrobe|built[\s-]?in\s*wardrobe", f, re.I):
@@ -340,7 +355,7 @@ def parse_has_fitted_wardrobes(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_new_build(features: List[str]) -> Optional[bool]:
+def parse_new_build(features: list[str]) -> Optional[bool]:
     """Check if new build/development."""
     for f in features:
         if re.search(r"\bnew\s*build\b|new\s*development\b", f, re.I):
@@ -348,7 +363,7 @@ def parse_new_build(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_concierge(features: List[str]) -> Optional[bool]:
+def parse_has_concierge(features: list[str]) -> Optional[bool]:
     """Check for concierge/porter service."""
     for f in features:
         if re.search(r"\bconcierge\b|\bporter\b", f, re.I):
@@ -356,7 +371,7 @@ def parse_has_concierge(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_swimming_pool(features: List[str]) -> Optional[bool]:
+def parse_has_swimming_pool(features: list[str]) -> Optional[bool]:
     """Check for swimming pool."""
     for f in features:
         if re.search(r"swimming\s*pool", f, re.I):
@@ -364,7 +379,7 @@ def parse_has_swimming_pool(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_air_conditioning(features: List[str]) -> Optional[bool]:
+def parse_has_air_conditioning(features: list[str]) -> Optional[bool]:
     """Check for air conditioning."""
     for f in features:
         if re.search(r"air\s*condition", f, re.I):
@@ -372,7 +387,7 @@ def parse_has_air_conditioning(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_solar_panels(features: List[str]) -> Optional[bool]:
+def parse_has_solar_panels(features: list[str]) -> Optional[bool]:
     """Check for solar panels."""
     for f in features:
         if re.search(r"solar\s*panel", f, re.I):
@@ -380,7 +395,7 @@ def parse_has_solar_panels(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_loft(features: List[str]) -> Optional[bool]:
+def parse_has_loft(features: list[str]) -> Optional[bool]:
     """Check for loft room/conversion/storage."""
     for f in features:
         if re.search(r"\bloft\b", f, re.I):
@@ -388,7 +403,7 @@ def parse_has_loft(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_entrance_hall(features: List[str]) -> Optional[bool]:
+def parse_has_entrance_hall(features: list[str]) -> Optional[bool]:
     """Check for entrance hall/hallway."""
     for f in features:
         if re.search(r"entrance\s*(hall|foyer)", f, re.I):
@@ -396,7 +411,7 @@ def parse_has_entrance_hall(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_white_goods(features: List[str]) -> Optional[bool]:
+def parse_has_white_goods(features: list[str]) -> Optional[bool]:
     """Check for white goods included."""
     for f in features:
         low = f.lower()
@@ -407,7 +422,7 @@ def parse_has_white_goods(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_has_bay_window(features: List[str]) -> Optional[bool]:
+def parse_has_bay_window(features: list[str]) -> Optional[bool]:
     """Check for bay window."""
     for f in features:
         if re.search(r"bay\s*window", f, re.I):
@@ -415,17 +430,20 @@ def parse_has_bay_window(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_distance_to_station(features: List[str]) -> Optional[float]:
+def parse_distance_to_station(features: list[str]) -> Optional[float]:
     """Extract distance to nearest station in miles."""
     for f in features:
         # "0.2 Miles to Raynes Park Station", "0.4 Miles From..."
         m = re.search(r"([\d.]+)\s*mile", f, re.I)
         if m and re.search(r"station", f, re.I):
-            return float(m.group(1))
+            try:
+                return float(m.group(1).rstrip("."))
+            except ValueError:
+                continue
     return None
 
 
-def parse_has_intercom(features: List[str]) -> Optional[bool]:
+def parse_has_intercom(features: list[str]) -> Optional[bool]:
     """Check for intercom/entry phone system."""
     for f in features:
         if re.search(r"intercom|entry\s*phone|entryphone", f, re.I):
@@ -433,7 +451,7 @@ def parse_has_intercom(features: List[str]) -> Optional[bool]:
     return None
 
 
-def parse_split_level(features: List[str]) -> Optional[bool]:
+def parse_split_level(features: list[str]) -> Optional[bool]:
     """Check for split level property."""
     for f in features:
         if re.search(r"split\s*level", f, re.I):
@@ -441,24 +459,618 @@ def parse_split_level(features: List[str]) -> Optional[bool]:
     return None
 
 
+# ── NEW v2 parsers ─────────────────────────────────────────────────────────
+
+
+def parse_has_cellar(features: list[str]) -> Optional[bool]:
+    """Check for cellar/basement storage space."""
+    for f in features:
+        low = f.lower()
+        if "cellar" in low or "undercroft" in low:
+            return True
+        # Only match "basement" when it's clearly a room, not a floor level
+        if low.strip() in ("basement", "basement room", "basement storage"):
+            return True
+    return None
+
+
+def parse_has_roof_terrace(features: list[str]) -> Optional[bool]:
+    """Check for roof terrace."""
+    for f in features:
+        if re.search(r"roof\s*terrace", f, re.I):
+            return True
+    return None
+
+
+def parse_has_high_ceilings(features: list[str]) -> Optional[bool]:
+    """Check for high ceilings."""
+    for f in features:
+        if re.search(r"high\s*ceiling", f, re.I):
+            return True
+    return None
+
+
+def parse_has_open_plan(features: list[str]) -> Optional[bool]:
+    """Check for open plan layout."""
+    for f in features:
+        if re.search(r"open[\s-]*plan", f, re.I):
+            return True
+    return None
+
+
+def parse_has_gated(features: list[str]) -> Optional[bool]:
+    """Check for gated development/community."""
+    for f in features:
+        if re.search(r"\bgated\b", f, re.I):
+            return True
+    return None
+
+
+def parse_purpose_built(features: list[str]) -> Optional[bool]:
+    """Check for purpose-built property."""
+    for f in features:
+        if re.search(r"purpose[\s-]*built", f, re.I):
+            return True
+    return None
+
+
+def parse_refurbished(features: list[str]) -> Optional[bool]:
+    """Check if recently refurbished/renovated."""
+    for f in features:
+        if re.search(
+            r"(newly|recently)\s*(refurbish|renovate|decorat|fitted|updated)"
+            r"|refurbished|renovated",
+            f, re.I,
+        ):
+            return True
+    return None
+
+
+def parse_duplex(features: list[str]) -> Optional[bool]:
+    """Check for duplex property."""
+    for f in features:
+        if re.search(r"\bduplex\b", f, re.I):
+            return True
+    return None
+
+
+def parse_penthouse(features: list[str]) -> Optional[bool]:
+    """Check for penthouse property."""
+    for f in features:
+        if re.search(r"\bpenthouse\b", f, re.I):
+            return True
+    return None
+
+
+def parse_own_front_door(features: list[str]) -> Optional[bool]:
+    """Check for own front door (independent entrance for a flat)."""
+    for f in features:
+        if re.search(r"own\s*front\s*door", f, re.I):
+            return True
+    return None
+
+
+def parse_private_entrance(features: list[str]) -> Optional[bool]:
+    """Check for private entrance."""
+    for f in features:
+        if re.search(r"private\s*entrance", f, re.I):
+            return True
+    return None
+
+
+def parse_has_bike_storage(features: list[str]) -> Optional[bool]:
+    """Check for bike/cycle storage."""
+    for f in features:
+        if re.search(r"(bike|cycle|bicycle)\s*stor", f, re.I):
+            return True
+    return None
+
+
+def parse_cul_de_sac(features: list[str]) -> Optional[bool]:
+    """Check for cul-de-sac location."""
+    for f in features:
+        if re.search(r"cul[\s-]*de[\s-]*sac", f, re.I):
+            return True
+    return None
+
+
+def parse_conservation_area(features: list[str]) -> Optional[bool]:
+    """Check if in a conservation area."""
+    for f in features:
+        if re.search(r"conservation\s*area", f, re.I):
+            return True
+    return None
+
+
+def parse_has_annexe(features: list[str]) -> Optional[bool]:
+    """Check for annexe/annex."""
+    for f in features:
+        if re.search(r"\bannex[e]?\b", f, re.I):
+            return True
+    return None
+
+
+def parse_has_views(features: list[str]) -> Optional[bool]:
+    """Check for notable views (river, sea, park, city, panoramic, etc.)."""
+    for f in features:
+        if re.search(
+            r"(river|sea|park|garden|city|panoramic|rural|country|woodland|lake|"
+            r"mountain|canal|harbour|harbor|ocean|thames)\s*view",
+            f, re.I,
+        ):
+            return True
+        if re.search(r"view(s)?\s*(of|over|across)\s*(the\s*)?(river|sea|park|city|thames|canal|lake)", f, re.I):
+            return True
+    return None
+
+
+def parse_underground_parking(features: list[str]) -> Optional[bool]:
+    """Check for underground/basement parking."""
+    for f in features:
+        if re.search(r"underground\s*park", f, re.I):
+            return True
+    return None
+
+
+def parse_allocated_parking(features: list[str]) -> Optional[bool]:
+    """Check for allocated parking space."""
+    for f in features:
+        if re.search(r"allocat\w*\s*park", f, re.I):
+            return True
+    return None
+
+
+def parse_garden_facing(features: list[str]) -> Optional[str]:
+    """Extract garden/property orientation: South, West, East, North."""
+    for f in features:
+        if re.search(r"south\s*fac", f, re.I):
+            return "South"
+        if re.search(r"west\s*fac", f, re.I):
+            return "West"
+        if re.search(r"east\s*fac", f, re.I):
+            return "East"
+        if re.search(r"north\s*fac", f, re.I):
+            return "North"
+    return None
+
+
+def parse_property_era(features: list[str]) -> Optional[str]:
+    """Extract property era: Victorian, Edwardian, Georgian, Art Deco, Period."""
+    for f in features:
+        low = f.lower()
+        if "victorian" in low:
+            return "Victorian"
+        if "edwardian" in low:
+            return "Edwardian"
+        if "georgian" in low:
+            return "Georgian"
+        if re.search(r"art\s*deco", low):
+            return "Art Deco"
+    return None
+
+
+def parse_condition(features: list[str]) -> Optional[str]:
+    """Extract property condition: Excellent, Good, Immaculate, Fair."""
+    for f in features:
+        low = f.lower().strip()
+        if re.search(r"\bimmaculate\b", low):
+            return "Immaculate"
+        if re.search(r"\bexcellent\s*condition\b", low):
+            return "Excellent"
+        if re.search(r"\bgood\s*condition\b", low):
+            return "Good"
+        if re.search(r"\bfair\s*condition\b", low):
+            return "Fair"
+    return None
+
+
+def parse_kitchen_type(features: list[str]) -> Optional[str]:
+    """Extract kitchen layout type."""
+    for f in features:
+        low = f.lower()
+        if re.search(r"open[\s-]*plan\s*kitchen", low):
+            return "Open Plan"
+        if re.search(r"kitchen[\s/]*(din(er|ing)|breakfast)", low):
+            return "Kitchen Diner"
+        if re.search(r"eat[\s-]*in\s*kitchen", low):
+            return "Eat-in"
+        if re.search(r"separate\s*kitchen", low):
+            return "Separate"
+    return None
+
+
+def parse_listed_building(features: list[str]) -> Optional[bool]:
+    """Check for listed building status."""
+    for f in features:
+        if re.search(r"\blisted\s*(building|property|grade)", f, re.I):
+            return True
+        if re.search(r"grade\s*(i{1,3}|[12])\s*listed", f, re.I):
+            return True
+    return None
+
+
+# ── NEW v3 parsers ─────────────────────────────────────────────────────────
+
+
+def parse_extended(features: list[str]) -> Optional[bool]:
+    """Check if property has been extended (side return, loft extension, etc.)."""
+    for f in features:
+        low = f.lower()
+        if re.search(r"\bextend(ed|sion)\b", low) and "potential" not in low:
+            return True
+        if "side return" in low:
+            return True
+    return None
+
+
+def parse_has_outbuilding(features: list[str]) -> Optional[bool]:
+    """Check for outbuilding, garden room, summer house, workshop, etc."""
+    for f in features:
+        if re.search(
+            r"\b(outbuilding|summer\s*house|garden\s*room|garden\s*office"
+            r"|workshop|garden\s*studio|garden\s*shed)\b",
+            f, re.I,
+        ):
+            return True
+    return None
+
+
+def parse_potential_to_extend(features: list[str]) -> Optional[bool]:
+    """Check for potential to extend (STPP = Subject to Planning Permission)."""
+    for f in features:
+        if re.search(
+            r"potential\s*(to\s*)?(extend|develop|convert|improve)"
+            r"|stpp\b|subject\s*to\s*planning",
+            f, re.I,
+        ):
+            return True
+    return None
+
+
+def parse_has_walk_in_wardrobe(features: list[str]) -> Optional[bool]:
+    """Check for walk-in wardrobe/closet."""
+    for f in features:
+        if re.search(r"walk[\s-]*in\s*(wardrobe|closet|dressing)", f, re.I):
+            return True
+    return None
+
+
+def parse_has_wet_room(features: list[str]) -> Optional[bool]:
+    """Check for wet room."""
+    for f in features:
+        if re.search(r"wet\s*room", f, re.I):
+            return True
+    return None
+
+
+def parse_has_integrated_appliances(features: list[str]) -> Optional[bool]:
+    """Check for integrated/built-in kitchen appliances."""
+    for f in features:
+        if re.search(r"integrat\w*\s*appliance|built[\s-]*in\s*appliance", f, re.I):
+            return True
+    return None
+
+
+def parse_has_side_access(features: list[str]) -> Optional[bool]:
+    """Check for side access/passage."""
+    for f in features:
+        if re.search(r"side\s*(access|return|entrance|gate|passage)", f, re.I) and "extension" not in f.lower():
+            return True
+    return None
+
+
+def parse_has_video_entry(features: list[str]) -> Optional[bool]:
+    """Check for video entry/intercom/door system."""
+    for f in features:
+        if re.search(r"video\s*(entry|intercom|door)|door\s*entry", f, re.I):
+            return True
+    return None
+
+
+def parse_has_separate_living_room(features: list[str]) -> Optional[bool]:
+    """Check for separate sitting room/living room/drawing room/lounge."""
+    for f in features:
+        low = f.lower().strip()
+        if low in ("sitting room", "living room", "drawing room", "lounge",
+                    "living/dining room", "front room"):
+            return True
+        if re.search(r"^(separate|large|spacious|bright)\s*(sitting|living|drawing)\s*room$", low):
+            return True
+    return None
+
+
+def parse_has_laminate_flooring(features: list[str]) -> Optional[bool]:
+    """Check for laminate flooring."""
+    for f in features:
+        if re.search(r"laminate\s*floor", f, re.I):
+            return True
+    return None
+
+
+# ── NEW v4 parsers ─────────────────────────────────────────────────────────
+
+
+def parse_corner_plot(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"corner\s*(plot|position|site)", f, re.I):
+            return True
+    return None
+
+
+def parse_end_terrace(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"end\s*(of\s*)?terrac", f, re.I):
+            return True
+    return None
+
+
+def parse_mid_terrace(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"mid[\s-]*terrac", f, re.I):
+            return True
+    return None
+
+
+def parse_bungalow(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"\bbungalow\b", f, re.I):
+            return True
+    return None
+
+
+def parse_double_garage(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"double\s*garage", f, re.I):
+            return True
+    return None
+
+
+def parse_integral_garage(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"integral\s*garage", f, re.I):
+            return True
+    return None
+
+
+def parse_through_lounge(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"through\s*(lounge|reception|living)", f, re.I):
+            return True
+    return None
+
+
+def parse_breakfast_kitchen(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"breakfast\s*(kitchen|room|bar)|breakfasting\s*kitchen", f, re.I):
+            return True
+    return None
+
+
+def parse_rear_garden(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(rear|back)\s*garden", f, re.I):
+            return True
+    return None
+
+
+def parse_front_garden(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"front\s*garden", f, re.I):
+            return True
+    return None
+
+
+def parse_mature_garden(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(mature|established|well[\s-]*stocked)\s*garden", f, re.I):
+            return True
+    return None
+
+
+def parse_family_bathroom(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"family\s*bathroom", f, re.I):
+            return True
+    return None
+
+
+def parse_guest_wc(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"guest\s*(wc|w/c|toilet|cloakroom)", f, re.I):
+            return True
+    return None
+
+
+def parse_dressing_room(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"dressing\s*room", f, re.I):
+            return True
+    return None
+
+
+def parse_snug(features: list[str]) -> Optional[bool]:
+    for f in features:
+        low = f.lower().strip()
+        if low == "snug" or re.search(r"\bsnug\b", low):
+            return True
+    return None
+
+
+def parse_porch(features: list[str]) -> Optional[bool]:
+    for f in features:
+        low = f.lower().strip()
+        if low == "porch" or re.search(r"\bporch\b", low):
+            return True
+    return None
+
+
+def parse_orangery(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"\borangery\b", f, re.I):
+            return True
+    return None
+
+
+def parse_pantry(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"\bpantry\b", f, re.I):
+            return True
+    return None
+
+
+def parse_boot_room(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"boot\s*room", f, re.I):
+            return True
+    return None
+
+
+def parse_games_room(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(games?|play|hobby)\s*room", f, re.I):
+            return True
+    return None
+
+
+def parse_cinema_room(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"cinema\s*room|home\s*cinema|media\s*room|home\s*theatre", f, re.I):
+            return True
+    return None
+
+
+def parse_reception_hall(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"reception\s*hall", f, re.I):
+            return True
+    return None
+
+
+def parse_garage_conversion(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"garage\s*conversion|converted\s*garage", f, re.I):
+            return True
+    return None
+
+
+def parse_needs_modernisation(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(need|in need|require).*(modernis|updat|renovat|refurb)", f, re.I):
+            return True
+    return None
+
+
+def parse_vacant_possession(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"vacant\s*possession", f, re.I):
+            return True
+    return None
+
+
+def parse_original_features(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"original\s*features|retain.*original", f, re.I):
+            return True
+    return None
+
+
+def parse_period_conversion(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"period\s*conversion|converted\s*(period|victorian|georgian|edwardian)", f, re.I):
+            return True
+    return None
+
+
+def parse_countryside_views(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(countryside|rural|field|valley|hill|rolling)\s*view", f, re.I):
+            return True
+    return None
+
+
+def parse_sea_views(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(sea|ocean|coast|beach|harbour|harbor)\s*view", f, re.I):
+            return True
+    return None
+
+
+def parse_acre_plot(features: list[str]) -> Optional[float]:
+    for f in features:
+        m = re.search(r"(\d+\.?\d*)\s*acre", f, re.I)
+        if m:
+            try:
+                return float(m.group(1))
+            except ValueError:
+                continue
+        if re.search(r"\bacreage\b", f, re.I):
+            return 1.0  # unspecified acreage
+    return None
+
+
+def parse_alarm_system(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"(burglar|security|intruder)\s*alarm|alarm\s*system", f, re.I):
+            return True
+    return None
+
+
+def parse_electric_gates(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"electric\s*gates?", f, re.I):
+            return True
+    return None
+
+
+def parse_stables(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"\bstables?\b|equestrian", f, re.I):
+            return True
+    return None
+
+
+def parse_hot_tub(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"hot\s*tub|jacuzzi", f, re.I):
+            return True
+    return None
+
+
+def parse_sauna(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"\bsauna\b", f, re.I):
+            return True
+    return None
+
+
+def parse_wine_cellar(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"wine\s*(cellar|room|store)", f, re.I):
+            return True
+    return None
+
+
+def parse_underfloor_heating(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"underfloor\s*heat", f, re.I):
+            return True
+    return None
+
+
+def parse_first_time_buy(features: list[str]) -> Optional[bool]:
+    for f in features:
+        if re.search(r"first\s*time\s*buy", f, re.I):
+            return True
+    return None
+
+
 # ── convenience: parse all fields at once ───────────────────────────────────
 
-_ALL_KEYS = [
-    "epc_rating", "council_tax_band", "chain_free", "parking", "garden",
-    "heating", "double_glazed", "lease_type", "lease_years", "receptions",
-    "furnished", "period_property", "utility_room", "conservatory", "ensuite",
-    "cloakroom", "floor_level", "sq_ft", "service_charge", "ground_rent",
-    "wooden_floors", "gym", "lift", "dining_room", "ev_charger", "fireplace",
-    "study", "shower_room", "fitted_wardrobes", "new_build", "concierge",
-    "swimming_pool", "air_conditioning", "solar_panels", "loft",
-    "entrance_hall", "white_goods", "bay_window", "distance_to_station",
-    "intercom", "split_level",
-]
 
 
 def parse_all_features(raw: Optional[str]) -> dict:
     """Parse a JSON extra_features string into a dict of structured fields."""
-    features: List[str] = []
+    features: list[str] = []
     if raw:
         try:
             parsed = json.loads(raw)
@@ -468,7 +1080,7 @@ def parse_all_features(raw: Optional[str]) -> dict:
             pass
 
     if not features:
-        return {k: None for k in _ALL_KEYS}
+        return {k: None for k in FEATURE_PARSER_KEYS}
 
     lease_type, lease_years = parse_lease(features)
 
@@ -514,4 +1126,78 @@ def parse_all_features(raw: Optional[str]) -> dict:
         "distance_to_station": parse_distance_to_station(features),
         "intercom": parse_has_intercom(features),
         "split_level": parse_split_level(features),
+        # v2 features
+        "cellar": parse_has_cellar(features),
+        "roof_terrace": parse_has_roof_terrace(features),
+        "high_ceilings": parse_has_high_ceilings(features),
+        "open_plan": parse_has_open_plan(features),
+        "gated": parse_has_gated(features),
+        "purpose_built": parse_purpose_built(features),
+        "refurbished": parse_refurbished(features),
+        "duplex": parse_duplex(features),
+        "penthouse": parse_penthouse(features),
+        "own_front_door": parse_own_front_door(features),
+        "private_entrance": parse_private_entrance(features),
+        "bike_storage": parse_has_bike_storage(features),
+        "cul_de_sac": parse_cul_de_sac(features),
+        "conservation_area": parse_conservation_area(features),
+        "annexe": parse_has_annexe(features),
+        "views": parse_has_views(features),
+        "underground_parking": parse_underground_parking(features),
+        "allocated_parking": parse_allocated_parking(features),
+        "garden_facing": parse_garden_facing(features),
+        "property_era": parse_property_era(features),
+        "condition": parse_condition(features),
+        "kitchen_type": parse_kitchen_type(features),
+        "listed_building": parse_listed_building(features),
+        # v3 features
+        "extended": parse_extended(features),
+        "outbuilding": parse_has_outbuilding(features),
+        "potential_to_extend": parse_potential_to_extend(features),
+        "walk_in_wardrobe": parse_has_walk_in_wardrobe(features),
+        "wet_room": parse_has_wet_room(features),
+        "integrated_appliances": parse_has_integrated_appliances(features),
+        "side_access": parse_has_side_access(features),
+        "video_entry": parse_has_video_entry(features),
+        "separate_living_room": parse_has_separate_living_room(features),
+        "laminate_flooring": parse_has_laminate_flooring(features),
+        # v4 features
+        "corner_plot": parse_corner_plot(features),
+        "end_terrace": parse_end_terrace(features),
+        "mid_terrace": parse_mid_terrace(features),
+        "bungalow": parse_bungalow(features),
+        "double_garage": parse_double_garage(features),
+        "integral_garage": parse_integral_garage(features),
+        "through_lounge": parse_through_lounge(features),
+        "breakfast_kitchen": parse_breakfast_kitchen(features),
+        "rear_garden": parse_rear_garden(features),
+        "front_garden": parse_front_garden(features),
+        "mature_garden": parse_mature_garden(features),
+        "family_bathroom": parse_family_bathroom(features),
+        "guest_wc": parse_guest_wc(features),
+        "dressing_room": parse_dressing_room(features),
+        "snug": parse_snug(features),
+        "porch": parse_porch(features),
+        "orangery": parse_orangery(features),
+        "pantry": parse_pantry(features),
+        "boot_room": parse_boot_room(features),
+        "games_room": parse_games_room(features),
+        "cinema_room": parse_cinema_room(features),
+        "reception_hall": parse_reception_hall(features),
+        "garage_conversion": parse_garage_conversion(features),
+        "needs_modernisation": parse_needs_modernisation(features),
+        "vacant_possession": parse_vacant_possession(features),
+        "original_features": parse_original_features(features),
+        "period_conversion": parse_period_conversion(features),
+        "countryside_views": parse_countryside_views(features),
+        "sea_views": parse_sea_views(features),
+        "acre_plot": parse_acre_plot(features),
+        "alarm_system": parse_alarm_system(features),
+        "electric_gates": parse_electric_gates(features),
+        "stables": parse_stables(features),
+        "hot_tub": parse_hot_tub(features),
+        "sauna": parse_sauna(features),
+        "wine_cellar": parse_wine_cellar(features),
+        "underfloor_heating": parse_underfloor_heating(features),
+        "first_time_buy": parse_first_time_buy(features),
     }

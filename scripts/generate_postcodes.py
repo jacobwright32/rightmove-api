@@ -32,6 +32,7 @@ def fetch_all_postcodes() -> list[str]:
     """Paginate through the ONS API and return all PCDS values."""
     postcodes: list[str] = []
     offset = 0
+    max_retries = 5
 
     while True:
         params = {
@@ -42,8 +43,19 @@ def fetch_all_postcodes() -> list[str]:
             "resultRecordCount": BATCH_SIZE,
             "resultOffset": offset,
         }
-        resp = requests.get(API_URL, params=params, timeout=30)
-        resp.raise_for_status()
+        for attempt in range(1, max_retries + 1):
+            try:
+                resp = requests.get(API_URL, params=params, timeout=60)
+                resp.raise_for_status()
+                break
+            except (requests.RequestException, requests.Timeout) as e:
+                if attempt < max_retries:
+                    wait = 2 ** attempt
+                    print(f"  request failed (attempt {attempt}/{max_retries}): {e}. Retrying in {wait}s...", flush=True)
+                    time.sleep(wait)
+                else:
+                    raise
+
         data = resp.json()
 
         features = data.get("features", [])
@@ -58,7 +70,9 @@ def fetch_all_postcodes() -> list[str]:
         print(f"  fetched {len(postcodes):,} postcodes (offset={offset})", flush=True)
         offset += BATCH_SIZE
 
-        if not data.get("exceededTransferLimit", False):
+        # Keep going if we got a full batch OR the API says there's more.
+        # The API sometimes drops exceededTransferLimit before all data is sent.
+        if len(features) < BATCH_SIZE and not data.get("exceededTransferLimit", False):
             break
 
         time.sleep(0.1)  # be polite
